@@ -1,0 +1,7 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" fill="none">
+<rect width="1280" height="720" rx="36" fill="#06112D"/>
+<path d="M0 170C180 90 330 210 530 150C700 100 860 220 1040 160C1120 134 1210 130 1280 145" stroke="#66FFDA" stroke-opacity="0.55" stroke-width="95" stroke-linecap="round"/>
+<path d="M0 240C180 170 340 260 520 220C720 170 850 270 1060 220C1150 200 1210 190 1280 205" stroke="#89A9FF" stroke-opacity="0.45" stroke-width="85" stroke-linecap="round"/>
+<path d="M0 510L150 470L280 498L420 450L560 490L720 460L880 500L1030 470L1160 496L1280 468V720H0V510Z" fill="#0F1E52"/>
+<rect x="820" y="440" width="170" height="110" rx="10" fill="#3B2B2A"/><polygon points="800,440 910,360 1020,440" fill="#E3A468"/>
+</svg>
