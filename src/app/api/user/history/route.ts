@@ -1,15 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
 import { addHistoryItem, getHistoryByUser, type MediaType } from "@/lib/history";
+import { isProd } from "@/lib/env";
 
 export async function GET(request: NextRequest) {
-  const authUser = getUserFromRequest(request);
+  const authUser = await getUserFromRequest(request);
+  if (!authUser && isProd) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userId = authUser?.id || request.nextUrl.searchParams.get("userId") || "demo-user";
   return NextResponse.json({ items: getHistoryByUser(userId) });
 }
 
 export async function POST(request: NextRequest) {
-  const authUser = getUserFromRequest(request);
+  const authUser = await getUserFromRequest(request);
+  if (!authUser && isProd) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json()) as { userId?: string; mediaType?: MediaType; urls?: string[]; prompt?: string };
   const userId = authUser?.id || body.userId || "demo-user";
   if (!body.mediaType || !Array.isArray(body.urls) || body.urls.length === 0) {

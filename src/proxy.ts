@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getAuthCookieName, getUserBySessionToken } from "@/lib/auth";
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const token = request.cookies.get(getAuthCookieName())?.value;
-  const user = getUserBySessionToken(token);
+  const user = await getUserBySessionToken(token);
 
   if (pathname.startsWith("/user")) {
     if (!user) return NextResponse.redirect(new URL("/login", request.url));

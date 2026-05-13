@@ -4,6 +4,7 @@ import { createAIGenerationTask } from "@/lib/ai/service";
 import type { CreateTaskInput } from "@/lib/ai/types";
 import { calculateTaskCost, chargeCredits, refundCredits } from "@/lib/credit";
 import { getUserFromRequest } from "@/lib/auth";
+import { isProd } from "@/lib/env";
 
 export async function POST(request: NextRequest) {
   const { ok, retryAfter } = checkRateLimit(request);
@@ -19,7 +20,11 @@ export async function POST(request: NextRequest) {
     if (!body.serviceId) {
       return NextResponse.json({ error: "serviceId is required." }, { status: 400 });
     }
-    const userId = getUserFromRequest(request)?.id || request.headers.get("x-user-id") || "demo-user";
+    const authUser = await getUserFromRequest(request);
+    if (!authUser && isProd) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = authUser?.id || request.headers.get("x-user-id") || "demo-user";
     const cost = calculateTaskCost(body);
     const charged = chargeCredits(userId, cost);
     if (!charged.ok) {
@@ -42,3 +47,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
+

@@ -10,11 +10,7 @@ type KieEnvelope<T> = {
 };
 
 function getApiKey() {
-  const apiKey = process.env.KIE_API_KEY;
-  if (!apiKey) {
-    throw new Error("KIE_API_KEY is missing on server environment.");
-  }
-  return apiKey;
+  return getKieApiKey();
 }
 
 async function kieFetch<T>(path: string, init: RequestInit): Promise<KieEnvelope<T>> {
@@ -106,3 +102,5 @@ export async function uploadFileToKie(file: File) {
 
   throw new Error(lastError);
 }
+import "server-only";
+import { getKieApiKey } from "@/lib/env";

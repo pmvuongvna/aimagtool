@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createSession, loginUser, sanitizeUser, setAuthCookie } from "@/lib/auth";
+﻿import { NextRequest, NextResponse } from "next/server";
+import { createSessionToken, loginUser, sanitizeUser, setAuthCookie } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as { email?: string; password?: string };
@@ -11,8 +11,9 @@ export async function POST(request: NextRequest) {
   const result = loginUser(email, password);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 401 });
 
-  const session = createSession(result.user.id);
+  const token = await createSessionToken(result.user);
   const response = NextResponse.json({ user: sanitizeUser(result.user) });
-  setAuthCookie(response, session.token);
+  setAuthCookie(response, token);
   return response;
 }
+

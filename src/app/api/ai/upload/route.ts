@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Upload succeeded but no file URL found in response." }, { status: 500 });
     }
 
-    return NextResponse.json({ url, payload });
+    return NextResponse.json({ url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to upload file.";
     return NextResponse.json({ error: message }, { status: 500 });

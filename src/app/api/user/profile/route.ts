@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { calculateTaskCost, getCreditSettings, getUserCredits } from "@/lib/credit";
 import type { CreateTaskInput } from "@/lib/ai/types";
 import { getUserFromRequest, sanitizeUser } from "@/lib/auth";
+import { isProd } from "@/lib/env";
 
 export async function GET(request: NextRequest) {
-  const authUser = getUserFromRequest(request);
+  const authUser = await getUserFromRequest(request);
+  if (!authUser && isProd) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const userId = authUser?.id || request.nextUrl.searchParams.get("userId") || request.headers.get("x-user-id") || "demo-user";
   const settings = getCreditSettings();
 
@@ -24,3 +28,4 @@ export async function GET(request: NextRequest) {
     previewCosts,
   });
 }
+

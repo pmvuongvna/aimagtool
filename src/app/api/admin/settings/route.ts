@@ -1,22 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getCreditSettings, setUserCredits, updateCreditSettings } from "@/lib/credit";
 import { getUserFromRequest } from "@/lib/auth";
+import { getAdminToken } from "@/lib/env";
 
-function isAdmin(request: NextRequest) {
-  const authUser = getUserFromRequest(request);
+async function isAdmin(request: NextRequest) {
+  const authUser = await getUserFromRequest(request);
   if (authUser?.role === "admin") return true;
   const token = request.headers.get("x-admin-token");
-  const expected = process.env.ADMIN_TOKEN || "dev-admin-token";
-  return token === expected;
+  return token === getAdminToken();
 }
 
 export async function GET(request: NextRequest) {
-  if (!isAdmin(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   return NextResponse.json({ settings: getCreditSettings() });
 }
 
 export async function PUT(request: NextRequest) {
-  if (!isAdmin(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json()) as {
     settings?: {
       creditPackages?: Array<{ id: string; name: string; credits: number; priceVnd: number; badge?: string; active: boolean }>;
