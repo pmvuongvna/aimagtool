@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
 
   if (!email || !password) return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
 
-  const result = loginUser(email, password);
+  const result = await loginUser(email, password);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 401 });
 
   const token = await createSessionToken(result.user);

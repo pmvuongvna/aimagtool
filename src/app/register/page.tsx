@@ -23,7 +23,7 @@ export default function RegisterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
       });
-      const payload = (await res.json()) as { error?: string };
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setError(payload.error || "Register failed.");
         return;

@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   if (!email.includes("@")) return NextResponse.json({ error: "Invalid email address." }, { status: 400 });
   if (password.length < 6) return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
 
-  const result = registerUser(name, email, password);
+  const result = await registerUser(name, email, password);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 409 });
 
   const token = await createSessionToken(result.user);

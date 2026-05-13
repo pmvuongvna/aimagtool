@@ -22,7 +22,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const payload = (await res.json()) as { error?: string };
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setError(payload.error || "Login failed.");
         return;

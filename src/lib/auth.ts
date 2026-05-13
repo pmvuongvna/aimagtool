@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { getAdminCredentials, getSessionSecret, allowDemoAuth } from "@/lib/env";
+import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 
 export type AuthRole = "user" | "admin";
 
@@ -97,13 +98,35 @@ export async function verifySessionToken(token?: string | null) {
   }
 }
 
-export function registerUser(name: string, email: string, password: string) {
-  if (!allowDemoAuth()) {
-    return { ok: false as const, error: "Registration requires database setup in production." };
+export async function registerUser(name: string, email: string, password: string) {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (hasDatabase()) {
+    await ensureSchema();
+    const pool = getPool();
+    const existing = await pool.query("SELECT id FROM auth_users WHERE email = $1 LIMIT 1", [normalizedEmail]);
+    if ((existing.rowCount || 0) > 0) return { ok: false as const, error: "Email already exists." };
+
+    const id = createId("user");
+    const user: AuthUser = {
+      id,
+      name: name.trim(),
+      email: normalizedEmail,
+      passwordHash: pseudoHashPassword(password),
+      role: "user",
+      createdAt: new Date().toISOString(),
+    };
+
+    await pool.query(
+      "INSERT INTO auth_users (id, name, email, password_hash, role, created_at) VALUES ($1,$2,$3,$4,$5,$6)",
+      [user.id, user.name, user.email, user.passwordHash, user.role, user.createdAt],
+    );
+    return { ok: true as const, user };
   }
 
+  if (!allowDemoAuth()) return { ok: false as const, error: "Registration is disabled." };
+
   const state = getState();
-  const normalizedEmail = normalizeEmail(email);
   if (state.userIdByEmail.has(normalizedEmail)) {
     return { ok: false as const, error: "Email already exists." };
   }
@@ -123,7 +146,7 @@ export function registerUser(name: string, email: string, password: string) {
   return { ok: true as const, user };
 }
 
-export function loginUser(email: string, password: string) {
+export async function loginUser(email: string, password: string) {
   const normalizedEmail = normalizeEmail(email);
   const adminCreds = getAdminCredentials();
 
@@ -137,6 +160,38 @@ export function loginUser(email: string, password: string) {
         passwordHash: "",
         role: "admin" as const,
         createdAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  if (hasDatabase()) {
+    await ensureSchema();
+    const pool = getPool();
+    const result = await pool.query(
+      "SELECT id, name, email, password_hash, role, created_at FROM auth_users WHERE email = $1 LIMIT 1",
+      [normalizedEmail],
+    );
+    if ((result.rowCount || 0) === 0) return { ok: false as const, error: "Invalid email or password." };
+    const row = result.rows[0] as {
+      id: string;
+      name: string;
+      email: string;
+      password_hash: string;
+      role: AuthRole;
+      created_at: string;
+    };
+    if (row.password_hash !== pseudoHashPassword(password)) {
+      return { ok: false as const, error: "Invalid email or password." };
+    }
+    return {
+      ok: true as const,
+      user: {
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        passwordHash: row.password_hash,
+        role: row.role,
+        createdAt: new Date(row.created_at).toISOString(),
       },
     };
   }
