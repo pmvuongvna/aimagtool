@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { AIServiceId, CreateTaskInput, ImageResolution } from "@/lib/ai/types";
-import { apiPath } from "@/lib/api-url";
+import { apiFetch, apiPath } from "@/lib/api-url";
 import styles from "./generate.module.css";
 
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
@@ -87,7 +87,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   useEffect(() => {
     async function loadProfile() {
-      const res = await fetch(apiPath(`/api/user/profile?userId=${encodeURIComponent(userId)}`));
+      const res = await apiFetch(apiPath(`/api/user/profile?userId=${encodeURIComponent(userId)}`));
       if (!res.ok) return;
       const data = (await res.json()) as ProfileResponse & { user?: { id: string; name: string } | null };
       if (data.user?.id && data.user.id !== userId) setUserId(data.user.id);
@@ -100,7 +100,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   useEffect(() => {
     async function loadPackages() {
-      const res = await fetch(apiPath("/api/public/credit-packages"));
+      const res = await apiFetch(apiPath("/api/public/credit-packages"));
       if (!res.ok) return;
       const payload = (await res.json()) as { packages?: CreditPackage[] };
       setPackages(payload.packages || []);
@@ -110,7 +110,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   useEffect(() => {
     async function loadHistory() {
-      const res = await fetch(apiPath(`/api/user/history?userId=${encodeURIComponent(userId)}`));
+      const res = await apiFetch(apiPath(`/api/user/history?userId=${encodeURIComponent(userId)}`));
       if (!res.ok) return;
       const data = (await res.json()) as { items?: HistoryItem[] };
       setHistory((data.items || []).filter((x) => x.mediaType === "image"));
@@ -119,7 +119,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, [userId]);
 
   const checkTask = useCallback(async (targetTaskId: string) => {
-    const res = await fetch(apiPath(`/api/ai/task/${targetTaskId}`));
+    const res = await apiFetch(apiPath(`/api/ai/task/${targetTaskId}`));
     const payload = (await res.json()) as Record<string, unknown>;
     if (!res.ok) {
       setStatusText("Không đọc được trạng thái task.");
@@ -153,7 +153,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(apiPath("/api/ai/upload"), { method: "POST", body: fd });
+      const res = await apiFetch(apiPath("/api/ai/upload"), { method: "POST", body: fd });
       const payload = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !payload.url) {
         setStatusText(payload.error || "Upload thất bại.");
@@ -188,7 +188,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
     const taskIds: string[] = [];
     for (let i = 0; i < quantity; i += 1) {
-      const res = await fetch(apiPath("/api/ai/create-task"), {
+      const res = await apiFetch(apiPath("/api/ai/create-task"), {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": userId },
         body: JSON.stringify(body),
@@ -217,7 +217,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     setLoading(false);
 
     if (uniqueUrls.length > 0) {
-      const r = await fetch(apiPath("/api/user/history"), {
+      const r = await apiFetch(apiPath("/api/user/history"), {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": userId },
         body: JSON.stringify({ mediaType: "image", urls: uniqueUrls, prompt }),
@@ -230,7 +230,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }
 
   async function handleLogout() {
-    await fetch(apiPath("/api/auth/logout"), { method: "POST" });
+    await apiFetch(apiPath("/api/auth/logout"), { method: "POST" });
     router.push("/login");
   }
 
@@ -426,6 +426,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     </div>
   );
 }
+
 
 
 

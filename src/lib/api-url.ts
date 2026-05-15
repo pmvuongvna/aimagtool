@@ -4,3 +4,10 @@ export function apiPath(path: string) {
   if (!base) return normalizedPath;
   return `${base.replace(/\/+$/, "")}${normalizedPath}`;
 }
+
+export function apiFetch(input: string, init?: RequestInit) {
+  return fetch(input, {
+    credentials: "include",
+    ...init,
+  });
+}

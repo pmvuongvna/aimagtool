@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { apiPath } from "@/lib/api-url";
+import { apiFetch, apiPath } from "@/lib/api-url";
 import styles from "../auth.module.css";
 
 export default function RegisterPage() {
@@ -19,7 +19,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(apiPath("/api/auth/register"), {
+      const res = await apiFetch(apiPath("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
@@ -65,3 +65,4 @@ export default function RegisterPage() {
     </main>
   );
 }
+

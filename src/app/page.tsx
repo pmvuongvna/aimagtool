@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { apiPath } from "@/lib/api-url";
+import { apiFetch, apiPath } from "@/lib/api-url";
 import styles from "./page.module.css";
 
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string; active?: boolean };
@@ -12,7 +12,7 @@ export default function HomePage() {
 
   useEffect(() => {
     async function loadPackages() {
-      const res = await fetch(apiPath("/api/public/credit-packages"));
+      const res = await apiFetch(apiPath("/api/public/credit-packages"));
       if (!res.ok) return;
       const payload = (await res.json()) as { packages?: CreditPackage[] };
       setPackages(payload.packages || []);
@@ -199,6 +199,7 @@ export default function HomePage() {
     </div>
   );
 }
+
 
 
 
