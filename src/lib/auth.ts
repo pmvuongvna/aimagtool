@@ -242,22 +242,26 @@ export function sanitizeUser(user: Pick<AuthUser, "id" | "name" | "email" | "rol
 }
 
 export function setAuthCookie(response: NextResponse, token: string) {
+  const cookieDomain = process.env.AUTH_COOKIE_DOMAIN?.trim();
   response.cookies.set(AUTH_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
+    domain: cookieDomain || undefined,
   });
 }
 
 export function clearAuthCookie(response: NextResponse) {
+  const cookieDomain = process.env.AUTH_COOKIE_DOMAIN?.trim();
   response.cookies.set(AUTH_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 0,
+    domain: cookieDomain || undefined,
   });
 }
 
