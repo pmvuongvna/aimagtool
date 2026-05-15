@@ -90,10 +90,10 @@ export default function AdminPage() {
   return (
     <main className="admin-v2">
       <header className="admin-header">
-        <div>
-          <p className="admin-kicker">Control Plane</p>
+        <div className="admin-header-main">
+          <p className="admin-kicker">SYSTEM CONTROL</p>
           <h1>Admin Console</h1>
-          <p className="admin-status">{status}</p>
+          <p className="admin-status">Status: {status}</p>
         </div>
         <div className="admin-header-actions">
           <Link href="/user" className="chip-btn dark">Open Studio</Link>
@@ -173,7 +173,7 @@ export default function AdminPage() {
               rows={10}
               value={packageJson}
               onChange={(e) => setPackageJson(e.target.value)}
-              placeholder='[{"id":"starter","name":"Starter","credits":500,"priceVnd":99000,"badge":"Phá»• biáº¿n","active":true}]'
+              placeholder='[{"id":"starter","name":"Starter","credits":500,"priceVnd":99000,"badge":"Pho bien","active":true}]'
             />
           </label>
 
