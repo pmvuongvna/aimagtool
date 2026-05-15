@@ -23,12 +23,12 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      const payload = (await res.json().catch(() => ({}))) as { error?: string; user?: { role?: "user" | "admin" } };
       if (!res.ok) {
         setError(payload.error || "Login failed.");
         return;
       }
-      router.push("/user");
+      router.push(payload.user?.role === "admin" ? "/admin" : "/user");
     } finally {
       setLoading(false);
     }
