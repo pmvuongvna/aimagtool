@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { CreateTaskInput, VideoMode, VideoResolution } from "@/lib/ai/types";
+import { apiPath } from "@/lib/api-url";
 import styles from "../generate.module.css";
 
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
@@ -109,7 +110,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
 
   useEffect(() => {
     async function loadProfile() {
-      const res = await fetch(`/api/user/profile?userId=${encodeURIComponent(userId)}`);
+      const res = await fetch(apiPath(`/api/user/profile?userId=${encodeURIComponent(userId)}`));
       if (!res.ok) return;
       const data = (await res.json()) as ProfileResponse & { user?: { id: string; name: string } | null };
       if (data.user?.id && data.user.id !== userId) setUserId(data.user.id);
@@ -122,7 +123,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
 
   useEffect(() => {
     async function loadPackages() {
-      const res = await fetch("/api/public/credit-packages");
+      const res = await fetch(apiPath("/api/public/credit-packages"));
       if (!res.ok) return;
       const payload = (await res.json()) as { packages?: CreditPackage[] };
       setPackages(payload.packages || []);
@@ -132,7 +133,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
 
   useEffect(() => {
     async function loadHistory() {
-      const res = await fetch(`/api/user/history?userId=${encodeURIComponent(userId)}`);
+      const res = await fetch(apiPath(`/api/user/history?userId=${encodeURIComponent(userId)}`));
       if (!res.ok) return;
       const data = (await res.json()) as { items?: HistoryItem[] };
       setHistory((data.items || []).filter((x) => x.mediaType === "video"));
@@ -141,7 +142,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   }, [userId]);
 
   const checkTask = useCallback(async (targetTaskId: string) => {
-    const res = await fetch(`/api/ai/task/${targetTaskId}`);
+    const res = await fetch(apiPath(`/api/ai/task/${targetTaskId}`));
     const payload = (await res.json()) as Record<string, unknown>;
     if (!res.ok) {
       return { kind: "failed" as const, message: (typeof payload.error === "string" && payload.error) || "Không đọc được trạng thái task." };
@@ -183,7 +184,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/ai/upload", { method: "POST", body: fd });
+      const res = await fetch(apiPath("/api/ai/upload"), { method: "POST", body: fd });
       const payload = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !payload.url) {
         setStatusText(payload.error || "Upload thất bại.");
@@ -213,7 +214,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
       inputUrl: videoModeType === "image" ? referenceUrl : undefined,
     };
 
-    const res = await fetch("/api/ai/create-task", {
+    const res = await fetch(apiPath("/api/ai/create-task"), {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-user-id": userId },
       body: JSON.stringify(body),
@@ -234,7 +235,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     if (result.kind === "success") {
       setResultUrl(result.video);
       setStatusText("Hoàn tất video.");
-      const r = await fetch("/api/user/history", {
+      const r = await fetch(apiPath("/api/user/history"), {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-user-id": userId },
         body: JSON.stringify({ mediaType: "video", urls: [result.video], prompt }),
@@ -250,7 +251,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   }
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch(apiPath("/api/auth/logout"), { method: "POST" });
     router.push("/login");
   }
 
@@ -336,3 +337,6 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     </div>
   );
 }
+
+
+

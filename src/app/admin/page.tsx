@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { apiPath } from "@/lib/api-url";
 
 type AdminPayload = {
   settings: {
@@ -25,7 +26,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch("/api/admin/settings");
+      const res = await fetch(apiPath("/api/admin/settings"));
       const payload = (await res.json()) as { settings?: AdminPayload["settings"]; error?: string };
       if (!res.ok || !payload.settings) {
         setStatus(payload.error || "Cannot load settings");
@@ -50,7 +51,7 @@ export default function AdminPage() {
       setStatus("Credit packages JSON không hợp lệ.");
       return;
     }
-    const res = await fetch("/api/admin/settings", {
+    const res = await fetch(apiPath("/api/admin/settings"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings: { ...settings, creditPackages } }),
@@ -61,7 +62,7 @@ export default function AdminPage() {
   async function updateUserCredits(e: FormEvent) {
     e.preventDefault();
     setStatus("Updating credits...");
-    const res = await fetch("/api/admin/settings", {
+    const res = await fetch(apiPath("/api/admin/settings"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userCredit: { userId, credits } }),
@@ -70,7 +71,7 @@ export default function AdminPage() {
   }
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch(apiPath("/api/auth/logout"), { method: "POST" });
     router.push("/login");
   }
 
@@ -172,7 +173,7 @@ export default function AdminPage() {
               rows={10}
               value={packageJson}
               onChange={(e) => setPackageJson(e.target.value)}
-              placeholder='[{"id":"starter","name":"Starter","credits":500,"priceVnd":99000,"badge":"Phổ biến","active":true}]'
+              placeholder='[{"id":"starter","name":"Starter","credits":500,"priceVnd":99000,"badge":"Phá»• biáº¿n","active":true}]'
             />
           </label>
 
@@ -195,3 +196,6 @@ export default function AdminPage() {
     </main>
   );
 }
+
+
+

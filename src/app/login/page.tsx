@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { apiPath } from "@/lib/api-url";
 import styles from "../auth.module.css";
 
 export default function LoginPage() {
@@ -17,7 +18,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(apiPath("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -55,7 +56,6 @@ export default function LoginPage() {
         <p className={styles.meta}>
           Chưa có tài khoản? <Link href="/register">Đăng ký</Link>
         </p>
-        <p className={styles.demo}>Admin demo: admin@aistudio.local / admin123</p>
       </section>
     </main>
   );

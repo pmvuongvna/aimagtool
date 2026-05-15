@@ -124,7 +124,12 @@ export async function registerUser(name: string, email: string, password: string
     return { ok: true as const, user };
   }
 
-  if (!allowDemoAuth()) return { ok: false as const, error: "Registration is disabled." };
+  if (!allowDemoAuth()) {
+    return {
+      ok: false as const,
+      error: "Registration is disabled because database auth is not available in this environment.",
+    };
+  }
 
   const state = getState();
   if (state.userIdByEmail.has(normalizedEmail)) {
