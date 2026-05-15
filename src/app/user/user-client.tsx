@@ -362,7 +362,30 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
               <div className={styles.loadingBox}><div className={styles.spinner} /><b>Đang tạo ảnh...</b><p>{statusText}</p></div>
             ) : activeTab === "history" ? (
               history.length === 0 ? <div className={styles.emptyTip}>Chưa có lịch sử ảnh.</div> :
-              <div className={styles.historyGrid}>{history.map((item) => <button key={item.id} className={styles.historyCard} onClick={() => { setLightboxUrls(item.urls); setLightboxIndex(0); }}><img src={item.urls[0]} alt="history" /><div className={styles.historyMeta}><b>{item.urls.length} ảnh</b><span>{new Date(item.createdAt).toLocaleString("vi-VN")}</span></div></button>)}</div>
+              <div className={styles.historyGrid}>
+                {history.map((item) => (
+                  <button
+                    key={item.id}
+                    className={styles.historyCard}
+                    onClick={() => {
+                      setLightboxUrls(item.urls);
+                      setLightboxIndex(0);
+                    }}
+                  >
+                    <div className={`${styles.historyPreviewGrid} ${item.urls.length > 1 ? styles.historyPreviewTwo : styles.historyPreviewOne}`}>
+                      {item.urls.slice(0, 2).map((url) => (
+                        <div key={url} className={styles.historyPreviewItem}>
+                          <img src={url} alt="history" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className={styles.historyMeta}>
+                      <b>{item.urls.length} ảnh</b>
+                      <span>{new Date(item.createdAt).toLocaleString("vi-VN")}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             ) : resultUrls.length === 0 ? (
               <div className={styles.emptyTip}>Chưa có ảnh kết quả. Hãy nhập prompt và bấm Tạo ảnh.</div>
             ) : resultUrls.length === 1 ? (
