@@ -1,7 +1,17 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
-import { getCreditSettings, setUserCredits, updateCreditSettings } from "@/lib/credit";
+import { getCreditSettings, getUserCredits, setUserCredits, updateCreditSettings } from "@/lib/credit";
 import { getUserFromRequest } from "@/lib/auth";
 import { getAdminToken } from "@/lib/env";
+import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
+
+type AdminUserItem = {
+  id: string;
+  name: string;
+  email: string;
+  role: "user" | "admin";
+  createdAt: string;
+  credits: number;
+};
 
 async function isAdmin(request: NextRequest) {
   const authUser = await getUserFromRequest(request);
@@ -10,9 +20,28 @@ async function isAdmin(request: NextRequest) {
   return token === getAdminToken();
 }
 
+async function getAdminUsers(): Promise<AdminUserItem[]> {
+  if (!hasDatabase()) return [];
+  await ensureSchema();
+  const pool = getPool();
+  const result = await pool.query(
+    "SELECT id, name, email, role, created_at FROM auth_users ORDER BY created_at DESC LIMIT 200",
+  );
+
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    email: String(row.email),
+    role: (row.role === "admin" ? "admin" : "user") as "user" | "admin",
+    createdAt: new Date(String(row.created_at)).toISOString(),
+    credits: getUserCredits(String(row.id)),
+  }));
+}
+
 export async function GET(request: NextRequest) {
   if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return NextResponse.json({ settings: getCreditSettings() });
+  const users = await getAdminUsers();
+  return NextResponse.json({ settings: getCreditSettings(), users });
 }
 
 export async function PUT(request: NextRequest) {
@@ -33,5 +62,6 @@ export async function PUT(request: NextRequest) {
   const userCredits =
     body.userCredit && body.userCredit.userId ? setUserCredits(body.userCredit.userId, body.userCredit.credits) : null;
 
-  return NextResponse.json({ settings, userCredits });
+  const users = await getAdminUsers();
+  return NextResponse.json({ settings, userCredits, users });
 }

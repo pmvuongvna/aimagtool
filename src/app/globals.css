@@ -988,6 +988,19 @@ a {
   color: #eaf0ff;
 }
 
+.admin-v2,
+.admin-v2 h1,
+.admin-v2 h2,
+.admin-v2 h3,
+.admin-v2 p,
+.admin-v2 label,
+.admin-v2 span,
+.admin-v2 b,
+.admin-v2 th,
+.admin-v2 td {
+  color: #eaf0ff;
+}
+
 .admin-header {
   border: 1px solid var(--admin-line);
   border-radius: 18px;
@@ -1147,6 +1160,96 @@ a {
   height: 52px;
   font-size: 16px;
   font-weight: 800;
+}
+
+.admin-users-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-users-table-wrap {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid rgba(141, 169, 255, 0.24);
+  border-radius: 12px;
+}
+
+.admin-users-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+
+.admin-users-table thead th {
+  text-align: left;
+  font-size: 12px;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: #a7bbea;
+  background: #0c1331;
+  border-bottom: 1px solid rgba(141, 169, 255, 0.2);
+  padding: 10px 12px;
+}
+
+.admin-users-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(141, 169, 255, 0.14);
+  vertical-align: top;
+  font-size: 14px;
+}
+
+.admin-users-table tbody tr:hover {
+  background: rgba(95, 124, 210, 0.12);
+}
+
+.admin-user-main {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-user-main b {
+  font-size: 14px;
+}
+
+.admin-user-main span {
+  color: #acc0ee;
+  font-size: 13px;
+}
+
+.admin-user-main code {
+  color: #84a2eb;
+  font-size: 12px;
+}
+
+.admin-role {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(141, 169, 255, 0.24);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.admin-role.admin {
+  background: rgba(255, 196, 67, 0.16);
+  border-color: rgba(255, 196, 67, 0.35);
+  color: #ffd16e;
+}
+
+.admin-role.user {
+  background: rgba(109, 142, 245, 0.14);
+  border-color: rgba(109, 142, 245, 0.35);
+  color: #b7ccff;
+}
+
+.admin-users-empty {
+  color: #9fb3e8 !important;
+  text-align: center;
+  padding: 20px 12px !important;
 }
 
 @media (max-width: 960px) {

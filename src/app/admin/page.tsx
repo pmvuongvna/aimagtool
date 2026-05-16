@@ -14,6 +14,14 @@ type AdminPayload = {
     imageEditExtraCost: number;
     defaultUserCredits: number;
   };
+  users?: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: "user" | "admin";
+    createdAt: string;
+    credits: number;
+  }>;
 };
 
 export default function AdminPage() {
@@ -22,17 +30,19 @@ export default function AdminPage() {
   const [userId, setUserId] = useState("demo-user");
   const [credits, setCredits] = useState(500);
   const [packageJson, setPackageJson] = useState("[]");
+  const [users, setUsers] = useState<NonNullable<AdminPayload["users"]>>([]);
   const [status, setStatus] = useState("Loading settings...");
 
   useEffect(() => {
     async function load() {
       const res = await apiFetch(apiPath("/api/admin/settings"));
-      const payload = (await res.json()) as { settings?: AdminPayload["settings"]; error?: string };
+      const payload = (await res.json()) as { settings?: AdminPayload["settings"]; users?: AdminPayload["users"]; error?: string };
       if (!res.ok || !payload.settings) {
         setStatus(payload.error || "Cannot load settings");
         return;
       }
       setSettings(payload.settings);
+      setUsers(payload.users || []);
       setPackageJson(JSON.stringify(payload.settings.creditPackages || [], null, 2));
       setStatus("Ready");
     }
@@ -56,6 +66,10 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings: { ...settings, creditPackages } }),
     });
+    if (res.ok) {
+      const payload = (await res.json()) as { users?: AdminPayload["users"] };
+      setUsers(payload.users || []);
+    }
     setStatus(res.ok ? "Settings saved" : "Save failed");
   }
 
@@ -67,6 +81,10 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userCredit: { userId, credits } }),
     });
+    if (res.ok) {
+      const payload = (await res.json()) as { users?: AdminPayload["users"] };
+      setUsers(payload.users || []);
+    }
     setStatus(res.ok ? "User credits updated" : "Update failed");
   }
 
@@ -192,6 +210,61 @@ export default function AdminPage() {
           </label>
           <button className="generate-cta">Update User Credits</button>
         </form>
+      </section>
+
+      <section className="admin-card">
+        <div className="admin-users-head">
+          <h2>Users</h2>
+          <p className="admin-hint">Danh sách tài khoản đã đăng ký trong hệ thống.</p>
+        </div>
+        <div className="admin-users-table-wrap">
+          <table className="admin-users-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Credits</th>
+                <th>Created</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="admin-users-empty">Chưa có user hoặc backend chưa kết nối DB.</td>
+                </tr>
+              ) : (
+                users.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <div className="admin-user-main">
+                        <b>{item.name}</b>
+                        <span>{item.email}</span>
+                        <code>{item.id}</code>
+                      </div>
+                    </td>
+                    <td><span className={`admin-role ${item.role}`}>{item.role}</span></td>
+                    <td>{item.credits.toLocaleString("vi-VN")}</td>
+                    <td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="chip-btn dark"
+                        onClick={() => {
+                          setUserId(item.id);
+                          setCredits(item.credits);
+                          setStatus(`Selected ${item.email}`);
+                        }}
+                      >
+                        Edit credit
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   );
