@@ -255,7 +255,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
       <main className={styles.layout}>
         <aside className={styles.sidebar}>
           <div className={styles.tabs}>
-            <button className={`${styles.tab} ${styles.activeTab}`} onClick={() => setActiveTab("create")}>▣ Tạo ảnh</button>
+            <button className={`${styles.tab} ${activeTab === "create" ? styles.activeTab : ""}`} onClick={() => setActiveTab("create")}>▣ Tạo ảnh</button>
             <button className={`${styles.tab} ${activeTab === "history" ? styles.activeTab : ""}`} onClick={() => setActiveTab("history")}>◴ Lịch sử</button>
           </div>
 
@@ -358,9 +358,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           <div className={styles.resultSection}>
             <div className={styles.resultHead}><div className={styles.resultTitle}><h2>{activeTab === "history" ? "Lịch sử" : "Kết quả"}</h2><span className={styles.count}>{activeTab === "history" ? `${history.length} mục` : `${resultUrls.length} ảnh`}</span><span className={styles.hint}>{taskId ? `Task: ${taskId}` : new Date().toLocaleString("vi-VN")}</span></div><button className={styles.downloadAll}>⇩ Tải tất cả</button></div>
 
-            {loading ? (
-              <div className={styles.loadingBox}><div className={styles.spinner} /><b>Đang tạo ảnh...</b><p>{statusText}</p></div>
-            ) : activeTab === "history" ? (
+            {activeTab === "history" ? (
               history.length === 0 ? <div className={styles.emptyTip}>Chưa có lịch sử ảnh.</div> :
               <div className={styles.historyGrid}>
                 {history.map((item) => (
@@ -386,6 +384,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                   </button>
                 ))}
               </div>
+            ) : loading ? (
+              <div className={styles.loadingBox}><div className={styles.spinner} /><b>Đang tạo ảnh...</b><p>{statusText}</p></div>
             ) : resultUrls.length === 0 ? (
               <div className={styles.emptyTip}>Chưa có ảnh kết quả. Hãy nhập prompt và bấm Tạo ảnh.</div>
             ) : resultUrls.length === 1 ? (
