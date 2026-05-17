@@ -38,7 +38,29 @@ export async function ensureSchema() {
       role TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS credit_settings (
+      id TEXT PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS user_credits (
+      user_id TEXT PRIMARY KEY,
+      credits NUMERIC(14, 2) NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS history_items (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      media_type TEXT NOT NULL,
+      urls JSONB NOT NULL,
+      prompt TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_history_user_created ON history_items(user_id, created_at DESC);
   `);
   initialized = true;
 }
-

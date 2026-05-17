@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const authUser = await getUserFromRequest(request);
   if (!authUser && isProd) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userId = authUser?.id || request.nextUrl.searchParams.get("userId") || "demo-user";
-  return NextResponse.json({ items: getHistoryByUser(userId) });
+  return NextResponse.json({ items: await getHistoryByUser(userId) });
 }
 
 export async function POST(request: NextRequest) {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   if (!body.mediaType || !Array.isArray(body.urls) || body.urls.length === 0) {
     return NextResponse.json({ error: "mediaType and urls are required." }, { status: 400 });
   }
-  const item = addHistoryItem({
+  const item = await addHistoryItem({
     userId,
     mediaType: body.mediaType,
     urls: body.urls,

@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const userId = authUser?.id || request.headers.get("x-user-id") || "demo-user";
-    const cost = calculateTaskCost(body);
-    const charged = chargeCredits(userId, cost);
+    const cost = await calculateTaskCost(body);
+    const charged = await chargeCredits(userId, cost);
     if (!charged.ok) {
       return NextResponse.json(
         { error: `Not enough credits. Required ${cost}, available ${charged.credits}.`, required: cost, available: charged.credits },
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       const payload = await createAIGenerationTask(body);
       return NextResponse.json({ ...payload, creditCost: cost, remainingCredits: charged.credits });
     } catch (innerError) {
-      const credits = refundCredits(userId, cost);
+      const credits = await refundCredits(userId, cost);
       const message = innerError instanceof Error ? innerError.message : "Unable to create task.";
       return NextResponse.json({ error: message, remainingCredits: credits }, { status: 400 });
     }

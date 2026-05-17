@@ -34,14 +34,15 @@ async function getAdminUsers(): Promise<AdminUserItem[]> {
     email: String(row.email),
     role: (row.role === "admin" ? "admin" : "user") as "user" | "admin",
     createdAt: new Date(String(row.created_at)).toISOString(),
-    credits: getUserCredits(String(row.id)),
+    credits: 0,
   }));
 }
 
 export async function GET(request: NextRequest) {
   if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const users = await getAdminUsers();
-  return NextResponse.json({ settings: getCreditSettings(), users });
+  for (const user of users) user.credits = await getUserCredits(user.id);
+  return NextResponse.json({ settings: await getCreditSettings(), users });
 }
 
 export async function PUT(request: NextRequest) {
@@ -58,10 +59,11 @@ export async function PUT(request: NextRequest) {
     userCredit?: { userId: string; credits: number };
   };
 
-  const settings = body.settings ? updateCreditSettings(body.settings) : getCreditSettings();
+  const settings = body.settings ? await updateCreditSettings(body.settings) : await getCreditSettings();
   const userCredits =
-    body.userCredit && body.userCredit.userId ? setUserCredits(body.userCredit.userId, body.userCredit.credits) : null;
+    body.userCredit && body.userCredit.userId ? await setUserCredits(body.userCredit.userId, body.userCredit.credits) : null;
 
   const users = await getAdminUsers();
+  for (const user of users) user.credits = await getUserCredits(user.id);
   return NextResponse.json({ settings, userCredits, users });
 }
