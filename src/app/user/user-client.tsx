@@ -73,6 +73,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [lightboxUrls, setLightboxUrls] = useState<string[] | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [clientNow, setClientNow] = useState("");
 
   const currentCost = useMemo(() => {
     if (imageModel === "seedream") {
@@ -88,6 +89,10 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   useEffect(() => {
     router.prefetch("/user/video");
   }, [router]);
+
+  useEffect(() => {
+    setClientNow(new Date().toLocaleString("vi-VN"));
+  }, []);
 
   useEffect(() => {
     async function loadProfile() {
@@ -360,7 +365,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
         <section className={styles.results}>
           <div className={styles.resultSection}>
-            <div className={styles.resultHead}><div className={styles.resultTitle}><h2>{activeTab === "history" ? "Lịch sử" : "Kết quả"}</h2><span className={styles.count}>{activeTab === "history" ? `${history.length} mục` : `${resultUrls.length} ảnh`}</span><span className={styles.hint}>{taskId ? `Task: ${taskId}` : new Date().toLocaleString("vi-VN")}</span></div><button className={styles.downloadAll}>⇩ Tải tất cả</button></div>
+            <div className={styles.resultHead}><div className={styles.resultTitle}><h2>{activeTab === "history" ? "Lịch sử" : "Kết quả"}</h2><span className={styles.count}>{activeTab === "history" ? `${history.length} mục` : `${resultUrls.length} ảnh`}</span><span className={styles.hint}>{taskId ? `Task: ${taskId}` : clientNow || "--:--"}</span></div><button className={styles.downloadAll}>⇩ Tải tất cả</button></div>
 
             {activeTab === "history" ? (
               history.length === 0 ? <div className={styles.emptyTip}>Chưa có lịch sử ảnh.</div> :
