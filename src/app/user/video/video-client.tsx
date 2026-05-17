@@ -109,6 +109,10 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   const canGenerate = prompt.trim().length >= 3 && (videoModeType === "text" || /^https?:\/\//.test(referenceUrl)) && !uploading;
 
   useEffect(() => {
+    router.prefetch("/user");
+  }, [router]);
+
+  useEffect(() => {
     async function loadProfile() {
       const res = await apiFetch(apiPath(`/api/user/profile?userId=${encodeURIComponent(userId)}`));
       if (!res.ok) return;
@@ -259,7 +263,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     <div className={styles.page}>
       <header className={styles.topbar}>
         <Link className={styles.brand} href="/"><span className={styles.logo} />AIStudio</Link>
-        <nav className={styles.nav}><Link href="/">Trang chủ</Link><Link href="/user">Tạo ảnh</Link><a className={styles.active}>Tạo video</a><Link href="/admin">Công cụ AI⌄</Link></nav>
+        <nav className={styles.nav}><Link href="/">Trang chủ</Link><Link href="/user" onMouseEnter={() => router.prefetch("/user")}>Tạo ảnh</Link><a className={styles.active}>Tạo video</a><Link href="/admin">Công cụ AI⌄</Link></nav>
         <div className={styles.topActions}><div className={styles.credit}>▣ {formatCredits(credits)}</div><button className={`${styles.iconBtn} ${styles.hideSm}`} onClick={handleLogout}>⎋</button><div className={styles.avatar} /><b>{userName}⌄</b></div>
       </header>
 

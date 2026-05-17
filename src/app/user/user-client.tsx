@@ -86,6 +86,10 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const canGenerate = prompt.trim().length >= 3 && (generationMode === "text" || /^https?:\/\//.test(referenceUrl)) && !uploading;
 
   useEffect(() => {
+    router.prefetch("/user/video");
+  }, [router]);
+
+  useEffect(() => {
     async function loadProfile() {
       const res = await apiFetch(apiPath(`/api/user/profile?userId=${encodeURIComponent(userId)}`));
       if (!res.ok) return;
@@ -241,7 +245,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
         <nav className={styles.nav}>
           <Link href="/">Trang chủ</Link>
           <a className={styles.active}>Tạo ảnh</a>
-          <Link href="/user/video">Tạo video</Link>
+          <Link href="/user/video" onMouseEnter={() => router.prefetch("/user/video")}>Tạo video</Link>
           <Link href="/admin">Công cụ AI⌄</Link>
         </nav>
         <div className={styles.topActions}>
