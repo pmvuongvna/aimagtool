@@ -11,6 +11,38 @@ type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: n
 type ProfileResponse = { userId: string; credits: number; previewCosts: { image1k: number; image2k: number; image4k: number } };
 type HistoryItem = { id: string; mediaType: "image" | "video"; urls: string[]; prompt: string; createdAt: string };
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string };
+type DashboardCache = {
+  userId: string;
+  userName: string;
+  credits: number;
+  costPreview: ProfileResponse["previewCosts"] | null;
+  history: HistoryItem[];
+  packages: CreditPackage[];
+};
+
+type CardItem = {
+  id: string;
+  title: string;
+  meta: string;
+  thumbUrl: string;
+  urls: string[];
+  createdAt: string;
+};
+
+const CACHE_KEY = "aistudio_user_dashboard_cache_v1";
+const templates = [
+  { title: "YouTube Thumbnail", ratio: "16:9", image: "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&w=300&q=80" },
+  { title: "Product Showcase", ratio: "1:1", image: "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=300&q=80" },
+  { title: "Instagram Post", ratio: "1:1", image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80" },
+  { title: "Fantasy Art", ratio: "16:9", image: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?auto=format&fit=crop&w=300&q=80" },
+  { title: "Short Video Ad", ratio: "9:16", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=300&q=80" },
+];
+const styleCards = [
+  { title: "Cinematic", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=300&q=80" },
+  { title: "Realistic", image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=300&q=80" },
+  { title: "Anime", image: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=300&q=80" },
+  { title: "3D Render", image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=300&q=80" },
+];
 
 function formatCredits(value: number) {
   return Number.isInteger(value)
@@ -44,26 +76,32 @@ function isCompletedState(state: string) {
   return ["success", "completed", "succeeded", "done", "finish", "finished"].includes(state.toLowerCase());
 }
 
+function truncate(value: string, max = 34) {
+  const clean = value.trim();
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max - 1)}…`;
+}
+
 export default function UserClient({ initialPrompt }: { initialPrompt: string }) {
   const router = useRouter();
-  const [userId, setUserId] = useState("demo-user");
+  const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("User");
   const [credits, setCredits] = useState(0);
   const [costPreview, setCostPreview] = useState<ProfileResponse["previewCosts"] | null>(null);
+  const [search, setSearch] = useState("");
 
   const [prompt, setPrompt] = useState(initialPrompt.trim() || "Cô gái đứng trên đỉnh núi, ánh hoàng hôn vàng cam, siêu thực, cinematic.");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [imageModel, setImageModel] = useState<"gpt" | "seedream">("gpt");
-  const [modelOpen, setModelOpen] = useState(false);
   const [generationMode, setGenerationMode] = useState<"text" | "image">("text");
   const [referenceUrl, setReferenceUrl] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [quantity, setQuantity] = useState(2);
+  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [quantity, setQuantity] = useState(1);
   const [imageResolution, setImageResolution] = useState<ImageResolution>("2k");
-  const [activeTab, setActiveTab] = useState<"create" | "history">("create");
-  const [activeStyle, setActiveStyle] = useState("Ảnh thực");
-  const [resultAspectRatio, setResultAspectRatio] = useState("1:1");
+  const [activeTab, setActiveTab] = useState<"result" | "history">("result");
+  const [activeStyle, setActiveStyle] = useState("Cinematic");
+  const [resultAspectRatio, setResultAspectRatio] = useState("16:9");
 
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo ảnh.");
@@ -73,7 +111,15 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [lightboxUrls, setLightboxUrls] = useState<string[] | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [clientNow, setClientNow] = useState("");
+
+  const saveCache = useCallback((next: Partial<DashboardCache>) => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.sessionStorage.getItem(CACHE_KEY);
+      const base: DashboardCache = raw ? (JSON.parse(raw) as DashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [] };
+      window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next }));
+    } catch {}
+  }, []);
 
   const currentCost = useMemo(() => {
     if (imageModel === "seedream") {
@@ -91,41 +137,55 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, [router]);
 
   useEffect(() => {
-    setClientNow(new Date().toLocaleString("vi-VN"));
-  }, []);
-
-  useEffect(() => {
-    async function loadProfile() {
-      const res = await apiFetch(apiPath(`/api/user/profile?userId=${encodeURIComponent(userId)}`));
-      if (!res.ok) return;
-      const data = (await res.json()) as ProfileResponse & { user?: { id: string; name: string } | null };
-      if (data.user?.id && data.user.id !== userId) setUserId(data.user.id);
-      if (data.user?.name) setUserName(data.user.name);
-      setCredits(data.credits);
-      setCostPreview(data.previewCosts);
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.sessionStorage.getItem(CACHE_KEY);
+        if (raw) {
+          const cached = JSON.parse(raw) as DashboardCache;
+          if (cached.userId) setUserId(cached.userId);
+          if (cached.userName) setUserName(cached.userName);
+          if (typeof cached.credits === "number") setCredits(cached.credits);
+          if (cached.costPreview) setCostPreview(cached.costPreview);
+          if (Array.isArray(cached.history)) setHistory(cached.history.filter((x) => x.mediaType === "image"));
+          if (Array.isArray(cached.packages)) setPackages(cached.packages);
+        }
+      } catch {}
     }
-    void loadProfile();
-  }, [userId]);
 
-  useEffect(() => {
-    async function loadPackages() {
-      const res = await apiFetch(apiPath("/api/public/credit-packages"));
-      if (!res.ok) return;
-      const payload = (await res.json()) as { packages?: CreditPackage[] };
-      setPackages(payload.packages || []);
-    }
-    void loadPackages();
-  }, []);
+    async function bootstrap() {
+      const [profileRes, packageRes] = await Promise.all([
+        apiFetch(apiPath("/api/user/profile")),
+        apiFetch(apiPath("/api/public/credit-packages")),
+      ]);
 
-  useEffect(() => {
-    async function loadHistory() {
-      const res = await apiFetch(apiPath(`/api/user/history?userId=${encodeURIComponent(userId)}`));
-      if (!res.ok) return;
-      const data = (await res.json()) as { items?: HistoryItem[] };
-      setHistory((data.items || []).filter((x) => x.mediaType === "image"));
+      if (profileRes.ok) {
+        const data = (await profileRes.json()) as ProfileResponse & { user?: { id: string; name: string } | null };
+        const resolvedUserId = data.user?.id || data.userId || "demo-user";
+        setUserId(resolvedUserId);
+        if (data.user?.name) setUserName(data.user.name);
+        setCredits(data.credits);
+        setCostPreview(data.previewCosts);
+        saveCache({ userId: resolvedUserId, userName: data.user?.name || "User", credits: data.credits, costPreview: data.previewCosts });
+
+        const historyRes = await apiFetch(apiPath(`/api/user/history?userId=${encodeURIComponent(resolvedUserId)}`));
+        if (historyRes.ok) {
+          const historyData = (await historyRes.json()) as { items?: HistoryItem[] };
+          const imageItems = (historyData.items || []).filter((x) => x.mediaType === "image");
+          setHistory(imageItems);
+          saveCache({ history: imageItems });
+        }
+      }
+
+      if (packageRes.ok) {
+        const payload = (await packageRes.json()) as { packages?: CreditPackage[] };
+        const nextPackages = payload.packages || [];
+        setPackages(nextPackages);
+        saveCache({ packages: nextPackages });
+      }
     }
-    void loadHistory();
-  }, [userId]);
+
+    void bootstrap();
+  }, [saveCache]);
 
   const checkTask = useCallback(async (targetTaskId: string) => {
     const res = await apiFetch(apiPath(`/api/ai/task/${targetTaskId}`));
@@ -182,6 +242,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     setResultUrls([]);
     setResultAspectRatio(aspectRatio);
     setStatusText("Đang tạo ảnh...");
+    setActiveTab("result");
 
     const body: CreateTaskInput = {
       serviceId: (
@@ -189,7 +250,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           ? (generationMode === "text" ? "gpt-image-2-text" : "gpt-image-2-image")
           : (generationMode === "text" ? "seedream-5-lite-text" : "seedream-5-lite-image")
       ) as AIServiceId,
-      prompt: `${prompt}${negativePrompt.trim() ? `\nNegative prompt: ${negativePrompt.trim()}` : ""}${activeStyle !== "Không chọn" ? `\nStyle: ${activeStyle}` : ""}`,
+      prompt: `${prompt}${negativePrompt.trim() ? `\nNegative prompt: ${negativePrompt.trim()}` : ""}${activeStyle !== "Khong chon" ? `\nStyle: ${activeStyle}` : ""}`,
       aspectRatio,
       imageResolution: imageModel === "gpt" ? imageResolution : "1k",
       inputUrl: generationMode === "image" ? referenceUrl : undefined,
@@ -220,6 +281,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
       const urls = await waitForTaskImages(taskIds[i]);
       allUrls.push(...urls);
     }
+
     const uniqueUrls = Array.from(new Set(allUrls));
     setResultUrls(uniqueUrls);
     setStatusText(uniqueUrls.length > 0 ? `Hoàn tất ${uniqueUrls.length} ảnh.` : "Task hoàn tất nhưng chưa có ảnh.");
@@ -233,219 +295,285 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
       });
       if (r.ok) {
         const payload = (await r.json()) as { item?: HistoryItem };
-        if (payload.item) setHistory((prev) => [payload.item!, ...prev].slice(0, 24));
+        if (payload.item) {
+          setHistory((prev) => {
+            const next = [payload.item!, ...prev].slice(0, 24);
+            saveCache({ history: next });
+            return next;
+          });
+        }
       }
     }
   }
 
   async function handleLogout() {
     await apiFetch(apiPath("/api/auth/logout"), { method: "POST" });
-    router.push("/login");
+    window.location.assign("/login");
   }
+
+  function openUrls(urls: string[], index = 0) {
+    setLightboxUrls(urls);
+    setLightboxIndex(index);
+  }
+
+  const recentResultCards: CardItem[] = resultUrls.map((url, index) => ({
+    id: `${url}-${index}`,
+    title: truncate(prompt),
+    meta: `${imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"} · ${aspectRatio}`,
+    thumbUrl: url,
+    urls: resultUrls,
+    createdAt: new Date().toISOString(),
+  }));
+
+  const historyCards: CardItem[] = history.map((item) => ({
+    id: item.id,
+    title: truncate(item.prompt || "Tạo ảnh AI"),
+    meta: `${item.urls.length} ảnh · ${new Date(item.createdAt).toLocaleDateString("vi-VN")}`,
+    thumbUrl: item.urls[0],
+    urls: item.urls,
+    createdAt: item.createdAt,
+  }));
+
+  const displayCards = (activeTab === "result" && (loading || recentResultCards.length > 0)) ? recentResultCards : historyCards;
+  const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
+  const activityItems = historyCards.slice(0, 4);
+  const progressWidth = Math.max(8, Math.min(100, Math.round((credits / Math.max(credits + (currentCost || 0), 1000)) * 100)));
+  const createdImageCount = history.reduce((sum, item) => sum + item.urls.length, 0) + resultUrls.length;
+  const projectCount = history.length;
+  const activePackage = packages[0];
 
   return (
     <div className={styles.page}>
-      <header className={styles.topbar}>
-        <Link className={styles.brand} href="/"><span className={styles.logo} />AIStudio</Link>
-        <nav className={styles.nav}>
-          <Link href="/">Trang chủ</Link>
-          <a className={styles.active}>Tạo ảnh</a>
-          <Link href="/user/video" onMouseEnter={() => router.prefetch("/user/video")}>Tạo video</Link>
-          <Link href="/admin">Công cụ AI⌄</Link>
-        </nav>
-        <div className={styles.topActions}>
-          <div className={styles.credit}>▣ {formatCredits(credits)}</div>
-          <button className={`${styles.iconBtn} ${styles.hideSm}`} onClick={handleLogout}>⎋</button>
-          <div className={styles.avatar} />
-          <b>{userName}⌄</b>
-        </div>
-      </header>
-
-      <main className={styles.layout}>
+      <div className={styles.appShell}>
         <aside className={styles.sidebar}>
-          <div className={styles.tabs}>
-            <button className={`${styles.tab} ${activeTab === "create" ? styles.activeTab : ""}`} onClick={() => setActiveTab("create")}>▣ Tạo ảnh</button>
-            <button className={`${styles.tab} ${activeTab === "history" ? styles.activeTab : ""}`} onClick={() => setActiveTab("history")}>◴ Lịch sử</button>
+          <Link href="/" className={styles.logoLink}>
+            <span className={styles.logoMark} />
+            <span className={styles.logoText}>VizoAI</span>
+          </Link>
+
+          <nav className={styles.navMenu}>
+            <a className={`${styles.navItem} ${styles.activeNav}`} href="#dashboard"><span className={styles.navIcon}>⌂</span><span className={styles.navText}>Dashboard</span></a>
+            <a className={styles.navItem} href="#generator"><span className={styles.navIcon}>▧</span><span className={styles.navText}>Tạo ảnh</span></a>
+            <Link className={styles.navItem} href="/user/video"><span className={styles.navIcon}>▶</span><span className={styles.navText}>Tạo video</span></Link>
+            <a className={styles.navItem} href="#templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></a>
+            <a className={styles.navItem} href="#recent"><span className={styles.navIcon}>↺</span><span className={styles.navText}>Lịch sử</span></a>
+            <a className={styles.navItem} href="#styles"><span className={styles.navIcon}>♡</span><span className={styles.navText}>Phong cách</span></a>
+            <Link className={styles.navItem} href="/admin"><span className={styles.navIcon}>⚙</span><span className={styles.navText}>Cài đặt</span></Link>
+          </nav>
+
+          <div className={styles.sidebarSpacer} />
+
+          <div className={styles.upgradeCard}>
+            <h3>Nâng cấp Pro</h3>
+            <p>Tạo ảnh nhiều hơn, mở khóa model cao cấp và xuất file chất lượng cao cho chiến dịch thật.</p>
+            <button type="button">Nâng cấp ngay →</button>
           </div>
 
-          <form className={styles.form} onSubmit={onGenerate}>
-            <div className={styles.field}>
-              <label>Mô hình AI</label>
-              <button
-                type="button"
-                className={`${styles.modelCard} ${styles.modelTrigger}`}
-                onClick={() => setModelOpen((v) => !v)}
-              >
-                <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80" alt="Model" />
-                <div>
-                  <b>{imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"}</b>
-                  <span>{generationMode === "text" ? "Text to Image" : "Image to Image"}</span>
-                </div>
-                <span className={styles.badge}>{modelOpen ? "Thu gọn" : "Đang dùng"}</span>
-              </button>
-              {modelOpen ? (
-                <div className={styles.modelDropdown}>
-                  <button
-                    type="button"
-                    className={`${styles.modelOption} ${imageModel === "gpt" ? styles.modelOptionActive : ""}`}
-                    onClick={() => {
-                      setImageModel("gpt");
-                      setModelOpen(false);
-                    }}
-                  >
-                    <b>GPT Image 2</b>
-                    <span>Text/Image to Image • hỗ trợ 1K/2K/4K</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.modelOption} ${imageModel === "seedream" ? styles.modelOptionActive : ""}`}
-                    onClick={() => {
-                      setImageModel("seedream");
-                      setImageResolution("1k");
-                      setModelOpen(false);
-                    }}
-                  >
-                    <b>Seedream 5 Lite</b>
-                    <span>Text/Image to Image • quality basic</span>
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            <div className={styles.field}>
-              <label>Chế độ tạo ảnh</label>
-              <div className={styles.optionsTwo}>
-                <button type="button" className={`${styles.option} ${generationMode === "text" ? styles.activeOption : ""}`} onClick={() => setGenerationMode("text")}>Text → Image</button>
-                <button type="button" className={`${styles.option} ${generationMode === "image" ? styles.activeOption : ""}`} onClick={() => setGenerationMode("image")}>Image → Image</button>
-              </div>
-            </div>
-
-            {generationMode === "image" ? (
-              <div className={styles.field}>
-                <label>Ảnh tham chiếu <span className={styles.hint}>bắt buộc</span></label>
-                <div className={styles.uploadBox}>
-                  <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFileUpload(f); }} />
-                  <input className={styles.urlInput} value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
-                </div>
-              </div>
-            ) : null}
-
-            <div className={styles.field}><label>Prompt <span className={styles.hint}>{prompt.length}/1000</span></label><textarea value={prompt} onChange={(e) => setPrompt(e.target.value.slice(0, 1000))} /></div>
-            <div className={styles.field}><label>Negative Prompt <span className={styles.hint}>tùy chọn</span></label><textarea className={styles.negative} value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value.slice(0, 1000))} placeholder="Nhập những gì bạn không muốn xuất hiện" /></div>
-            <div className={styles.field}><label>Tỷ lệ khung hình</label><div className={styles.options}>{["1:1", "16:9", "4:3", "3:4", "9:16"].map((v) => <button key={v} type="button" className={`${styles.option} ${aspectRatio === v ? styles.activeOption : ""}`} onClick={() => setAspectRatio(v)}>{v}</button>)}</div></div>
-            <div className={styles.field}><label>Số lượng ảnh</label><div className={styles.optionsTwo}>{[1, 2].map((v) => <button key={v} type="button" className={`${styles.option} ${quantity === v ? styles.activeOption : ""}`} onClick={() => setQuantity(v)}>{v}</button>)}</div></div>
-
-            {imageModel === "gpt" ? (
-              <div className={styles.field}><label>Chất lượng</label><div className={styles.optionsThree}><button type="button" className={`${styles.option} ${imageResolution === "1k" ? styles.activeOption : ""}`} onClick={() => setImageResolution("1k")}>1K</button><button type="button" className={`${styles.option} ${imageResolution === "2k" ? styles.activeOption : ""}`} onClick={() => setImageResolution("2k")}>2K</button><button type="button" className={`${styles.option} ${imageResolution === "4k" ? styles.activeOption : ""}`} onClick={() => setImageResolution("4k")}>4K</button></div></div>
-            ) : (
-              <div className={styles.field}><label>Chất lượng</label><div className={styles.emptyTip}>Seedream 5 Lite dùng tham số quality = basic theo API.</div></div>
-            )}
-
-            <div className={styles.field}><label>Phong cách</label><div className={styles.styleGrid}>{[["Không chọn", "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=160&q=80"], ["Ảnh thực", "https://images.unsplash.com/photo-1496440737103-cd596325d314?auto=format&fit=crop&w=160&q=80"], ["Anime", "https://images.unsplash.com/photo-1635322966219-b75ed372eb01?auto=format&fit=crop&w=160&q=80"], ["CGI", "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=160&q=80"], ["Tranh vẽ", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=160&q=80"]].map(([name, src]) => <button key={name} type="button" className={`${styles.style} ${activeStyle === name ? styles.activeStyle : ""}`} onClick={() => setActiveStyle(name)}><img src={src} alt={name} /><span>{name}</span></button>)}</div></div>
-            <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Đang tạo ảnh..." : `Tạo ảnh ✨   ⚡ ${formatCredits(currentCost ?? 0)}`}</button>
-            <div className={styles.hint}>Ước tính trừ: <b>{formatCredits(currentCost ?? 0)} credit</b> cho lần tạo này.</div>
-            <div className={styles.emptyTip}>{statusText}</div>
-            {packages.length > 0 ? (
-              <div className={styles.field}>
-                <label>Gói credit</label>
-                <div className={styles.historyGrid}>
-                  {packages.slice(0, 3).map((item) => (
-                    <div key={item.id} className={styles.historyCard}>
-                      <div className={styles.historyMeta}>
-                        <b>{item.name} {item.badge ? `· ${item.badge}` : ""}</b>
-                        <span>{item.credits.toLocaleString("vi-VN")} credits · {item.priceVnd.toLocaleString("vi-VN")}đ</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </form>
+          <div className={styles.planBox}>
+            <div className={styles.planRow}><span>Gói hiện tại</span><strong>{activePackage?.badge || "Free"}</strong></div>
+            <div className={styles.planRow}><span>Credits còn lại</span><strong>{formatCredits(credits)}</strong></div>
+          </div>
         </aside>
 
-        <section className={styles.results}>
-          <div className={styles.resultSection}>
-            <div className={styles.resultHead}><div className={styles.resultTitle}><h2>{activeTab === "history" ? "Lịch sử" : "Kết quả"}</h2><span className={styles.count}>{activeTab === "history" ? `${history.length} mục` : `${resultUrls.length} ảnh`}</span><span className={styles.hint}>{taskId ? `Task: ${taskId}` : clientNow || "--:--"}</span></div><button className={styles.downloadAll}>⇩ Tải tất cả</button></div>
+        <main className={styles.main} id="dashboard">
+          <header className={styles.topbar}>
+            <div className={styles.search}>
+              <span>🔍</span>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm ảnh, prompt, lịch sử..." />
+              <div className={styles.shortcut}>Ctrl K</div>
+            </div>
 
-            {activeTab === "history" ? (
-              history.length === 0 ? <div className={styles.emptyTip}>Chưa có lịch sử ảnh.</div> :
-              <div className={styles.historyGrid}>
-                {history.map((item) => (
-                  <button
-                    key={item.id}
-                    className={styles.historyCard}
-                    onClick={() => {
-                      setLightboxUrls(item.urls);
-                      setLightboxIndex(0);
-                    }}
-                  >
-                    <div className={`${styles.historyPreviewGrid} ${item.urls.length > 1 ? styles.historyPreviewTwo : styles.historyPreviewOne}`}>
-                      {item.urls.slice(0, 2).map((url) => (
-                        <div key={url} className={styles.historyPreviewItem}>
-                          <img src={url} alt="history" />
-                        </div>
-                      ))}
+            <div className={styles.topActions}>
+              <div className={styles.creditsPill}>⚡ {formatCredits(credits)} Credits</div>
+              <button type="button" className={styles.iconBtn}><span>🔔</span><span className={styles.iconDot} /></button>
+              <button type="button" className={styles.iconBtn} onClick={handleLogout}>⎋</button>
+              <div className={styles.userCard}>
+                <div className={styles.avatar} />
+                <div>
+                  <strong>{userName}</strong>
+                  <span>{activePackage?.name || "Free Plan"}</span>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <section className={styles.generator} id="generator">
+            <div className={styles.generatorTabs}>
+              <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}>✨ AI Image</button>
+              <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>🎬 AI Video</Link>
+            </div>
+
+            <form onSubmit={onGenerate}>
+              <div className={styles.promptBox}>
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value.slice(0, 1000))} placeholder="Mô tả nội dung anh muốn tạo... Ví dụ: poster sản phẩm, phong cách cinematic, ánh sáng cao cấp." />
+                <div className={styles.promptSide}>
+                  <button type="button" className={styles.magicBtn}>✦</button>
+                  <span>{prompt.length} / 1000</span>
+                </div>
+              </div>
+
+              <div className={styles.controls}>
+                <div className={styles.controlCard}><div className={styles.controlCardIcon}>▭</div><div><small>Tỷ lệ ảnh</small><strong>{aspectRatio}</strong></div></div>
+                <div className={styles.controlCard}><div className={styles.controlCardIcon}>✺</div><div><small>Phong cách</small><strong>{activeStyle}</strong></div></div>
+                <div className={styles.controlCard}><div className={styles.controlCardIcon}>▤</div><div><small>Model</small><strong>{imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"}</strong></div></div>
+                <div className={styles.controlCard}><div className={styles.controlCardIcon}>🖼</div><div><small>Ảnh tham chiếu</small><strong>{generationMode === "image" ? (referenceUrl ? "Đã sẵn sàng" : "Chưa tải lên") : "Không dùng"}</strong></div></div>
+                <button type="button" className={styles.resetBtn} onClick={() => { setPrompt(""); setNegativePrompt(""); setReferenceUrl(""); setActiveStyle("Cinematic"); }}>Reset</button>
+                <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Đang tạo..." : `✨ Generate · ${formatCredits(currentCost ?? 0)}`}</button>
+              </div>
+
+              <div className={styles.advancedGrid}>
+                <div className={styles.fieldBlock}>
+                  <div className={styles.fieldBlockHeader}><h4>Model AI</h4><span className={styles.fieldHint}>Chọn engine</span></div>
+                  <div className={styles.modelMenu}>
+                    <button type="button" className={`${styles.modelOption} ${imageModel === "gpt" ? styles.modelOptionActive : ""}`} onClick={() => setImageModel("gpt")}>
+                      <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80" alt="GPT Image 2" />
+                      <div><strong>GPT Image 2</strong><span>Text/Image to Image · 1K / 2K / 4K</span></div>
+                      <span className={styles.badge}>Pro</span>
+                    </button>
+                    <button type="button" className={`${styles.modelOption} ${imageModel === "seedream" ? styles.modelOptionActive : ""}`} onClick={() => { setImageModel("seedream"); setImageResolution("1k"); }}>
+                      <img src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=200&q=80" alt="Seedream 5 Lite" />
+                      <div><strong>Seedream 5 Lite</strong><span>Text/Image to Image · quality basic</span></div>
+                      <span className={styles.badge}>Lite</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.fieldBlock}>
+                  <div className={styles.fieldBlockHeader}><h4>Thiết lập ảnh</h4><span className={styles.fieldHint}>Tạo đúng format</span></div>
+                  <div className={styles.choiceGrid}>
+                    {["1:1", "16:9", "4:3", "3:4", "9:16"].map((value) => (
+                      <button key={value} type="button" className={`${styles.choiceBtn} ${aspectRatio === value ? styles.choiceBtnActive : ""}`} onClick={() => setAspectRatio(value)}>{value}</button>
+                    ))}
+                  </div>
+                  <div className={styles.choiceGrid} style={{ marginTop: 10 }}>
+                    {[1, 2].map((value) => (
+                      <button key={value} type="button" className={`${styles.choiceBtn} ${quantity === value ? styles.choiceBtnActive : ""}`} onClick={() => setQuantity(value)}>{value} ảnh</button>
+                    ))}
+                  </div>
+                  <div className={styles.choiceGrid} style={{ marginTop: 10 }}>
+                    {["1k", "2k", "4k"].map((value) => (
+                      <button key={value} type="button" className={`${styles.choiceBtn} ${imageResolution === value ? styles.choiceBtnActive : ""}`} onClick={() => setImageResolution(value as ImageResolution)} disabled={imageModel !== "gpt"}>{value.toUpperCase()}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={styles.fieldBlock}>
+                  <div className={styles.fieldBlockHeader}><h4>Chế độ & tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : "Image to Image nếu cần"}</span></div>
+                  <div className={styles.choiceGrid}>
+                    {[{ id: "text", label: "Text → Image" }, { id: "image", label: "Image → Image" }].map((item) => (
+                      <button key={item.id} type="button" className={`${styles.choiceBtn} ${generationMode === item.id ? styles.choiceBtnActive : ""}`} onClick={() => setGenerationMode(item.id as "text" | "image")}>{item.label}</button>
+                    ))}
+                  </div>
+                  {generationMode === "image" ? (
+                    <div className={styles.uploadRow} style={{ marginTop: 10 }}>
+                      <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file); }} />
+                      <input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
                     </div>
-                    <div className={styles.historyMeta}>
-                      <b>{item.urls.length} ảnh</b>
-                      <span>{new Date(item.createdAt).toLocaleString("vi-VN")}</span>
+                  ) : null}
+                </div>
+
+                <div className={styles.fieldBlock}>
+                  <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt & style</span></div>
+                  <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value.slice(0, 1000))} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
+                  <div className={styles.choiceGrid} style={{ marginTop: 10 }}>
+                    {["Cinematic", "Ảnh thực", "Anime", "3D Render", "Editorial"].map((value) => (
+                      <button key={value} type="button" className={`${styles.choiceBtn} ${activeStyle === value ? styles.choiceBtnActive : ""}`} onClick={() => setActiveStyle(value)}>{value}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.statusBar}>
+                <span>{statusText}</span>
+                <span>Task: {taskId || "chưa tạo"}</span>
+              </div>
+            </form>
+          </section>
+
+          <section className={styles.statsGrid}>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statPurple}`}>🖼</div><div><small>Ảnh đã tạo</small><h3>{createdImageCount.toLocaleString("vi-VN")}</h3></div><div className={styles.statUp}>↑ 18%</div></article>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statBlue}`}>✨</div><div><small>Model đang dùng</small><h3>{imageModel === "gpt" ? "GPT" : "Lite"}</h3></div><div className={styles.statUp}>↑ 9%</div></article>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statOrange}`}>⚡</div><div><small>Credits còn lại</small><h3>{formatCredits(credits)}</h3><div className={styles.progressTrack}><span style={{ width: `${progressWidth}%` }} /></div></div></article>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statGreen}`}>📁</div><div><small>Dự án đã lưu</small><h3>{projectCount.toLocaleString("vi-VN")}</h3></div><div className={styles.statUp}>↑ 6%</div></article>
+          </section>
+
+          <section className={styles.contentGrid} id="recent">
+            <div className={styles.panel}>
+              <div className={styles.panelHead}>
+                <h2>{activeTab === "result" ? "Kết quả & sản phẩm gần đây" : "Lịch sử tạo ảnh"}</h2>
+                <div className={styles.segmentTabs}>
+                  <button type="button" className={`${styles.segmentTab} ${activeTab === "result" ? styles.segmentTabActive : ""}`} onClick={() => setActiveTab("result")}>Kết quả</button>
+                  <button type="button" className={`${styles.segmentTab} ${activeTab === "history" ? styles.segmentTabActive : ""}`} onClick={() => setActiveTab("history")}>Lịch sử</button>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className={styles.loadingBox}><div className={styles.spinner} /><b>Đang tạo ảnh...</b><p>{statusText}</p></div>
+              ) : filteredCards.length === 0 ? (
+                <div className={styles.emptyState}>{activeTab === "result" ? "Chưa có ảnh kết quả. Hãy nhập prompt và bấm Generate." : "Chưa có lịch sử phù hợp với bộ lọc hiện tại."}</div>
+              ) : (
+                <div className={styles.creationGrid}>
+                  {filteredCards.slice(0, 8).map((item) => (
+                    <button key={item.id} type="button" className={styles.creationCard} onClick={() => openUrls(item.urls)}>
+                      <div className={`${styles.creationThumb} ${styles.creationThumbContain}`} style={activeTab === "result" && item.urls.length === 1 ? { aspectRatio: resultAspectRatio } : undefined}>
+                        <span className={styles.creationType}>▧</span>
+                        <img src={item.thumbUrl} alt={item.title} />
+                      </div>
+                      <div className={styles.creationMeta}>
+                        <strong>{item.title}</strong>
+                        <span>{item.meta}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.panel}>
+              <div className={styles.panelHead}><h2>Hoạt động gần đây</h2></div>
+              <div className={styles.activityList}>
+                {activityItems.length === 0 ? (
+                  <div className={styles.emptyState}>Chưa có hoạt động nào được lưu.</div>
+                ) : activityItems.map((item) => (
+                  <button key={item.id} type="button" className={styles.activityItem} onClick={() => openUrls(item.urls)}>
+                    <div className={styles.activityImg}><img src={item.thumbUrl} alt={item.title} /></div>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span>{item.meta}</span>
                     </div>
+                    <time>{new Date(item.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</time>
                   </button>
                 ))}
               </div>
-            ) : loading ? (
-              <div className={styles.loadingBox}><div className={styles.spinner} /><b>Đang tạo ảnh...</b><p>{statusText}</p></div>
-            ) : resultUrls.length === 0 ? (
-              <div className={styles.emptyTip}>Chưa có ảnh kết quả. Hãy nhập prompt và bấm Tạo ảnh.</div>
-            ) : resultUrls.length === 1 ? (
-              <div className={styles.imageGridSingle}>
-                <button
-                  className={`${styles.imageCard} ${styles.resultCard} ${styles.resultButton}`}
-                  style={{ aspectRatio: resultAspectRatio }}
-                  onClick={() => {
-                    setLightboxUrls(resultUrls);
-                    setLightboxIndex(0);
-                  }}
-                >
-                  <img src={resultUrls[0]} alt="Generated" className={styles.resultImg} />
-                </button>
+              <button type="button" className={styles.fullBtn} onClick={() => setActiveTab("history")}>Xem toàn bộ hoạt động</button>
+            </div>
+          </section>
+
+          <section className={styles.bottomGrid}>
+            <div className={styles.panel} id="templates">
+              <div className={styles.panelHead}><h2>Mẫu tạo nhanh</h2><button type="button" className={styles.viewBtn}>Xem tất cả</button></div>
+              <div className={styles.templates}>
+                {templates.map((item) => (
+                  <div key={item.title} className={styles.templateCard}>
+                    <div className={styles.templateImg} style={{ backgroundImage: `url(${item.image})` }} />
+                    <div className={styles.templateBody}><strong>{item.title}</strong><span>{item.ratio}</span></div>
+                  </div>
+                ))}
+                <div className={styles.customSize}><div><b>+</b><strong>Custom Size</strong><br /><span>Tự chọn kích thước</span></div></div>
               </div>
-            ) : resultUrls.length <= 2 ? (
-              <div className={styles.imageGridTwo}>
-                {resultUrls.map((url, index) => (
-                  <button
-                    key={url}
-                    className={`${styles.imageCard} ${styles.resultCard} ${styles.resultButton}`}
-                    style={{ aspectRatio: resultAspectRatio }}
-                    onClick={() => {
-                      setLightboxUrls(resultUrls);
-                      setLightboxIndex(index);
-                    }}
-                  >
-                    <img src={url} alt="Generated" className={styles.resultImg} />
-                  </button>
+            </div>
+
+            <div className={styles.panel} id="styles">
+              <div className={styles.panelHead}><h2>Phong cách phổ biến</h2><button type="button" className={styles.viewBtn}>Xem tất cả</button></div>
+              <div className={styles.stylesGrid}>
+                {styleCards.map((item) => (
+                  <div key={item.title} className={styles.styleCard} style={{ backgroundImage: `url(${item.image})` }}><strong>{item.title}</strong></div>
                 ))}
               </div>
-            ) : (
-              <div className={styles.imageGridFour}>
-                {resultUrls.map((url, index) => (
-                  <button
-                    key={url}
-                    className={`${styles.imageCard} ${styles.resultCard} ${styles.resultButton}`}
-                    style={{ aspectRatio: resultAspectRatio }}
-                    onClick={() => {
-                      setLightboxUrls(resultUrls);
-                      setLightboxIndex(index);
-                    }}
-                  >
-                    <img src={url} alt="Generated" className={styles.resultImg} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      </main>
+            </div>
+          </section>
+        </main>
+      </div>
 
       {lightboxUrls ? (
         <div className={styles.lightbox} onClick={() => setLightboxUrls(null)}>
@@ -458,7 +586,3 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     </div>
   );
 }
-
-
-
-
