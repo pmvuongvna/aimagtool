@@ -1,18 +1,25 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import styles from "../auth.module.css";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  async function waitForSession() {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const res = await apiFetch(apiPath("/api/auth/me"), { cache: "no-store" });
+      if (res.ok) return true;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    return false;
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -29,7 +36,8 @@ export default function RegisterPage() {
         setError(payload.error || "Register failed.");
         return;
       }
-      router.push("/user");
+      await waitForSession();
+      window.location.assign("/user");
     } finally {
       setLoading(false);
     }
@@ -65,4 +73,3 @@ export default function RegisterPage() {
     </main>
   );
 }
-
