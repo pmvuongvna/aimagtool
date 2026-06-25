@@ -44,6 +44,11 @@ const styleCards = [
   { title: "3D Trailer", image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=300&q=80" },
 ];
 
+const videoAspectOptions = ["auto", "2:3", "16:9", "9:16", "4:3", "3:4", "1:1"];
+const durationOptions = [5, 10, 15, 20, 25, 30];
+const videoResolutionOptions: VideoResolution[] = ["480p", "720p"];
+const videoModeOptions: VideoMode[] = ["normal", "fun", "spicy"];
+
 function formatCredits(value: number) {
   return Number.isInteger(value)
     ? value.toLocaleString("vi-VN")
@@ -131,6 +136,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   const [duration, setDuration] = useState(6);
   const [resolution, setResolution] = useState<VideoResolution>("480p");
   const [activeTab, setActiveTab] = useState<"result" | "history">("result");
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo video.");
@@ -397,72 +403,115 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                 <div className={styles.promptSide}><button type="button" className={styles.magicBtn}>✦</button><span>{prompt.length} / 20000</span></div>
               </div>
 
-              <div className={styles.controls}>
-                <div className={styles.controlCard}><div className={styles.controlCardIcon}>▭</div><div><small>Tỷ lệ video</small><strong>{aspectRatio}</strong></div></div>
-                <div className={styles.controlCard}><div className={styles.controlCardIcon}>⏱</div><div><small>Thời lượng</small><strong>{duration}s</strong></div></div>
-                <div className={styles.controlCard}><div className={styles.controlCardIcon}>⚙</div><div><small>Mode</small><strong>{mode}</strong></div></div>
-                <div className={styles.controlCard}><div className={styles.controlCardIcon}>🖼</div><div><small>Ảnh tham chiếu</small><strong>{videoModeType === "image" ? (referenceUrl ? "Đã sẵn sàng" : "Chưa tải lên") : "Không dùng"}</strong></div></div>
-                <button type="button" className={styles.resetBtn} onClick={() => { setPrompt(""); setReferenceUrl(""); setMode("normal"); }}>Reset</button>
+              <div className={styles.controlsCompact}>
+                <div className={styles.controlSelectCard}>
+                  <div className={styles.controlSelectIcon}>▭</div>
+                  <div className={styles.controlSelectHead}>
+                    <small>Tỷ lệ video</small>
+                    <select className={styles.controlSelect} value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)}>
+                      {videoAspectOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.controlSelectCard}>
+                  <div className={styles.controlSelectIcon}>⏱</div>
+                  <div className={styles.controlSelectHead}>
+                    <small>Thời lượng</small>
+                    <select className={styles.controlSelect} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+                      {durationOptions.map((value) => <option key={value} value={value}>{value}s</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.controlSelectCard}>
+                  <div className={styles.controlSelectIcon}>▤</div>
+                  <div className={styles.controlSelectHead}>
+                    <small>Độ phân giải</small>
+                    <select className={styles.controlSelect} value={resolution} onChange={(e) => setResolution(e.target.value as VideoResolution)}>
+                      {videoResolutionOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.controlSelectCard}>
+                  <div className={styles.controlSelectIcon}>🖼</div>
+                  <div className={styles.controlSelectHead}>
+                    <small>Workflow</small>
+                    <select className={styles.controlSelect} value={videoModeType} onChange={(e) => setVideoModeType(e.target.value as "text" | "image")}>
+                      <option value="text">Text to Video</option>
+                      <option value="image">Image to Video</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
+                  {showAdvancedSettings ? "Ẩn Advanced" : "Advanced settings"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.resetBtn}
+                  onClick={() => {
+                    setPrompt("");
+                    setReferenceUrl("");
+                    setMode("normal");
+                    setAspectRatio("2:3");
+                    setDuration(6);
+                    setResolution("480p");
+                    setVideoModeType("text");
+                  }}
+                >
+                  Reset
+                </button>
                 <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Đang tạo..." : `✨ Generate · ${formatCredits(currentCost ?? 0)}`}</button>
               </div>
 
-              <div className={styles.advancedGrid}>
-                <div className={styles.fieldBlock}>
-                  <div className={styles.fieldBlockHeader}><h4>Mô hình AI</h4><span className={styles.fieldHint}>Grok Imagine</span></div>
-                  <div className={styles.modelMenu}>
-                    <button type="button" className={`${styles.modelOption} ${videoModeType === "text" ? styles.modelOptionActive : ""}`} onClick={() => setVideoModeType("text")}>
-                      <img src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=200&q=80" alt="Text to video" />
-                      <div><strong>Text to Video</strong><span>Prompt → video theo tài liệu Grok Imagine</span></div>
-                      <span className={styles.badge}>Live</span>
-                    </button>
-                    <button type="button" className={`${styles.modelOption} ${videoModeType === "image" ? styles.modelOptionActive : ""}`} onClick={() => setVideoModeType("image")}>
-                      <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80" alt="Image to video" />
-                      <div><strong>Image to Video</strong><span>Ảnh tham chiếu + prompt chuyển động</span></div>
-                      <span className={styles.badge}>Ref</span>
-                    </button>
+              {showAdvancedSettings ? (
+                <div className={styles.advancedPanel}>
+                  <div className={styles.fieldBlockHeader}>
+                    <h4>Advanced settings</h4>
+                    <span className={styles.fieldHint}>Mode, reference image và trạng thái render</span>
                   </div>
-                </div>
 
-                <div className={styles.fieldBlock}>
-                  <div className={styles.fieldBlockHeader}><h4>Thiết lập video</h4><span className={styles.fieldHint}>Aspect, duration, resolution</span></div>
-                  <div className={styles.choiceGrid}>
-                    {["auto", "2:3", "16:9", "9:16", "4:3", "3:4", "1:1"].map((value) => (
-                      <button key={value} type="button" className={`${styles.choiceBtn} ${aspectRatio === value ? styles.choiceBtnActive : ""}`} onClick={() => setAspectRatio(value)}>{value}</button>
-                    ))}
-                  </div>
-                  <div className={styles.choiceGrid} style={{ marginTop: 10 }}>
-                    {[5, 10, 15, 20, 25, 30].map((value) => (
-                      <button key={value} type="button" className={`${styles.choiceBtn} ${duration === value ? styles.choiceBtnActive : ""}`} onClick={() => setDuration(value)}>{value}s</button>
-                    ))}
-                  </div>
-                  <div className={styles.choiceGrid} style={{ marginTop: 10 }}>
-                    {(["480p", "720p"] as VideoResolution[]).map((value) => (
-                      <button key={value} type="button" className={`${styles.choiceBtn} ${resolution === value ? styles.choiceBtnActive : ""}`} onClick={() => setResolution(value)}>{value}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={styles.fieldBlock}>
-                  <div className={styles.fieldBlockHeader}><h4>Mode & tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : "Reference optional"}</span></div>
-                  <div className={styles.choiceGrid}>
-                    {(["normal", "fun", "spicy"] as VideoMode[]).map((value) => (
-                      <button key={value} type="button" className={`${styles.choiceBtn} ${mode === value ? styles.choiceBtnActive : ""}`} onClick={() => setMode(value)}>{value}</button>
-                    ))}
-                  </div>
-                  {videoModeType === "image" ? (
-                    <div className={styles.uploadRow} style={{ marginTop: 10 }}>
-                      <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file); }} />
-                      <input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
+                  <div className={styles.advancedPanelGrid}>
+                    <div className={styles.fieldBlock}>
+                      <div className={styles.fieldBlockHeader}><h4>Model AI</h4><span className={styles.fieldHint}>Grok Imagine</span></div>
+                      <select value={videoModeType} onChange={(e) => setVideoModeType(e.target.value as "text" | "image")}>
+                        <option value="text">Text to Video</option>
+                        <option value="image">Image to Video</option>
+                      </select>
                     </div>
-                  ) : null}
-                </div>
 
-                <div className={styles.fieldBlock}>
-                  <div className={styles.fieldBlockHeader}><h4>Trạng thái render</h4><span className={styles.fieldHint}>Theo dõi realtime</span></div>
-                  <textarea value={statusText} readOnly />
-                  <div className={styles.fieldHint} style={{ marginTop: 10 }}>Task ID: {taskId || "chưa tạo"}</div>
+                    <div className={styles.fieldBlock}>
+                      <div className={styles.fieldBlockHeader}><h4>Video mode</h4><span className={styles.fieldHint}>Tính cách chuyển động</span></div>
+                      <select value={mode} onChange={(e) => setMode(e.target.value as VideoMode)}>
+                        {videoModeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                      </select>
+                    </div>
+
+                    <div className={styles.fieldBlock}>
+                      <div className={styles.fieldBlockHeader}><h4>Output</h4><span className={styles.fieldHint}>Duration + quality</span></div>
+                      <div className={styles.subtleNote}>{duration}s · {resolution} · {aspectRatio}</div>
+                    </div>
+
+                    {videoModeType === "image" ? (
+                      <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
+                        <div className={styles.fieldBlockHeader}><h4>Ảnh tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : referenceUrl ? "Đã có URL ảnh" : "Upload hoặc dán URL"}</span></div>
+                        <div className={styles.uploadRow}>
+                          <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file); }} />
+                          <input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
+                      <div className={styles.fieldBlockHeader}><h4>Trạng thái render</h4><span className={styles.fieldHint}>Theo dõi realtime</span></div>
+                      <textarea value={statusText} readOnly />
+                      <div style={{ marginTop: 10 }} className={styles.subtleNote}>Task ID: {taskId || "chưa tạo"}</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className={styles.statusBar}><span>{statusText}</span><span>Ước tính: {formatCredits(currentCost ?? 0)} credit</span></div>
             </form>
@@ -527,3 +576,4 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     </div>
   );
 }
+

@@ -44,6 +44,11 @@ const styleCards = [
   { title: "3D Render", image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=300&q=80" },
 ];
 
+const aspectOptions = ["1:1", "16:9", "4:3", "3:4", "9:16"];
+const styleOptions = ["Cinematic", "Ảnh thực", "Anime", "3D Render", "Editorial"];
+const quantityOptions = [1, 2];
+const resolutionOptions: ImageResolution[] = ["1k", "2k", "4k"];
+
 function formatCredits(value: number) {
   return Number.isInteger(value)
     ? value.toLocaleString("vi-VN")
@@ -102,6 +107,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [activeTab, setActiveTab] = useState<"result" | "history">("result");
   const [activeStyle, setActiveStyle] = useState("Cinematic");
   const [resultAspectRatio, setResultAspectRatio] = useState("16:9");
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo ảnh.");
@@ -412,76 +418,129 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                 </div>
               </div>
 
-              <div className={styles.controls}>
-                <div className={styles.controlCard}><div className={styles.controlCardIcon}>▭</div><div><small>Tỷ lệ ảnh</small><strong>{aspectRatio}</strong></div></div>
-                <div className={styles.controlCard}><div className={styles.controlCardIcon}>✺</div><div><small>Phong cách</small><strong>{activeStyle}</strong></div></div>
-                <div className={styles.controlCard}><div className={styles.controlCardIcon}>▤</div><div><small>Model</small><strong>{imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"}</strong></div></div>
-                <div className={styles.controlCard}><div className={styles.controlCardIcon}>🖼</div><div><small>Ảnh tham chiếu</small><strong>{generationMode === "image" ? (referenceUrl ? "Đã sẵn sàng" : "Chưa tải lên") : "Không dùng"}</strong></div></div>
-                <button type="button" className={styles.resetBtn} onClick={() => { setPrompt(""); setNegativePrompt(""); setReferenceUrl(""); setActiveStyle("Cinematic"); }}>Reset</button>
+              <div className={styles.controlsCompact}>
+                <div className={styles.controlSelectCard}>
+                  <div className={styles.controlSelectIcon}>▭</div>
+                  <div className={styles.controlSelectHead}>
+                    <small>Tỷ lệ ảnh</small>
+                    <select className={styles.controlSelect} value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)}>
+                      {aspectOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.controlSelectCard}>
+                  <div className={styles.controlSelectIcon}>✺</div>
+                  <div className={styles.controlSelectHead}>
+                    <small>Phong cách</small>
+                    <select className={styles.controlSelect} value={activeStyle} onChange={(e) => setActiveStyle(e.target.value)}>
+                      {styleOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.controlSelectCard}>
+                  <div className={styles.controlSelectIcon}>▤</div>
+                  <div className={styles.controlSelectHead}>
+                    <small>Model</small>
+                    <select
+                      className={styles.controlSelect}
+                      value={imageModel}
+                      onChange={(e) => {
+                        const nextModel = e.target.value as "gpt" | "seedream";
+                        setImageModel(nextModel);
+                        if (nextModel === "seedream") setImageResolution("1k");
+                      }}
+                    >
+                      <option value="gpt">GPT Image 2</option>
+                      <option value="seedream">Seedream 5 Lite</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.controlSelectCard}>
+                  <div className={styles.controlSelectIcon}>🖼</div>
+                  <div className={styles.controlSelectHead}>
+                    <small>Chế độ tạo</small>
+                    <select className={styles.controlSelect} value={generationMode} onChange={(e) => setGenerationMode(e.target.value as "text" | "image")}>
+                      <option value="text">Text to Image</option>
+                      <option value="image">Image to Image</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
+                  {showAdvancedSettings ? "Ẩn Advanced" : "Advanced settings"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.resetBtn}
+                  onClick={() => {
+                    setPrompt("");
+                    setNegativePrompt("");
+                    setReferenceUrl("");
+                    setActiveStyle("Cinematic");
+                    setGenerationMode("text");
+                    setAspectRatio("16:9");
+                    setQuantity(1);
+                    setImageResolution(imageModel === "gpt" ? "2k" : "1k");
+                  }}
+                >
+                  Reset
+                </button>
                 <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Đang tạo..." : `✨ Generate · ${formatCredits(currentCost ?? 0)}`}</button>
               </div>
 
-              <div className={styles.advancedGrid}>
-                <div className={styles.fieldBlock}>
-                  <div className={styles.fieldBlockHeader}><h4>Model AI</h4><span className={styles.fieldHint}>Chọn engine</span></div>
-                  <div className={styles.modelMenu}>
-                    <button type="button" className={`${styles.modelOption} ${imageModel === "gpt" ? styles.modelOptionActive : ""}`} onClick={() => setImageModel("gpt")}>
-                      <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80" alt="GPT Image 2" />
-                      <div><strong>GPT Image 2</strong><span>Text/Image to Image · 1K / 2K / 4K</span></div>
-                      <span className={styles.badge}>Pro</span>
-                    </button>
-                    <button type="button" className={`${styles.modelOption} ${imageModel === "seedream" ? styles.modelOptionActive : ""}`} onClick={() => { setImageModel("seedream"); setImageResolution("1k"); }}>
-                      <img src="https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=200&q=80" alt="Seedream 5 Lite" />
-                      <div><strong>Seedream 5 Lite</strong><span>Text/Image to Image · quality basic</span></div>
-                      <span className={styles.badge}>Lite</span>
-                    </button>
+              {showAdvancedSettings ? (
+                <div className={styles.advancedPanel}>
+                  <div className={styles.fieldBlockHeader}>
+                    <h4>Advanced settings</h4>
+                    <span className={styles.fieldHint}>Quantity, resolution, reference image và negative prompt</span>
                   </div>
-                </div>
 
-                <div className={styles.fieldBlock}>
-                  <div className={styles.fieldBlockHeader}><h4>Thiết lập ảnh</h4><span className={styles.fieldHint}>Tạo đúng format</span></div>
-                  <div className={styles.choiceGrid}>
-                    {["1:1", "16:9", "4:3", "3:4", "9:16"].map((value) => (
-                      <button key={value} type="button" className={`${styles.choiceBtn} ${aspectRatio === value ? styles.choiceBtnActive : ""}`} onClick={() => setAspectRatio(value)}>{value}</button>
-                    ))}
-                  </div>
-                  <div className={styles.choiceGrid} style={{ marginTop: 10 }}>
-                    {[1, 2].map((value) => (
-                      <button key={value} type="button" className={`${styles.choiceBtn} ${quantity === value ? styles.choiceBtnActive : ""}`} onClick={() => setQuantity(value)}>{value} ảnh</button>
-                    ))}
-                  </div>
-                  <div className={styles.choiceGrid} style={{ marginTop: 10 }}>
-                    {["1k", "2k", "4k"].map((value) => (
-                      <button key={value} type="button" className={`${styles.choiceBtn} ${imageResolution === value ? styles.choiceBtnActive : ""}`} onClick={() => setImageResolution(value as ImageResolution)} disabled={imageModel !== "gpt"}>{value.toUpperCase()}</button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={styles.fieldBlock}>
-                  <div className={styles.fieldBlockHeader}><h4>Chế độ & tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : "Image to Image nếu cần"}</span></div>
-                  <div className={styles.choiceGrid}>
-                    {[{ id: "text", label: "Text → Image" }, { id: "image", label: "Image → Image" }].map((item) => (
-                      <button key={item.id} type="button" className={`${styles.choiceBtn} ${generationMode === item.id ? styles.choiceBtnActive : ""}`} onClick={() => setGenerationMode(item.id as "text" | "image")}>{item.label}</button>
-                    ))}
-                  </div>
-                  {generationMode === "image" ? (
-                    <div className={styles.uploadRow} style={{ marginTop: 10 }}>
-                      <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file); }} />
-                      <input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
+                  <div className={styles.advancedPanelGrid}>
+                    <div className={styles.fieldBlock}>
+                      <div className={styles.fieldBlockHeader}><h4>Số lượng ảnh</h4><span className={styles.fieldHint}>Tối đa 2 ảnh</span></div>
+                      <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}>
+                        {quantityOptions.map((value) => <option key={value} value={value}>{value} ảnh</option>)}
+                      </select>
                     </div>
-                  ) : null}
-                </div>
 
-                <div className={styles.fieldBlock}>
-                  <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt & style</span></div>
-                  <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value.slice(0, 1000))} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
-                  <div className={styles.choiceGrid} style={{ marginTop: 10 }}>
-                    {["Cinematic", "Ảnh thực", "Anime", "3D Render", "Editorial"].map((value) => (
-                      <button key={value} type="button" className={`${styles.choiceBtn} ${activeStyle === value ? styles.choiceBtnActive : ""}`} onClick={() => setActiveStyle(value)}>{value}</button>
-                    ))}
+                    <div className={styles.fieldBlock}>
+                      <div className={styles.fieldBlockHeader}><h4>Độ phân giải</h4><span className={styles.fieldHint}>{imageModel === "gpt" ? "1K / 2K / 4K" : "Seedream chỉ hỗ trợ 1K"}</span></div>
+                      <select value={imageResolution} onChange={(e) => setImageResolution(e.target.value as ImageResolution)} disabled={imageModel !== "gpt"}>
+                        {resolutionOptions.map((value) => <option key={value} value={value}>{value.toUpperCase()}</option>)}
+                      </select>
+                    </div>
+
+                    <div className={styles.fieldBlock}>
+                      <div className={styles.fieldBlockHeader}><h4>Workflow</h4><span className={styles.fieldHint}>{generationMode === "image" ? "Đang bật ảnh tham chiếu" : "Prompt thuần"}</span></div>
+                      <select value={generationMode} onChange={(e) => setGenerationMode(e.target.value as "text" | "image")}>
+                        <option value="text">Text to Image</option>
+                        <option value="image">Image to Image</option>
+                      </select>
+                    </div>
+
+                    {generationMode === "image" ? (
+                      <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
+                        <div className={styles.fieldBlockHeader}><h4>Ảnh tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : referenceUrl ? "Đã có URL ảnh" : "Upload hoặc dán URL"}</span></div>
+                        <div className={styles.uploadRow}>
+                          <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file); }} />
+                          <input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
+                      <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt</span></div>
+                      <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value.slice(0, 1000))} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
+                      <div style={{ marginTop: 10 }} className={styles.subtleNote}>
+                        {imageModel === "seedream" ? "Seedream 5 Lite đang được khóa về 1K để đúng workflow của model." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className={styles.statusBar}>
                 <span>{statusText}</span>
@@ -586,3 +645,5 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     </div>
   );
 }
+
+
