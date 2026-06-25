@@ -379,7 +379,7 @@
 
 .controlsCompact {
   display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr)) 150px 110px 190px;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto auto auto;
   gap: 14px;
   align-items: stretch;
 }
@@ -1249,6 +1249,7 @@
   .templates,
   .stylesGrid { grid-template-columns: repeat(2, 1fr); }
 }
+
 
 
 

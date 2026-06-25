@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTaskInput, VideoMode, VideoResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import styles from "../generate.module.css";
@@ -19,6 +19,8 @@ type VideoDashboardCache = {
   history: HistoryItem[];
   packages: CreditPackage[];
 };
+
+type ControlDropdown = "aspect" | "duration" | "resolution" | "workflow" | null;
 
 type CardItem = {
   id: string;
@@ -137,6 +139,8 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   const [resolution, setResolution] = useState<VideoResolution>("480p");
   const [activeTab, setActiveTab] = useState<"result" | "history">("result");
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [openControl, setOpenControl] = useState<ControlDropdown>(null);
+  const controlsRef = useRef<HTMLDivElement | null>(null);
 
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo video.");
@@ -166,6 +170,24 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   useEffect(() => {
     router.prefetch("/user");
   }, [router]);
+
+  useEffect(() => {
+    if (videoModeType === "image") {
+      setShowAdvancedSettings(true);
+    }
+  }, [videoModeType]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!controlsRef.current) return;
+      if (!controlsRef.current.contains(event.target as Node)) {
+        setOpenControl(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -403,46 +425,98 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                 <div className={styles.promptSide}><button type="button" className={styles.magicBtn}>✦</button><span>{prompt.length} / 20000</span></div>
               </div>
 
-              <div className={styles.controlsCompact}>
-                <div className={styles.controlSelectCard}>
-                  <div className={styles.controlSelectIcon}>▭</div>
-                  <div className={styles.controlSelectHead}>
-                    <small>Tỷ lệ video</small>
-                    <select className={styles.controlSelect} value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)}>
-                      {videoAspectOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-                    </select>
-                  </div>
+              <div className={styles.controlsCompact} ref={controlsRef}>
+                <div className={styles.settingDropdown}>
+                  <button
+                    type="button"
+                    className={`${styles.settingButton} ${styles.settingAspect} ${openControl === "aspect" ? styles.settingButtonActive : ""}`}
+                    onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}
+                  >
+                    <div className={styles.controlSelectIcon}>▭</div>
+                    <div>
+                      <small>Tỷ lệ video</small>
+                      <strong>{aspectRatio}</strong>
+                    </div>
+                  </button>
+                  {openControl === "aspect" ? (
+                    <div className={styles.settingMenu}>
+                      {videoAspectOptions.map((value) => (
+                        <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className={styles.controlSelectCard}>
-                  <div className={styles.controlSelectIcon}>⏱</div>
-                  <div className={styles.controlSelectHead}>
-                    <small>Thời lượng</small>
-                    <select className={styles.controlSelect} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-                      {durationOptions.map((value) => <option key={value} value={value}>{value}s</option>)}
-                    </select>
-                  </div>
+                <div className={styles.settingDropdown}>
+                  <button
+                    type="button"
+                    className={`${styles.settingButton} ${styles.settingStyle} ${openControl === "duration" ? styles.settingButtonActive : ""}`}
+                    onClick={() => setOpenControl((prev) => prev === "duration" ? null : "duration")}
+                  >
+                    <div className={styles.controlSelectIcon}>⏱</div>
+                    <div>
+                      <small>Thời lượng</small>
+                      <strong>{duration}s</strong>
+                    </div>
+                  </button>
+                  {openControl === "duration" ? (
+                    <div className={styles.settingMenu}>
+                      {durationOptions.map((value) => (
+                        <button key={value} type="button" className={`${styles.settingMenuItem} ${duration === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setDuration(value); setOpenControl(null); }}>
+                          {value}s
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className={styles.controlSelectCard}>
-                  <div className={styles.controlSelectIcon}>▤</div>
-                  <div className={styles.controlSelectHead}>
-                    <small>Độ phân giải</small>
-                    <select className={styles.controlSelect} value={resolution} onChange={(e) => setResolution(e.target.value as VideoResolution)}>
-                      {videoResolutionOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-                    </select>
-                  </div>
+                <div className={styles.settingDropdown}>
+                  <button
+                    type="button"
+                    className={`${styles.settingButton} ${styles.settingModel} ${openControl === "resolution" ? styles.settingButtonActive : ""}`}
+                    onClick={() => setOpenControl((prev) => prev === "resolution" ? null : "resolution")}
+                  >
+                    <div className={styles.controlSelectIcon}>▤</div>
+                    <div>
+                      <small>Độ phân giải</small>
+                      <strong>{resolution}</strong>
+                    </div>
+                  </button>
+                  {openControl === "resolution" ? (
+                    <div className={styles.settingMenu}>
+                      {videoResolutionOptions.map((value) => (
+                        <button key={value} type="button" className={`${styles.settingMenuItem} ${resolution === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setResolution(value); setOpenControl(null); }}>
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className={styles.controlSelectCard}>
-                  <div className={styles.controlSelectIcon}>🖼</div>
-                  <div className={styles.controlSelectHead}>
-                    <small>Workflow</small>
-                    <select className={styles.controlSelect} value={videoModeType} onChange={(e) => setVideoModeType(e.target.value as "text" | "image")}>
-                      <option value="text">Text to Video</option>
-                      <option value="image">Image to Video</option>
-                    </select>
-                  </div>
+                <div className={styles.settingDropdown}>
+                  <button
+                    type="button"
+                    className={`${styles.settingButton} ${styles.settingMode} ${videoModeType === "image" || openControl === "workflow" ? styles.settingButtonActive : ""}`}
+                    onClick={() => setOpenControl((prev) => prev === "workflow" ? null : "workflow")}
+                  >
+                    <div className={styles.controlSelectIcon}>🖼</div>
+                    <div>
+                      <small>Workflow</small>
+                      <strong>{videoModeType === "text" ? "Text to Video" : "Image to Video"}</strong>
+                    </div>
+                  </button>
+                  {openControl === "workflow" ? (
+                    <div className={styles.settingMenu}>
+                      <button type="button" className={`${styles.settingMenuItem} ${videoModeType === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("text"); setOpenControl(null); }}>
+                        Text to Video
+                      </button>
+                      <button type="button" className={`${styles.settingMenuItem} ${videoModeType === "image" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>
+                        Image to Video
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
@@ -501,6 +575,12 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                           <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file); }} />
                           <input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
                         </div>
+                        {referenceUrl ? (
+                          <div className={styles.referencePreview}>
+                            <img src={referenceUrl} alt="Ảnh tham chiếu video" />
+                            <div className={styles.referencePreviewMeta}>Ảnh này sẽ được dùng làm khung gốc cho workflow Image to Video.</div>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -576,4 +656,5 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     </div>
   );
 }
+
 
