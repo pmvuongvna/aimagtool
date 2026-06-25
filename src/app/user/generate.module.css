@@ -15,7 +15,7 @@
   --radius: 22px;
   min-height: 100vh;
   color: var(--text);
-  font-family: Verdana, Geneva, sans-serif;
+  font-family: var(--font-display), Roboto, Arial, sans-serif;
   background:
     radial-gradient(circle at top right, rgba(108, 60, 255, 0.12), transparent 35%),
     radial-gradient(circle at 35% 20%, rgba(47, 128, 237, 0.08), transparent 30%),
@@ -446,6 +446,89 @@
   cursor: pointer;
 }
 
+
+.settingButton {
+  min-height: 74px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.settingButton:hover {
+  transform: translateY(-1px);
+}
+
+.settingButton small {
+  display: block;
+  font-size: 12px;
+  color: rgba(20, 20, 43, 0.62);
+  margin-bottom: 6px;
+}
+
+.settingButton strong {
+  display: block;
+  font-size: 20px;
+  line-height: 1.15;
+  color: #16162a;
+}
+
+.settingAspect {
+  background: linear-gradient(135deg, #ffffff, #f3eeff);
+  border-color: #dfd4ff;
+  box-shadow: 0 14px 30px rgba(108, 60, 255, 0.08);
+}
+
+.settingStyle {
+  background: linear-gradient(135deg, #fffdf7, #fff1df);
+  border-color: #ffd8aa;
+  box-shadow: 0 14px 30px rgba(255, 176, 32, 0.12);
+}
+
+.settingModel {
+  background: linear-gradient(135deg, #f7fbff, #eaf3ff);
+  border-color: #cfe2ff;
+  box-shadow: 0 14px 30px rgba(47, 128, 237, 0.12);
+}
+
+.settingMode {
+  background: linear-gradient(135deg, #f7fff8, #e8fff1);
+  border-color: #c8f3d8;
+  box-shadow: 0 14px 30px rgba(32, 201, 151, 0.12);
+}
+
+.settingButtonActive {
+  border-color: #8d69ff;
+  box-shadow: 0 16px 34px rgba(108, 60, 255, 0.16);
+}
+
+.referencePreview {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.referencePreview img {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  display: block;
+  background: #f5f6ff;
+}
+
+.referencePreviewMeta {
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+}
 .advancedToggle {
   height: 60px;
   border-radius: 16px;
@@ -1128,3 +1211,5 @@
   .templates,
   .stylesGrid { grid-template-columns: repeat(2, 1fr); }
 }
+
+

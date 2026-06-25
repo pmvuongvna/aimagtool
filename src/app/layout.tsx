@@ -1,8 +1,8 @@
 ﻿import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono, Roboto } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const roboto = Roboto({
   variable: "--font-display",
   subsets: ["latin", "latin-ext", "vietnamese"],
 });
@@ -23,8 +23,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${roboto.variable} ${jetbrainsMono.variable}`}>
       <body>{children}</body>
     </html>
   );
 }
+

@@ -143,6 +143,12 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, [router]);
 
   useEffect(() => {
+    if (generationMode === "image") {
+      setShowAdvancedSettings(true);
+    }
+  }, [generationMode]);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       try {
         const raw = window.sessionStorage.getItem(CACHE_KEY);
@@ -419,55 +425,58 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
               </div>
 
               <div className={styles.controlsCompact}>
-                <div className={styles.controlSelectCard}>
+                <button
+                  type="button"
+                  className={`${styles.settingButton} ${styles.settingAspect}`}
+                  onClick={() => setAspectRatio(aspectOptions[(aspectOptions.indexOf(aspectRatio) + 1) % aspectOptions.length])}
+                >
                   <div className={styles.controlSelectIcon}>▭</div>
-                  <div className={styles.controlSelectHead}>
+                  <div>
                     <small>Tỷ lệ ảnh</small>
-                    <select className={styles.controlSelect} value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)}>
-                      {aspectOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-                    </select>
+                    <strong>{aspectRatio}</strong>
                   </div>
-                </div>
+                </button>
 
-                <div className={styles.controlSelectCard}>
+                <button
+                  type="button"
+                  className={`${styles.settingButton} ${styles.settingStyle}`}
+                  onClick={() => setActiveStyle(styleOptions[(styleOptions.indexOf(activeStyle) + 1) % styleOptions.length])}
+                >
                   <div className={styles.controlSelectIcon}>✺</div>
-                  <div className={styles.controlSelectHead}>
+                  <div>
                     <small>Phong cách</small>
-                    <select className={styles.controlSelect} value={activeStyle} onChange={(e) => setActiveStyle(e.target.value)}>
-                      {styleOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-                    </select>
+                    <strong>{activeStyle}</strong>
                   </div>
-                </div>
+                </button>
 
-                <div className={styles.controlSelectCard}>
+                <button
+                  type="button"
+                  className={`${styles.settingButton} ${styles.settingModel}`}
+                  onClick={() => {
+                    const nextModel = imageModel === "gpt" ? "seedream" : "gpt";
+                    setImageModel(nextModel);
+                    if (nextModel === "seedream") setImageResolution("1k");
+                    if (nextModel === "gpt" && imageResolution === "1k") setImageResolution("2k");
+                  }}
+                >
                   <div className={styles.controlSelectIcon}>▤</div>
-                  <div className={styles.controlSelectHead}>
+                  <div>
                     <small>Model</small>
-                    <select
-                      className={styles.controlSelect}
-                      value={imageModel}
-                      onChange={(e) => {
-                        const nextModel = e.target.value as "gpt" | "seedream";
-                        setImageModel(nextModel);
-                        if (nextModel === "seedream") setImageResolution("1k");
-                      }}
-                    >
-                      <option value="gpt">GPT Image 2</option>
-                      <option value="seedream">Seedream 5 Lite</option>
-                    </select>
+                    <strong>{imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"}</strong>
                   </div>
-                </div>
+                </button>
 
-                <div className={styles.controlSelectCard}>
+                <button
+                  type="button"
+                  className={`${styles.settingButton} ${styles.settingMode} ${generationMode === "image" ? styles.settingButtonActive : ""}`}
+                  onClick={() => setGenerationMode(generationMode === "text" ? "image" : "text")}
+                >
                   <div className={styles.controlSelectIcon}>🖼</div>
-                  <div className={styles.controlSelectHead}>
+                  <div>
                     <small>Chế độ tạo</small>
-                    <select className={styles.controlSelect} value={generationMode} onChange={(e) => setGenerationMode(e.target.value as "text" | "image")}>
-                      <option value="text">Text to Image</option>
-                      <option value="image">Image to Image</option>
-                    </select>
+                    <strong>{generationMode === "text" ? "Text to Image" : "Image to Image"}</strong>
                   </div>
-                </div>
+                </button>
 
                 <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
                   {showAdvancedSettings ? "Ẩn Advanced" : "Advanced settings"}
@@ -528,6 +537,12 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                           <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file); }} />
                           <input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
                         </div>
+                        {referenceUrl ? (
+                          <div className={styles.referencePreview}>
+                            <img src={referenceUrl} alt="Ảnh tham chiếu" />
+                            <div className={styles.referencePreviewMeta}>Ảnh tham chiếu hiện tại sẽ được dùng cho workflow Image to Image.</div>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -645,5 +660,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     </div>
   );
 }
+
+
 
 
