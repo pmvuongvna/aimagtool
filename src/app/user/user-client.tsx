@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AIServiceId, CreateTaskInput, ImageResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import styles from "./generate.module.css";
@@ -19,6 +19,8 @@ type DashboardCache = {
   history: HistoryItem[];
   packages: CreditPackage[];
 };
+
+type ControlDropdown = "aspect" | "style" | "model" | "mode" | null;
 
 type CardItem = {
   id: string;
@@ -108,6 +110,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [activeStyle, setActiveStyle] = useState("Cinematic");
   const [resultAspectRatio, setResultAspectRatio] = useState("16:9");
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [openControl, setOpenControl] = useState<ControlDropdown>(null);
+  const controlsRef = useRef<HTMLDivElement | null>(null);
 
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo ảnh.");
@@ -147,6 +151,18 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
       setShowAdvancedSettings(true);
     }
   }, [generationMode]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!controlsRef.current) return;
+      if (!controlsRef.current.contains(event.target as Node)) {
+        setOpenControl(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -424,59 +440,100 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                 </div>
               </div>
 
-              <div className={styles.controlsCompact}>
-                <button
-                  type="button"
-                  className={`${styles.settingButton} ${styles.settingAspect}`}
-                  onClick={() => setAspectRatio(aspectOptions[(aspectOptions.indexOf(aspectRatio) + 1) % aspectOptions.length])}
-                >
-                  <div className={styles.controlSelectIcon}>▭</div>
-                  <div>
-                    <small>Tỷ lệ ảnh</small>
-                    <strong>{aspectRatio}</strong>
-                  </div>
-                </button>
+              <div className={styles.controlsCompact} ref={controlsRef}>
+                <div className={styles.settingDropdown}>
+                  <button
+                    type="button"
+                    className={`${styles.settingButton} ${styles.settingAspect} ${openControl === "aspect" ? styles.settingButtonActive : ""}`}
+                    onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}
+                  >
+                    <div className={styles.controlSelectIcon}>▭</div>
+                    <div>
+                      <small>Tỷ lệ ảnh</small>
+                      <strong>{aspectRatio}</strong>
+                    </div>
+                  </button>
+                  {openControl === "aspect" ? (
+                    <div className={styles.settingMenu}>
+                      {aspectOptions.map((value) => (
+                        <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
 
-                <button
-                  type="button"
-                  className={`${styles.settingButton} ${styles.settingStyle}`}
-                  onClick={() => setActiveStyle(styleOptions[(styleOptions.indexOf(activeStyle) + 1) % styleOptions.length])}
-                >
-                  <div className={styles.controlSelectIcon}>✺</div>
-                  <div>
-                    <small>Phong cách</small>
-                    <strong>{activeStyle}</strong>
-                  </div>
-                </button>
+                <div className={styles.settingDropdown}>
+                  <button
+                    type="button"
+                    className={`${styles.settingButton} ${styles.settingStyle} ${openControl === "style" ? styles.settingButtonActive : ""}`}
+                    onClick={() => setOpenControl((prev) => prev === "style" ? null : "style")}
+                  >
+                    <div className={styles.controlSelectIcon}>✺</div>
+                    <div>
+                      <small>Phong cách</small>
+                      <strong>{activeStyle}</strong>
+                    </div>
+                  </button>
+                  {openControl === "style" ? (
+                    <div className={styles.settingMenu}>
+                      {styleOptions.map((value) => (
+                        <button key={value} type="button" className={`${styles.settingMenuItem} ${activeStyle === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setActiveStyle(value); setOpenControl(null); }}>
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
 
-                <button
-                  type="button"
-                  className={`${styles.settingButton} ${styles.settingModel}`}
-                  onClick={() => {
-                    const nextModel = imageModel === "gpt" ? "seedream" : "gpt";
-                    setImageModel(nextModel);
-                    if (nextModel === "seedream") setImageResolution("1k");
-                    if (nextModel === "gpt" && imageResolution === "1k") setImageResolution("2k");
-                  }}
-                >
-                  <div className={styles.controlSelectIcon}>▤</div>
-                  <div>
-                    <small>Model</small>
-                    <strong>{imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"}</strong>
-                  </div>
-                </button>
+                <div className={styles.settingDropdown}>
+                  <button
+                    type="button"
+                    className={`${styles.settingButton} ${styles.settingModel} ${openControl === "model" ? styles.settingButtonActive : ""}`}
+                    onClick={() => setOpenControl((prev) => prev === "model" ? null : "model")}
+                  >
+                    <div className={styles.controlSelectIcon}>▤</div>
+                    <div>
+                      <small>Model</small>
+                      <strong>{imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"}</strong>
+                    </div>
+                  </button>
+                  {openControl === "model" ? (
+                    <div className={styles.settingMenu}>
+                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "gpt" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("gpt"); if (imageResolution === "1k") setImageResolution("2k"); setOpenControl(null); }}>
+                        GPT Image 2
+                      </button>
+                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "seedream" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("seedream"); setImageResolution("1k"); setOpenControl(null); }}>
+                        Seedream 5 Lite
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
 
-                <button
-                  type="button"
-                  className={`${styles.settingButton} ${styles.settingMode} ${generationMode === "image" ? styles.settingButtonActive : ""}`}
-                  onClick={() => setGenerationMode(generationMode === "text" ? "image" : "text")}
-                >
-                  <div className={styles.controlSelectIcon}>🖼</div>
-                  <div>
-                    <small>Chế độ tạo</small>
-                    <strong>{generationMode === "text" ? "Text to Image" : "Image to Image"}</strong>
-                  </div>
-                </button>
+                <div className={styles.settingDropdown}>
+                  <button
+                    type="button"
+                    className={`${styles.settingButton} ${styles.settingMode} ${generationMode === "image" || openControl === "mode" ? styles.settingButtonActive : ""}`}
+                    onClick={() => setOpenControl((prev) => prev === "mode" ? null : "mode")}
+                  >
+                    <div className={styles.controlSelectIcon}>🖼</div>
+                    <div>
+                      <small>Chế độ tạo</small>
+                      <strong>{generationMode === "text" ? "Text to Image" : "Image to Image"}</strong>
+                    </div>
+                  </button>
+                  {openControl === "mode" ? (
+                    <div className={styles.settingMenu}>
+                      <button type="button" className={`${styles.settingMenuItem} ${generationMode === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { setGenerationMode("text"); setOpenControl(null); }}>
+                        Text to Image
+                      </button>
+                      <button type="button" className={`${styles.settingMenuItem} ${generationMode === "image" ? styles.settingMenuItemActive : ""}`} onClick={() => { setGenerationMode("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>
+                        Image to Image
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
 
                 <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
                   {showAdvancedSettings ? "Ẩn Advanced" : "Advanced settings"}
@@ -660,6 +717,12 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     </div>
   );
 }
+
+
+
+
+
+
 
 
 

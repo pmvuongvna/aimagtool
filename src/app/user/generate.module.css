@@ -507,6 +507,44 @@
   box-shadow: 0 16px 34px rgba(108, 60, 255, 0.16);
 }
 
+
+.settingDropdown {
+  position: relative;
+}
+
+.settingMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  z-index: 12;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid #ddd8ff;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 38px rgba(35, 31, 85, 0.14);
+}
+
+.settingMenuItem {
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.settingMenuItemActive {
+  border-color: #d8ccff;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
 .referencePreview {
   margin-top: 12px;
   border: 1px solid var(--border);
@@ -1211,5 +1249,6 @@
   .templates,
   .stylesGrid { grid-template-columns: repeat(2, 1fr); }
 }
+
 
 
