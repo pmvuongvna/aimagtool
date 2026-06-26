@@ -378,10 +378,18 @@
 }
 
 .controlsCompact {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   align-items: stretch;
+}
+
+.controlsCompact > :nth-child(-n+4) {
+  flex: 0 0 188px;
+}
+
+.controlsCompact > :nth-child(5) {
+  margin-left: auto;
 }
 
 .controlCard,
@@ -1192,8 +1200,12 @@
 }
 
 @media (max-width: 1360px) {
-  .controlsCompact {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .controlsCompact > :nth-child(-n+4) {
+    flex: 1 1 calc(50% - 14px);
+  }
+
+  .controlsCompact > :nth-child(5) {
+    margin-left: 0;
   }
 
   .advancedPanelGrid {
@@ -1238,10 +1250,20 @@
   .topbar { flex-wrap: wrap; }
   .topActions { width: 100%; margin-left: 0; justify-content: space-between; }
   .controls,
-  .controlsCompact,
   .statsGrid,
   .advancedGrid,
   .advancedPanelGrid { grid-template-columns: 1fr; }
+  .controlsCompact {
+    flex-direction: column;
+  }
+  .controlsCompact > :nth-child(-n+4),
+  .controlsCompact > :nth-child(5),
+  .controlsCompact > :nth-child(6),
+  .controlsCompact > :nth-child(7) {
+    flex: 1 1 100%;
+    width: 100%;
+    margin-left: 0;
+  }
   .advancedPanelWide {
     grid-column: span 1;
   }
@@ -1249,6 +1271,7 @@
   .templates,
   .stylesGrid { grid-template-columns: repeat(2, 1fr); }
 }
+
 
 
 
