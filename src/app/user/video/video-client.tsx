@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CreateTaskInput, VideoMode, VideoResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
+import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory } from "@/lib/template-catalog";
 import styles from "../generate.module.css";
 
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
@@ -18,6 +19,7 @@ type VideoDashboardCache = {
   costPreview: ProfileResponse["previewCosts"] | null;
   history: HistoryItem[];
   packages: CreditPackage[];
+  templates: PromptTemplate[];
 };
 
 type ControlDropdown = "aspect" | "duration" | "resolution" | "workflow" | null;
@@ -32,13 +34,6 @@ type CardItem = {
 };
 
 const CACHE_KEY = "aistudio_video_dashboard_cache_v1";
-const templates = [
-  { title: "Short Vertical Reel", ratio: "9:16", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=300&q=80" },
-  { title: "Product Motion", ratio: "16:9", image: "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=300&q=80" },
-  { title: "Landscape Timelapse", ratio: "16:9", image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=300&q=80" },
-  { title: "Fashion Clip", ratio: "2:3", image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80" },
-  { title: "Concept Teaser", ratio: "4:3", image: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=300&q=80" },
-];
 const styleCards = [
   { title: "Cinematic", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=300&q=80" },
   { title: "Documentary", image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=300&q=80" },
@@ -141,6 +136,8 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [openControl, setOpenControl] = useState<ControlDropdown>(null);
   const controlsRef = useRef<HTMLDivElement | null>(null);
+  const [templateLibrary, setTemplateLibrary] = useState<PromptTemplate[]>([]);
+  const [templateCategory, setTemplateCategory] = useState<TemplateCategory>("All");
 
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo video.");
@@ -154,7 +151,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     if (typeof window === "undefined") return;
     try {
       const raw = window.sessionStorage.getItem(CACHE_KEY);
-      const base: VideoDashboardCache = raw ? (JSON.parse(raw) as VideoDashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [] };
+      const base: VideoDashboardCache = raw ? (JSON.parse(raw) as VideoDashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [], templates: [] };
       window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next }));
     } catch {}
   }, []);
@@ -201,14 +198,16 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
           if (cached.costPreview) setCostPreview(cached.costPreview);
           if (Array.isArray(cached.history)) setHistory(cached.history.filter((x) => x.mediaType === "video"));
           if (Array.isArray(cached.packages)) setPackages(cached.packages);
+          if (Array.isArray(cached.templates)) setTemplateLibrary(cached.templates);
         }
       } catch {}
     }
 
     async function bootstrap() {
-      const [profileRes, packageRes] = await Promise.all([
+      const [profileRes, packageRes, templateRes] = await Promise.all([
         apiFetch(apiPath("/api/user/profile")),
         apiFetch(apiPath("/api/public/credit-packages")),
+        apiFetch(apiPath("/api/public/templates?mediaType=video")),
       ]);
 
       if (profileRes.ok) {
@@ -234,6 +233,13 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
         const nextPackages = payload.packages || [];
         setPackages(nextPackages);
         saveCache({ packages: nextPackages });
+      }
+
+      if (templateRes.ok) {
+        const payload = (await templateRes.json()) as { items?: PromptTemplate[] };
+        const nextTemplates = payload.items || [];
+        setTemplateLibrary(nextTemplates);
+        saveCache({ templates: nextTemplates });
       }
     }
 
@@ -382,6 +388,19 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
   const activityItems = historyCards.slice(0, 4);
   const progressWidth = Math.max(8, Math.min(100, Math.round((credits / Math.max(credits + (currentCost || 0), 1000)) * 100)));
+
+  const filteredTemplates = useMemo(() => {
+    if (templateCategory === "All") return templateLibrary;
+    return templateLibrary.filter((item) => item.category === templateCategory || item.tags.includes(templateCategory));
+  }, [templateCategory, templateLibrary]);
+
+  const applyTemplate = useCallback((item: PromptTemplate) => {
+    setPrompt(item.prompt);
+    if (videoAspectOptions.includes(item.aspectRatio)) setAspectRatio(item.aspectRatio);
+    setVideoModeType("text");
+    setActiveTab("result");
+    document.getElementById("generator")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
   const activePackage = packages[0];
 
   return (
@@ -646,7 +665,43 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
           </section>
 
           <section className={styles.bottomGrid}>
-            <div className={styles.panel} id="templates"><div className={styles.panelHead}><h2>Mẫu tạo nhanh</h2><button type="button" className={styles.viewBtn}>Xem tất cả</button></div><div className={styles.templates}>{templates.map((item) => <div key={item.title} className={styles.templateCard}><div className={styles.templateImg} style={{ backgroundImage: `url(${item.image})` }} /><div className={styles.templateBody}><strong>{item.title}</strong><span>{item.ratio}</span></div></div>)}<div className={styles.customSize}><div><b>+</b><strong>Custom Size</strong><br /><span>Tự chọn kịch bản</span></div></div></div></div>
+            <div className={styles.panel} id="templates">
+              <div className={styles.panelHead}><h2>Mẫu tạo nhanh</h2><button type="button" className={styles.viewBtn} onClick={() => setTemplateCategory("All")}>Xem tất cả</button></div>
+              <div className={styles.templateLibrary}>
+                <aside className={styles.templateSidebar}>
+                  <span className={styles.templateSidebarTitle}>Tags</span>
+                  <div className={styles.templateCategoryList}>
+                    {TEMPLATE_CATEGORIES.map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        className={`${styles.templateCategoryBtn} ${templateCategory === category ? styles.templateCategoryBtnActive : ""}`}
+                        onClick={() => setTemplateCategory(category)}
+                      >
+                        {category}
+                      </button>
+                    ))}
+                  </div>
+                </aside>
+
+                <div className={styles.templateGridContent}>
+                  <div className={styles.templates}>
+                    {filteredTemplates.length === 0 ? (
+                      <div className={styles.emptyState}>Chưa có prompt nào trong nhóm tag này.</div>
+                    ) : filteredTemplates.map((item) => (
+                      <button key={item.id} type="button" className={styles.templateCard} onClick={() => applyTemplate(item)}>
+                        <div className={styles.templateImg} style={{ backgroundImage: `url(${item.thumbnailUrl})` }} />
+                        <div className={styles.templateBody}>
+                          <strong>{item.title}</strong>
+                          <span>{item.aspectRatio} ? {item.model}</span>
+                          <em className={styles.templatePrompt}>{truncate(item.prompt, 92)}</em>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
             <div className={styles.panel} id="styles"><div className={styles.panelHead}><h2>Phong cách phổ biến</h2><button type="button" className={styles.viewBtn}>Xem tất cả</button></div><div className={styles.stylesGrid}>{styleCards.map((item) => <div key={item.title} className={styles.styleCard} style={{ backgroundImage: `url(${item.image})` }}><strong>{item.title}</strong></div>)}</div></div>
           </section>
         </main>

@@ -1083,9 +1083,66 @@
   cursor: pointer;
 }
 
+.templateLibrary {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.templateSidebar {
+  border-right: 1px solid var(--border);
+  padding-right: 16px;
+}
+
+.templateSidebarTitle {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.templateCategoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.templateCategoryBtn {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #4f5369;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.templateCategoryBtn:hover {
+  background: #f7f4ff;
+  border-color: #ece4ff;
+}
+
+.templateCategoryBtnActive {
+  background: #f3efff;
+  border-color: #ddd2ff;
+  color: #6c3cff;
+}
+
+.templateGridContent {
+  min-width: 0;
+}
+
 .templates {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 13px;
 }
 
@@ -1094,10 +1151,14 @@
   overflow: hidden;
   border: 1px solid var(--border);
   background: #fff;
+  padding: 0;
+  text-align: left;
+  appearance: none;
+  cursor: pointer;
 }
 
 .templateImg {
-  height: 66px;
+  height: 78px;
   background-size: cover;
   background-position: center;
 }
@@ -1108,13 +1169,23 @@
 
 .templateBody strong {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   margin-bottom: 4px;
 }
 
 .templateBody span {
   font-size: 11px;
   color: var(--muted);
+}
+
+.templatePrompt {
+  display: block;
+  margin-top: 8px;
+  min-height: 34px;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.45;
+  color: #6f748c;
 }
 
 .customSize {
@@ -1309,6 +1380,19 @@
     grid-column: span 1;
   }
   .creationGrid,
+  .templateLibrary {
+    grid-template-columns: 1fr;
+  }
+  .templateSidebar {
+    border-right: 0;
+    padding-right: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .templateCategoryList {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
   .templates,
   .stylesGrid { grid-template-columns: repeat(2, 1fr); }
 }

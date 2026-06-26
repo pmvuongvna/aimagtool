@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AIServiceId, CreateTaskInput, ImageResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
+import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory } from "@/lib/template-catalog";
 import styles from "./generate.module.css";
 
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
@@ -18,6 +19,7 @@ type DashboardCache = {
   costPreview: ProfileResponse["previewCosts"] | null;
   history: HistoryItem[];
   packages: CreditPackage[];
+  templates: PromptTemplate[];
 };
 
 type ControlDropdown = "aspect" | "style" | "model" | "mode" | null;
@@ -32,13 +34,6 @@ type CardItem = {
 };
 
 const CACHE_KEY = "aistudio_user_dashboard_cache_v1";
-const templates = [
-  { title: "YouTube Thumbnail", ratio: "16:9", image: "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&w=300&q=80" },
-  { title: "Product Showcase", ratio: "1:1", image: "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=300&q=80" },
-  { title: "Instagram Post", ratio: "1:1", image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80" },
-  { title: "Fantasy Art", ratio: "16:9", image: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?auto=format&fit=crop&w=300&q=80" },
-  { title: "Short Video Ad", ratio: "9:16", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=300&q=80" },
-];
 const styleCards = [
   { title: "Cinematic", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=300&q=80" },
   { title: "Realistic", image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=300&q=80" },
@@ -112,6 +107,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [openControl, setOpenControl] = useState<ControlDropdown>(null);
   const controlsRef = useRef<HTMLDivElement | null>(null);
+  const [templateLibrary, setTemplateLibrary] = useState<PromptTemplate[]>([]);
+  const [templateCategory, setTemplateCategory] = useState<TemplateCategory>("All");
 
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo ảnh.");
@@ -126,7 +123,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     if (typeof window === "undefined") return;
     try {
       const raw = window.sessionStorage.getItem(CACHE_KEY);
-      const base: DashboardCache = raw ? (JSON.parse(raw) as DashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [] };
+      const base: DashboardCache = raw ? (JSON.parse(raw) as DashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [], templates: [] };
       window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next }));
     } catch {}
   }, []);
@@ -176,14 +173,16 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           if (cached.costPreview) setCostPreview(cached.costPreview);
           if (Array.isArray(cached.history)) setHistory(cached.history.filter((x) => x.mediaType === "image"));
           if (Array.isArray(cached.packages)) setPackages(cached.packages);
+          if (Array.isArray(cached.templates)) setTemplateLibrary(cached.templates);
         }
       } catch {}
     }
 
     async function bootstrap() {
-      const [profileRes, packageRes] = await Promise.all([
+      const [profileRes, packageRes, templateRes] = await Promise.all([
         apiFetch(apiPath("/api/user/profile")),
         apiFetch(apiPath("/api/public/credit-packages")),
+        apiFetch(apiPath("/api/public/templates?mediaType=image")),
       ]);
 
       if (profileRes.ok) {
@@ -209,6 +208,13 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
         const nextPackages = payload.packages || [];
         setPackages(nextPackages);
         saveCache({ packages: nextPackages });
+      }
+
+      if (templateRes.ok) {
+        const payload = (await templateRes.json()) as { items?: PromptTemplate[] };
+        const nextTemplates = payload.items || [];
+        setTemplateLibrary(nextTemplates);
+        saveCache({ templates: nextTemplates });
       }
     }
 
@@ -369,6 +375,19 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const createdImageCount = history.reduce((sum, item) => sum + item.urls.length, 0) + resultUrls.length;
   const projectCount = history.length;
   const activePackage = packages[0];
+  const filteredTemplates = useMemo(() => {
+    if (templateCategory === "All") return templateLibrary;
+    return templateLibrary.filter((item) => item.category === templateCategory || item.tags.includes(templateCategory));
+  }, [templateCategory, templateLibrary]);
+
+  const applyTemplate = useCallback((item: PromptTemplate) => {
+    setPrompt(item.prompt);
+    if (aspectOptions.includes(item.aspectRatio)) setAspectRatio(item.aspectRatio);
+    const matchedStyle = styleOptions.find((style) => item.tags.includes(style) || item.prompt.toLowerCase().includes(style.toLowerCase()));
+    if (matchedStyle) setActiveStyle(matchedStyle);
+    setActiveTab("result");
+    document.getElementById("generator")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   return (
     <div className={styles.page}>
@@ -687,15 +706,40 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
           <section className={styles.bottomGrid}>
             <div className={styles.panel} id="templates">
-              <div className={styles.panelHead}><h2>Mẫu tạo nhanh</h2><button type="button" className={styles.viewBtn}>Xem tất cả</button></div>
-              <div className={styles.templates}>
-                {templates.map((item) => (
-                  <div key={item.title} className={styles.templateCard}>
-                    <div className={styles.templateImg} style={{ backgroundImage: `url(${item.image})` }} />
-                    <div className={styles.templateBody}><strong>{item.title}</strong><span>{item.ratio}</span></div>
+              <div className={styles.panelHead}><h2>Mẫu tạo nhanh</h2><button type="button" className={styles.viewBtn} onClick={() => setTemplateCategory("All")}>Xem tất cả</button></div>
+              <div className={styles.templateLibrary}>
+                <aside className={styles.templateSidebar}>
+                  <span className={styles.templateSidebarTitle}>Tags</span>
+                  <div className={styles.templateCategoryList}>
+                    {TEMPLATE_CATEGORIES.map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        className={`${styles.templateCategoryBtn} ${templateCategory === category ? styles.templateCategoryBtnActive : ""}`}
+                        onClick={() => setTemplateCategory(category)}
+                      >
+                        {category}
+                      </button>
+                    ))}
                   </div>
-                ))}
-                <div className={styles.customSize}><div><b>+</b><strong>Custom Size</strong><br /><span>Tự chọn kích thước</span></div></div>
+                </aside>
+
+                <div className={styles.templateGridContent}>
+                  <div className={styles.templates}>
+                    {filteredTemplates.length === 0 ? (
+                      <div className={styles.emptyState}>Chưa có prompt nào trong nhóm tag này.</div>
+                    ) : filteredTemplates.map((item) => (
+                      <button key={item.id} type="button" className={styles.templateCard} onClick={() => applyTemplate(item)}>
+                        <div className={styles.templateImg} style={{ backgroundImage: `url(${item.thumbnailUrl})` }} />
+                        <div className={styles.templateBody}>
+                          <strong>{item.title}</strong>
+                          <span>{item.aspectRatio} ? {item.model}</span>
+                          <em className={styles.templatePrompt}>{truncate(item.prompt, 92)}</em>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -1131,7 +1131,8 @@ a {
 }
 
 .admin-card input,
-.admin-card textarea {
+.admin-card textarea,
+.admin-card select {
   border-radius: 12px;
   border: 1px solid rgba(116, 146, 221, 0.4);
   background: #0b1333;
@@ -1142,7 +1143,8 @@ a {
 }
 
 .admin-card input:focus,
-.admin-card textarea:focus {
+.admin-card textarea:focus,
+.admin-card select:focus {
   outline: none;
   border-color: #7ca6ff;
   box-shadow: 0 0 0 3px rgba(97, 139, 255, 0.16);
@@ -1895,4 +1897,107 @@ a {
   .hd-projects,
   .hd-inspiration { grid-template-columns: 1fr; }
   .hd-project-thumb { height: 220px; }
+}
+
+.admin-grid-wide {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.admin-inline-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-card input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #7b61ff;
+}
+
+.admin-template-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-template-card {
+  border: 1px solid rgba(141, 169, 255, 0.22);
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(12, 19, 49, 0.92), rgba(10, 16, 42, 0.98));
+}
+
+.admin-template-thumb {
+  aspect-ratio: 16 / 10;
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid rgba(141, 169, 255, 0.18);
+}
+
+.admin-template-body {
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-template-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-template-head strong {
+  font-size: 15px;
+  color: #ffffff;
+}
+
+.admin-template-body > span,
+.admin-template-body > small {
+  color: #a8baed;
+  font-size: 12px;
+}
+
+.admin-template-body p {
+  margin: 0;
+  color: #eaf0ff;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.admin-template-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-template-tags span {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c8d7ff;
+  background: rgba(123, 97, 255, 0.16);
+  border: 1px solid rgba(141, 169, 255, 0.18);
+}
+
+@media (max-width: 960px) {
+  .admin-grid-wide {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-template-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-template-grid {
+    grid-template-columns: 1fr;
+  }
 }
