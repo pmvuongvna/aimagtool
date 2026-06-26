@@ -299,26 +299,37 @@
 }
 
 .generatorTabs {
-  display: flex;
-  gap: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
   margin-bottom: 18px;
+  border: 1px solid #e7e4f5;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .generatorTab {
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.78);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 44px;
   padding: 0 18px;
   border-radius: 14px;
-  font-weight: 800;
-  color: #444965;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #61667d;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
 .generatorTabActive {
-  background: #fff;
-  color: var(--primary);
-  box-shadow: 0 10px 24px rgba(108, 60, 255, 0.12);
+  background: #f3efff;
+  color: #6c3cff;
+  border-color: #ddd2ff;
+  box-shadow: none;
 }
 
 .generatorTabLink {
@@ -378,18 +389,24 @@
 }
 
 .controlsCompact {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
-  align-items: stretch;
+  align-items: center;
 }
 
-.controlsCompact > :nth-child(-n+4) {
-  flex: 0 0 188px;
+.optionCluster {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 180px));
+  gap: 14px;
+  align-items: center;
 }
 
-.controlsCompact > :nth-child(5) {
-  margin-left: auto;
+.actionCluster {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .controlCard,
@@ -456,63 +473,74 @@
 
 
 .settingButton {
-  min-height: 74px;
-  border-radius: 18px;
-  border: 1px solid transparent;
-  padding: 14px 16px;
+  width: 100%;
+  min-height: 68px;
+  height: 68px;
+  border-radius: 16px;
+  border: 1px solid #e7e4f5;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .settingButton:hover {
-  transform: translateY(-1px);
+  border-color: #d9d1f3;
+  box-shadow: none;
+}
+
+.settingButton > div:not(.controlSelectIcon) {
+  flex: 1;
+  min-width: 0;
 }
 
 .settingButton small {
   display: block;
   font-size: 12px;
-  color: rgba(20, 20, 43, 0.62);
-  margin-bottom: 6px;
+  font-weight: 500;
+  color: #8a8fa7;
+  margin-bottom: 5px;
 }
 
 .settingButton strong {
   display: block;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.15;
-  color: #16162a;
+  font-weight: 700;
+  color: #171b2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.settingAspect {
-  background: linear-gradient(135deg, #ffffff, #f3eeff);
-  border-color: #dfd4ff;
-  box-shadow: 0 14px 30px rgba(108, 60, 255, 0.08);
+.settingButton::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-right: 1.6px solid #9b8fc6;
+  border-bottom: 1.6px solid #9b8fc6;
+  transform: rotate(45deg) translateY(-1px);
+  flex-shrink: 0;
+  margin-right: 2px;
 }
 
-.settingStyle {
-  background: linear-gradient(135deg, #fffdf7, #fff1df);
-  border-color: #ffd8aa;
-  box-shadow: 0 14px 30px rgba(255, 176, 32, 0.12);
-}
-
-.settingModel {
-  background: linear-gradient(135deg, #f7fbff, #eaf3ff);
-  border-color: #cfe2ff;
-  box-shadow: 0 14px 30px rgba(47, 128, 237, 0.12);
-}
-
+.settingAspect,
+.settingStyle,
+.settingModel,
 .settingMode {
-  background: linear-gradient(135deg, #f7fff8, #e8fff1);
-  border-color: #c8f3d8;
-  box-shadow: 0 14px 30px rgba(32, 201, 151, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  border-color: #e7e4f5;
+  box-shadow: none;
 }
 
 .settingButtonActive {
-  border-color: #8d69ff;
-  box-shadow: 0 16px 34px rgba(108, 60, 255, 0.16);
+  border-color: #d8cbff;
+  background: #f8f4ff;
+  box-shadow: 0 8px 20px rgba(108, 60, 255, 0.08);
 }
 
 
@@ -576,13 +604,16 @@
   border-top: 1px solid var(--border);
 }
 .advancedToggle {
-  height: 60px;
+  height: 52px;
   border-radius: 16px;
-  border: 1px solid #d9ccff;
-  background: linear-gradient(135deg, rgba(108, 60, 255, 0.08), rgba(108, 60, 255, 0.16));
-  color: var(--primary);
-  font-weight: 800;
+  border: 1px solid #ddd2ff;
+  background: #f3efff;
+  color: #6c3cff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 18px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .generatorActions {
@@ -598,10 +629,11 @@
 .miniBtn,
 .viewBtn,
 .downloadBtn {
-  height: 48px;
-  border-radius: 14px;
+  height: 52px;
+  border-radius: 16px;
   border: none;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -610,22 +642,24 @@
 .viewBtn,
 .downloadBtn,
 .miniBtn {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid var(--border);
-  color: #5d6278;
+  background: #fff;
+  border: 1px solid #e7e4f5;
+  color: #6b6f86;
 }
 
 .resetBtn {
-  height: 60px;
+  padding: 0 20px;
+  white-space: nowrap;
 }
 
 .generateBtn {
   color: #fff;
-  min-width: 180px;
-  height: 60px;
+  min-width: 192px;
   background: linear-gradient(135deg, #6c3cff, #8b5cff);
-  box-shadow: 0 14px 28px rgba(108, 60, 255, 0.25);
-  padding: 0 20px;
+  box-shadow: 0 12px 24px rgba(108, 60, 255, 0.24);
+  padding: 0 26px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .generateBtn:disabled {
@@ -1200,12 +1234,17 @@
 }
 
 @media (max-width: 1360px) {
-  .controlsCompact > :nth-child(-n+4) {
-    flex: 1 1 calc(50% - 14px);
+  .controlsCompact {
+    grid-template-columns: 1fr;
   }
 
-  .controlsCompact > :nth-child(5) {
-    margin-left: 0;
+  .optionCluster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actionCluster {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .advancedPanelGrid {
@@ -1253,16 +1292,18 @@
   .statsGrid,
   .advancedGrid,
   .advancedPanelGrid { grid-template-columns: 1fr; }
-  .controlsCompact {
+  .controlsCompact,
+  .optionCluster {
+    grid-template-columns: 1fr;
+  }
+  .actionCluster {
+    width: 100%;
     flex-direction: column;
   }
-  .controlsCompact > :nth-child(-n+4),
-  .controlsCompact > :nth-child(5),
-  .controlsCompact > :nth-child(6),
-  .controlsCompact > :nth-child(7) {
-    flex: 1 1 100%;
+  .advancedToggle,
+  .resetBtn,
+  .generateBtn {
     width: 100%;
-    margin-left: 0;
   }
   .advancedPanelWide {
     grid-column: span 1;
@@ -1271,6 +1312,10 @@
   .templates,
   .stylesGrid { grid-template-columns: repeat(2, 1fr); }
 }
+
+
+
+
 
 
 

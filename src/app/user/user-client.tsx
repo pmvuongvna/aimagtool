@@ -441,10 +441,11 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
               </div>
 
               <div className={styles.controlsCompact} ref={controlsRef}>
+                <div className={styles.optionCluster}>
                 <div className={styles.settingDropdown}>
                   <button
                     type="button"
-                    className={`${styles.settingButton} ${styles.settingAspect} ${openControl === "aspect" ? styles.settingButtonActive : ""}`}
+                    className={`${styles.settingButton} ${openControl === "aspect" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}
                   >
                     <div className={styles.controlSelectIcon}>▭</div>
@@ -467,7 +468,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                 <div className={styles.settingDropdown}>
                   <button
                     type="button"
-                    className={`${styles.settingButton} ${styles.settingStyle} ${openControl === "style" ? styles.settingButtonActive : ""}`}
+                    className={`${styles.settingButton} ${openControl === "style" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "style" ? null : "style")}
                   >
                     <div className={styles.controlSelectIcon}>✺</div>
@@ -490,7 +491,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                 <div className={styles.settingDropdown}>
                   <button
                     type="button"
-                    className={`${styles.settingButton} ${styles.settingModel} ${openControl === "model" ? styles.settingButtonActive : ""}`}
+                    className={`${styles.settingButton} ${openControl === "model" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "model" ? null : "model")}
                   >
                     <div className={styles.controlSelectIcon}>▤</div>
@@ -514,7 +515,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                 <div className={styles.settingDropdown}>
                   <button
                     type="button"
-                    className={`${styles.settingButton} ${styles.settingMode} ${generationMode === "image" || openControl === "mode" ? styles.settingButtonActive : ""}`}
+                    className={`${styles.settingButton} ${generationMode === "image" || openControl === "mode" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "mode" ? null : "mode")}
                   >
                     <div className={styles.controlSelectIcon}>🖼</div>
@@ -535,8 +536,11 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                   ) : null}
                 </div>
 
-                <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
-                  {showAdvancedSettings ? "Ẩn Advanced" : "Advanced settings"}
+                </div>
+
+                <div className={styles.actionCluster}>
+                  <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
+                  {showAdvancedSettings ? "Hide advanced" : "Advanced settings"}
                 </button>
                 <button
                   type="button"
@@ -554,7 +558,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                 >
                   Reset
                 </button>
-                <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Đang tạo..." : `✨ Generate · ${formatCredits(currentCost ?? 0)}`}</button>
+                <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Generating..." : `Generate • ${formatCredits(currentCost ?? 0)}`}</button>
+                </div>
               </div>
 
               {showAdvancedSettings ? (
@@ -717,6 +722,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     </div>
   );
 }
+
+
 
 
 

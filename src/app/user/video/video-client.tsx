@@ -426,10 +426,11 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
               </div>
 
               <div className={styles.controlsCompact} ref={controlsRef}>
+                <div className={styles.optionCluster}>
                 <div className={styles.settingDropdown}>
                   <button
                     type="button"
-                    className={`${styles.settingButton} ${styles.settingAspect} ${openControl === "aspect" ? styles.settingButtonActive : ""}`}
+                    className={`${styles.settingButton} ${openControl === "aspect" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}
                   >
                     <div className={styles.controlSelectIcon}>▭</div>
@@ -452,7 +453,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                 <div className={styles.settingDropdown}>
                   <button
                     type="button"
-                    className={`${styles.settingButton} ${styles.settingStyle} ${openControl === "duration" ? styles.settingButtonActive : ""}`}
+                    className={`${styles.settingButton} ${openControl === "duration" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "duration" ? null : "duration")}
                   >
                     <div className={styles.controlSelectIcon}>⏱</div>
@@ -475,7 +476,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                 <div className={styles.settingDropdown}>
                   <button
                     type="button"
-                    className={`${styles.settingButton} ${styles.settingModel} ${openControl === "resolution" ? styles.settingButtonActive : ""}`}
+                    className={`${styles.settingButton} ${openControl === "resolution" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "resolution" ? null : "resolution")}
                   >
                     <div className={styles.controlSelectIcon}>▤</div>
@@ -498,7 +499,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                 <div className={styles.settingDropdown}>
                   <button
                     type="button"
-                    className={`${styles.settingButton} ${styles.settingMode} ${videoModeType === "image" || openControl === "workflow" ? styles.settingButtonActive : ""}`}
+                    className={`${styles.settingButton} ${videoModeType === "image" || openControl === "workflow" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "workflow" ? null : "workflow")}
                   >
                     <div className={styles.controlSelectIcon}>🖼</div>
@@ -519,8 +520,11 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                   ) : null}
                 </div>
 
-                <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
-                  {showAdvancedSettings ? "Ẩn Advanced" : "Advanced settings"}
+                </div>
+
+                <div className={styles.actionCluster}>
+                  <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>
+                  {showAdvancedSettings ? "Hide advanced" : "Advanced settings"}
                 </button>
                 <button
                   type="button"
@@ -537,7 +541,8 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                 >
                   Reset
                 </button>
-                <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Đang tạo..." : `✨ Generate · ${formatCredits(currentCost ?? 0)}`}</button>
+                <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Generating..." : `Generate • ${formatCredits(currentCost ?? 0)}`}</button>
+                </div>
               </div>
 
               {showAdvancedSettings ? (
@@ -656,5 +661,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     </div>
   );
 }
+
+
 
 
