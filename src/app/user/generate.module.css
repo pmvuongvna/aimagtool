@@ -397,7 +397,7 @@
 
 .optionCluster {
   display: grid;
-  grid-template-columns: repeat(4, minmax(140px, 180px));
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
   gap: 14px;
   align-items: center;
 }
@@ -508,7 +508,7 @@
 
 .settingButton strong {
   display: block;
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.15;
   font-weight: 700;
   color: #171b2e;
@@ -1312,6 +1312,9 @@
   .templates,
   .stylesGrid { grid-template-columns: repeat(2, 1fr); }
 }
+
+
+
 
 
 
