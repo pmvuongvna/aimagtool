@@ -137,7 +137,7 @@ export default function AdminPage() {
       const parsed = JSON.parse(packageJson) as CreditPackage[];
       if (Array.isArray(parsed)) creditPackages = parsed;
     } catch {
-      setStatus("Credit packages JSON kh?ng h?p l?.");
+      setStatus("Credit packages JSON is invalid.");
       return;
     }
     const res = await apiFetch(apiPath("/api/admin/settings"), {
@@ -306,7 +306,7 @@ export default function AdminPage() {
       <section className="admin-grid admin-grid-wide">
         <form className="admin-card" onSubmit={saveImportSettings}>
           <h2>Prompt Importer</h2>
-          <p className="admin-hint">Auto import from MeiGen 2 times per day. Thumbnail s? l?y tr?c ti?p t? MeiGen. Admin c? th? ??i s? l??ng v? b?m import ngay.</p>
+          <p className="admin-hint">Automatically import from MeiGen twice per day. Thumbnails are pulled directly from MeiGen, and you can adjust the count or run an import immediately.</p>
           <div className="admin-subgrid">
             <label>Auto Import
               <input type="checkbox" checked={templateSnapshot?.importSettings.enabled || false} onChange={(e) => setTemplateSnapshot((prev) => prev ? { ...prev, importSettings: { ...prev.importSettings, enabled: e.target.checked } } : prev)} />
@@ -326,18 +326,18 @@ export default function AdminPage() {
               <input type="number" min={0} max={23} value={templateSnapshot?.importSettings.eveningHour || 21} onChange={(e) => setTemplateSnapshot((prev) => prev ? { ...prev, importSettings: { ...prev.importSettings, eveningHour: Number(e.target.value) } } : prev)} />
             </label>
             <label>Last imported
-              <input value={templateSnapshot?.importSettings.lastImportedAt ? new Date(templateSnapshot.importSettings.lastImportedAt).toLocaleString("vi-VN") : "Chua có"} readOnly />
+              <input value={templateSnapshot?.importSettings.lastImportedAt ? new Date(templateSnapshot.importSettings.lastImportedAt).toLocaleString("vi-VN") : "Not yet"} readOnly />
             </label>
           </div>
           <div className="admin-inline-actions">
             <button className="generate-cta" type="submit" disabled={templateLoading}>Save Import Settings</button>
-            <button className="chip-btn dark" type="button" disabled={templateLoading} onClick={runImportNow}>Get ngay t? MeiGen</button>
+            <button className="chip-btn dark" type="button" disabled={templateLoading} onClick={runImportNow}>Import now from MeiGen</button>
           </div>
         </form>
 
         <form className="admin-card" onSubmit={saveManualTemplate}>
           <h2>Manual Prompt</h2>
-          <p className="admin-hint">Th?m prompt th? c?ng v?o th? vi?n m?u. Prompt n?y s? xu?t hi?n lu?n trong trang M?u c? s?n.</p>
+          <p className="admin-hint">Add a manual prompt into the template library. It will appear immediately inside the Templates gallery.</p>
           <div className="admin-subgrid">
             <label>Title<input value={manualTemplate.title} onChange={(e) => setManualTemplate({ ...manualTemplate, title: e.target.value })} /></label>
             <label>Thumbnail URL<input value={manualTemplate.thumbnailUrl} onChange={(e) => setManualTemplate({ ...manualTemplate, thumbnailUrl: e.target.value })} /></label>
@@ -375,7 +375,7 @@ export default function AdminPage() {
       <section className="admin-card">
         <div className="admin-users-head">
           <h2>Recent Import Runs</h2>
-          <p className="admin-hint">Theo d?i c?c l?n auto/manual import t? MeiGen.</p>
+          <p className="admin-hint">Track every automatic or manual import run from MeiGen.</p>
         </div>
         <div className="admin-users-table-wrap">
           <table className="admin-users-table">
@@ -391,7 +391,7 @@ export default function AdminPage() {
             </thead>
             <tbody>
               {(templateSnapshot?.runs || []).length === 0 ? (
-                <tr><td colSpan={6} className="admin-users-empty">Ch?a c? l?ch s? import prompt.</td></tr>
+                <tr><td colSpan={6} className="admin-users-empty">No prompt import history yet.</td></tr>
               ) : (
                 templateSnapshot?.runs.map((item) => (
                   <tr key={item.id}>
@@ -412,7 +412,7 @@ export default function AdminPage() {
       <section className="admin-card">
         <div className="admin-users-head">
           <h2>Template Library</h2>
-          <p className="admin-hint">Prompt ?? l?u trong h? th?ng, g?m prompt manual v? prompt import t? MeiGen.</p>
+          <p className="admin-hint">Templates currently stored in the system, including manual entries and prompts imported from MeiGen.</p>
         </div>
         <div className="admin-template-grid">
           {(templateSnapshot?.templates || []).map((item) => (
@@ -423,12 +423,12 @@ export default function AdminPage() {
                   <strong>{item.title}</strong>
                   <span className={`admin-role ${item.mediaType === "video" ? "admin" : "user"}`}>{item.mediaType}</span>
                 </div>
-                <span>{item.model} · {item.aspectRatio} · {item.category}</span>
-                <p>{item.prompt.slice(0, 180)}{item.prompt.length > 180 ? "…" : ""}</p>
+                <span>{item.model} - {item.aspectRatio} - {item.category}</span>
+                <p>{item.prompt.slice(0, 180)}{item.prompt.length > 180 ? "..." : ""}</p>
                 <div className="admin-template-tags">
                   {item.tags.slice(0, 6).map((tag) => <span key={`${item.id}-${tag}`}>{tag}</span>)}
                 </div>
-                <small>Source: {item.source}{item.authorName ? ` · ${item.authorName}` : ""}</small>
+                <small>Source: {item.source}{item.authorName ? ` - ${item.authorName}` : ""}</small>
               </div>
             </article>
           ))}
@@ -438,7 +438,7 @@ export default function AdminPage() {
       <section className="admin-card">
         <div className="admin-users-head">
           <h2>Users</h2>
-          <p className="admin-hint">Danh s?ch t?i kho?n ?? ??ng k? trong h? th?ng.</p>
+          <p className="admin-hint">Registered accounts currently available in the system.</p>
         </div>
         <div className="admin-users-table-wrap">
           <table className="admin-users-table">
@@ -453,7 +453,7 @@ export default function AdminPage() {
             </thead>
             <tbody>
               {users.length === 0 ? (
-                <tr><td colSpan={5} className="admin-users-empty">Ch?a c? user ho?c backend ch?a k?t n?i DB.</td></tr>
+                <tr><td colSpan={5} className="admin-users-empty">No users found yet, or the backend is not connected to the database.</td></tr>
               ) : users.map((item) => (
                 <tr key={item.id}>
                   <td><div className="admin-user-main"><b>{item.name}</b><span>{item.email}</span><code>{item.id}</code></div></td>
