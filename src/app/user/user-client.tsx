@@ -402,7 +402,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
             <a className={`${styles.navItem} ${styles.activeNav}`} href="#dashboard"><span className={styles.navIcon}>⌂</span><span className={styles.navText}>Dashboard</span></a>
             <a className={styles.navItem} href="#generator"><span className={styles.navIcon}>▧</span><span className={styles.navText}>Tạo ảnh</span></a>
             <Link className={styles.navItem} href="/user/video"><span className={styles.navIcon}>▶</span><span className={styles.navText}>Tạo video</span></Link>
-            <a className={styles.navItem} href="#templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></a>
+            <a className={styles.navItem} href="/user/templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></a>
             <a className={styles.navItem} href="#recent"><span className={styles.navIcon}>↺</span><span className={styles.navText}>Lịch sử</span></a>
             <a className={styles.navItem} href="#styles"><span className={styles.navIcon}>♡</span><span className={styles.navText}>Phong cách</span></a>
             <Link className={styles.navItem} href="/admin"><span className={styles.navIcon}>⚙</span><span className={styles.navText}>Cài đặt</span></Link>
@@ -705,46 +705,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           </section>
 
           <section className={styles.bottomGrid}>
-            <div className={styles.panel} id="templates">
-              <div className={styles.panelHead}><h2>Mẫu tạo nhanh</h2><button type="button" className={styles.viewBtn} onClick={() => setTemplateCategory("All")}>Xem tất cả</button></div>
-              <div className={styles.templateLibrary}>
-                <aside className={styles.templateSidebar}>
-                  <span className={styles.templateSidebarTitle}>Tags</span>
-                  <div className={styles.templateCategoryList}>
-                    {TEMPLATE_CATEGORIES.map((category) => (
-                      <button
-                        key={category}
-                        type="button"
-                        className={`${styles.templateCategoryBtn} ${templateCategory === category ? styles.templateCategoryBtnActive : ""}`}
-                        onClick={() => setTemplateCategory(category)}
-                      >
-                        {category}
-                      </button>
-                    ))}
-                  </div>
-                </aside>
-
-                <div className={styles.templateGridContent}>
-                  <div className={styles.templates}>
-                    {filteredTemplates.length === 0 ? (
-                      <div className={styles.emptyState}>Chưa có prompt nào trong nhóm tag này.</div>
-                    ) : filteredTemplates.map((item) => (
-                      <button key={item.id} type="button" className={styles.templateCard} onClick={() => applyTemplate(item)}>
-                        <div className={styles.templateImg} style={{ backgroundImage: `url(${item.thumbnailUrl})` }} />
-                        <div className={styles.templateBody}>
-                          <strong>{item.title}</strong>
-                          <span>{item.aspectRatio} ? {item.model}</span>
-                          <em className={styles.templatePrompt}>{truncate(item.prompt, 92)}</em>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div className={styles.panel} id="styles">
-              <div className={styles.panelHead}><h2>Phong cách phổ biến</h2><button type="button" className={styles.viewBtn}>Xem tất cả</button></div>
+              <div className={styles.panelHead}><h2>Popular styles</h2><button type="button" className={styles.viewBtn}>View all</button></div>
               <div className={styles.stylesGrid}>
                 {styleCards.map((item) => (
                   <div key={item.title} className={styles.styleCard} style={{ backgroundImage: `url(${item.image})` }}><strong>{item.title}</strong></div>

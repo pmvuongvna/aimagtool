@@ -1,0 +1,379 @@
+.pageIntro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7f76a6;
+}
+
+.pageIntro h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.08;
+  color: #18162a;
+}
+
+.subtitle {
+  margin: 10px 0 0;
+  max-width: 760px;
+  color: #6b6f86;
+  line-height: 1.6;
+}
+
+.modeTabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid #e7e4f5;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.modeTab {
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: #5f657d;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modeTabActive {
+  background: #f3efff;
+  color: #6c3cff;
+  border-color: #ddd2ff;
+}
+
+.galleryShell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 18px;
+  border: 1px solid #ebe7fb;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 18px;
+}
+
+.sidebarTitle {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8d84b4;
+}
+
+.tagList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tagBtn {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: #444b64;
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.tagBtn:hover {
+  background: #f8f5ff;
+  border-color: #ece4ff;
+}
+
+.tagBtnActive {
+  background: #f3efff;
+  border-color: #ddd2ff;
+  color: #6c3cff;
+}
+
+.galleryContent {
+  min-width: 0;
+}
+
+.masonry {
+  column-count: 4;
+  column-gap: 18px;
+}
+
+.card {
+  width: 100%;
+  display: block;
+  margin: 0 0 18px;
+  border: 0;
+  padding: 0;
+  break-inside: avoid;
+  border-radius: 22px;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 20px 40px rgba(28, 23, 56, 0.08);
+}
+
+.cardImage {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cardOverlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(12, 10, 24, 0) 0%, rgba(12, 10, 24, 0.78) 56%, rgba(12, 10, 24, 0.92) 100%);
+  color: #fff;
+  text-align: left;
+}
+
+.cardMeta {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.cardOverlay strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.cardOverlay p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.emptyState {
+  min-height: 320px;
+  border: 1px dashed #ddd2ff;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  display: grid;
+  place-items: center;
+  color: #756d96;
+  text-align: center;
+  padding: 24px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(11, 10, 20, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+}
+
+.modal {
+  width: min(1120px, 100%);
+  max-height: min(88vh, 920px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  border-radius: 28px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 32px 80px rgba(16, 12, 36, 0.3);
+  position: relative;
+}
+
+.modalClose {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(11, 10, 20, 0.46);
+  color: #fff;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.modalMedia {
+  background: #121021;
+  min-height: 560px;
+}
+
+.modalMedia img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.modalBody {
+  padding: 30px 28px;
+  overflow: auto;
+}
+
+.modalTopline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.modalTopline span,
+.modalInfo span,
+.modalTags span {
+  border-radius: 999px;
+  background: #f3efff;
+  color: #6c3cff;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modalBody h2 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+  color: #171528;
+}
+
+.modalInfo {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0 20px;
+}
+
+.modalPrompt {
+  margin: 0;
+  color: #4f5369;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.modalTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.copyBtn,
+.useBtn {
+  height: 50px;
+  padding: 0 18px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.copyBtn {
+  border: 1px solid #ddd2ff;
+  background: #f3efff;
+  color: #6c3cff;
+  cursor: pointer;
+}
+
+.useBtn {
+  border: 0;
+  background: linear-gradient(135deg, #6c3cff, #8b5cff);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(108, 60, 255, 0.24);
+}
+
+@media (max-width: 1380px) {
+  .masonry {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 1080px) {
+  .pageIntro,
+  .galleryShell,
+  .modal {
+    grid-template-columns: 1fr;
+  }
+
+  .pageIntro {
+    align-items: flex-start;
+  }
+
+  .masonry {
+    column-count: 2;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .tagList {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .tagBtn {
+    width: auto;
+  }
+
+  .modalMedia {
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 760px) {
+  .masonry {
+    column-count: 1;
+  }
+
+  .modeTabs,
+  .modalActions {
+    width: 100%;
+  }
+
+  .modeTabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .copyBtn,
+  .useBtn {
+    flex: 1;
+  }
+}
