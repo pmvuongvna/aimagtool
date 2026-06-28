@@ -380,21 +380,181 @@ function dedupeCandidates(items: CandidateSummary[]) {
   return Array.from(map.values());
 }
 
-async function fetchHtml(url: string) {
+type FetchedPage = {
+  body: string;
+  format: "html" | "markdown";
+};
+
+function looksLikeCloudflareChallenge(body: string) {
+  const normalized = body.toLowerCase();
+  return normalized.includes("just a moment") || normalized.includes("cf-browser-verification") || normalized.includes("cloudflare");
+}
+
+function buildJinaUrl(url: string) {
+  return `https://r.jina.ai/http://${url.replace(/^https?:\/\//i, "")}`;
+}
+
+async function fetchDirectHtml(url: string) {
   const res = await fetch(url, {
     headers: {
       "user-agent": "Mozilla/5.0 (compatible; EscanorPromptBot/1.0; +https://escanor.app)",
       accept: "text/html,application/xhtml+xml",
       "cache-control": "no-cache",
     },
+    cache: "no-store",
     next: { revalidate: 0 },
   });
   if (!res.ok) throw new Error(`Fetch failed ${res.status} for ${url}`);
+  const body = await res.text();
+  if (looksLikeCloudflareChallenge(body)) {
+    throw new Error(`Cloudflare challenge for ${url}`);
+  }
+  return body;
+}
+
+async function fetchJinaMarkdown(url: string) {
+  const proxyUrl = buildJinaUrl(url);
+  const res = await fetch(proxyUrl, {
+    headers: {
+      "user-agent": "Mozilla/5.0 (compatible; EscanorPromptBot/1.0; +https://escanor.app)",
+      accept: "text/plain,text/markdown;q=0.9,*/*;q=0.8",
+      "cache-control": "no-cache",
+    },
+    cache: "no-store",
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) throw new Error(`Fallback fetch failed ${res.status} for ${url}`);
   return res.text();
 }
 
+async function fetchPage(url: string): Promise<FetchedPage> {
+  try {
+    return {
+      body: await fetchDirectHtml(url),
+      format: "html",
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!/Cloudflare challenge|Fetch failed 403/i.test(message)) throw error;
+    return {
+      body: await fetchJinaMarkdown(url),
+      format: "markdown",
+    };
+  }
+}
+
+function extractMarkdownCandidates(markdown: string) {
+  const candidates: CandidateSummary[] = [];
+
+  const compactRegex = /\[!\[Image\s+\d+:\s*AI art:\s*([\s\S]*?)\]\((https?:\/\/[^\s)]+)\)([\s\S]{0,220}?)\]\((https?:\/\/www\.meigen\.ai\/prompt\/[^\s)]+)\)/g;
+  let compactMatch: RegExpExecArray | null;
+  while ((compactMatch = compactRegex.exec(markdown))) {
+    const descriptor = sanitizePrompt(compactMatch[1] || "");
+    const thumbnailUrl = sanitizePrompt(compactMatch[2] || "");
+    const trailing = sanitizePrompt(compactMatch[3] || "");
+    const detailUrl = sanitizePrompt(compactMatch[4] || "");
+
+    if (!descriptor || !detailUrl || descriptor.length < 8) continue;
+    if (descriptor.startsWith("{")) continue;
+
+    const descriptorParts = descriptor.split("|").map((item) => sanitizePrompt(item)).filter(Boolean);
+    const title = descriptorParts[0]?.replace(/^AI art:\s*/i, "").trim() || descriptor;
+    const model = descriptorParts[1]?.trim() || "";
+    const authorFromDescriptor = descriptorParts.find((item) => item.startsWith("@"))?.replace(/^@/, "") || "";
+    const authorFromTrailing = trailing.match(/@([A-Za-z0-9_.-]+)/)?.[1] || "";
+    const authorName = authorFromDescriptor || authorFromTrailing;
+
+    candidates.push({
+      title,
+      detailUrl,
+      thumbnailUrl,
+      model,
+      authorName,
+      mediaType: /video|seedance/i.test(model) ? "video" : undefined,
+    });
+  }
+
+  const blockRegex = /\*\s+!\[Image\s+\d+:\s*AI art:\s*([^\]]+)\]\((https?:\/\/[^\s)]+)\)\s+###\s+([^\n]+)\s+[\s\S]*?By\s+([^\n]+?)\s+[\s\S]*?Model:\s*([^\n]+)\s+[\s\S]*?\[View prompt details\]\((https?:\/\/www\.meigen\.ai\/prompt\/[^\s)]+)\)/g;
+  let blockMatch: RegExpExecArray | null;
+  while ((blockMatch = blockRegex.exec(markdown))) {
+    const descriptor = sanitizePrompt(blockMatch[1] || "");
+    const thumbnailUrl = sanitizePrompt(blockMatch[2] || "");
+    const headingTitle = sanitizePrompt(blockMatch[3] || "");
+    const authorLine = sanitizePrompt(blockMatch[4] || "");
+    const model = sanitizePrompt(blockMatch[5] || "");
+    const detailUrl = sanitizePrompt(blockMatch[6] || "");
+    const authorName = authorLine.match(/@([A-Za-z0-9_.-]+)/)?.[1] || authorLine.replace(/^By\s+/i, "").trim();
+
+    candidates.push({
+      title: headingTitle || descriptor,
+      detailUrl,
+      thumbnailUrl,
+      model,
+      authorName,
+      mediaType: /video|seedance/i.test(model) ? "video" : undefined,
+    });
+  }
+
+  return dedupeCandidates(candidates).filter((item) => item.thumbnailUrl && item.detailUrl);
+}
+
+function extractMarkdownSection(markdown: string, startMarker: string, endMarkers: string[]) {
+  const startIndex = markdown.indexOf(startMarker);
+  if (startIndex === -1) return "";
+  const rest = markdown.slice(startIndex + startMarker.length);
+  let endIndex = rest.length;
+
+  for (const marker of endMarkers) {
+    const markerIndex = rest.indexOf(marker);
+    if (markerIndex !== -1 && markerIndex < endIndex) {
+      endIndex = markerIndex;
+    }
+  }
+
+  return rest.slice(0, endIndex).trim();
+}
+
+function extractPromptFromMarkdown(markdown: string) {
+  const section = extractMarkdownSection(markdown, "\nPrompt\n", ["\nShow more", "\n### More like this", "\nUse as Prompt", "\nUse as Ref", "\n## "]);
+  return sanitizePrompt(section);
+}
+
+function extractModelFromMarkdown(markdown: string) {
+  const match = markdown.match(/\n(GPT Image(?: [0-9.]+)?|Nanobanana Pro|Seedance(?: mini\/4K)?|Midjourney|other)\n\s*\n1 Copy Prompt/i);
+  return sanitizePrompt(match?.[1] || "");
+}
+
+function extractTitleFromMarkdown(markdown: string) {
+  const match = markdown.match(/^Title:\s*(.+)$/m);
+  return sanitizePrompt((match?.[1] || "").replace(/\s+Prompt by.+$/i, ""));
+}
+
+function extractAuthorFromMarkdown(markdown: string) {
+  const promptIndex = markdown.indexOf("\nPrompt\n");
+  if (promptIndex === -1) return "";
+  const beforePrompt = markdown.slice(Math.max(0, promptIndex - 240), promptIndex);
+  const directHandle = beforePrompt.match(/@([A-Za-z0-9_.-]+)/);
+  if (directHandle) return directHandle[1];
+  const lines = beforePrompt
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines[lines.length - 2] || lines[lines.length - 1] || "";
+}
+
+function extractThumbnailFromMarkdown(markdown: string) {
+  const mediaSection = extractMarkdownSection(markdown, "\n## Media Preview\n", ["\nUse as Prompt", "\n### More like this", "\n## "]);
+  const mediaMatch = mediaSection.match(/\((https:\/\/images\.meigen\.ai\/[^\s)]+)\)/);
+  if (mediaMatch?.[1]) return mediaMatch[1];
+
+  const fallbackMatch = markdown.match(/\((https:\/\/images\.meigen\.ai\/cdn-cgi\/image\/[^\s)]+)\)/);
+  return fallbackMatch?.[1] || "";
+}
+
 async function extractDetailPrompt(candidate: CandidateSummary) {
-  const html = candidate.detailUrl ? await fetchHtml(candidate.detailUrl) : "";
+  const page = candidate.detailUrl ? await fetchPage(candidate.detailUrl) : { body: "", format: "html" as const };
+  const html = page.format === "html" ? page.body : "";
+  const markdown = page.format === "markdown" ? page.body : "";
   const nextData = html ? extractNextData(html) : null;
   const stringHits: string[] = [];
   walk(nextData, (value) => {
@@ -404,11 +564,15 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
     if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) return;
     stringHits.push(normalized);
   });
-  const prompt = [candidate.prompt, ...stringHits].filter((value): value is string => Boolean(value)).sort((a, b) => b.length - a.length)[0] || "";
-  const title = candidate.title || extractMeta(html, "og:title") || extractMeta(html, "twitter:title");
-  const thumbnailUrl = candidate.thumbnailUrl || extractMeta(html, "og:image") || extractMeta(html, "twitter:image");
-  const authorName = candidate.authorName || extractMeta(html, "author");
-  const model = candidate.model || stringHits.find((text) => /gpt|seedream|video/i.test(text)) || "";
+  const promptCandidates = [candidate.prompt, ...stringHits];
+  if (markdown) {
+    promptCandidates.push(extractPromptFromMarkdown(markdown));
+  }
+  const prompt = promptCandidates.filter((value): value is string => Boolean(value)).sort((a, b) => b.length - a.length)[0] || "";
+  const title = candidate.title || extractMeta(html, "og:title") || extractMeta(html, "twitter:title") || extractTitleFromMarkdown(markdown);
+  const thumbnailUrl = candidate.thumbnailUrl || extractMeta(html, "og:image") || extractMeta(html, "twitter:image") || extractThumbnailFromMarkdown(markdown);
+  const authorName = candidate.authorName || extractMeta(html, "author") || extractAuthorFromMarkdown(markdown);
+  const model = candidate.model || stringHits.find((text) => /gpt|seedream|video/i.test(text)) || extractModelFromMarkdown(markdown) || "";
   return {
     title: sanitizePrompt(title || "Untitled prompt"),
     prompt: sanitizePrompt(prompt),
@@ -529,10 +693,14 @@ async function collectListingCandidates(listingUrls: string[]) {
   const collected: CandidateSummary[] = [];
   for (const url of listingUrls) {
     try {
-      const html = await fetchHtml(url);
-      const nextData = extractNextData(html);
-      if (nextData) collected.push(...extractCandidateObjects(nextData, url));
-      collected.push(...extractAnchorCandidates(html, url));
+      const page = await fetchPage(url);
+      if (page.format === "html") {
+        const nextData = extractNextData(page.body);
+        if (nextData) collected.push(...extractCandidateObjects(nextData, url));
+        collected.push(...extractAnchorCandidates(page.body, url));
+      } else {
+        collected.push(...extractMarkdownCandidates(page.body));
+      }
     } catch {
       continue;
     }
