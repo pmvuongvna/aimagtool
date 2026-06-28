@@ -44,6 +44,12 @@ type ImportRun = {
   requestedCount: number;
   importedCount: number;
   message: string;
+  details?: {
+    errors?: string[];
+    candidateCount?: number;
+    attemptedCount?: number;
+    skippedCount?: number;
+  };
   createdAt: string;
 };
 
@@ -400,7 +406,17 @@ export default function AdminPage() {
                     <td><span className={`admin-role ${item.status === "success" ? "admin" : "user"}`}>{item.status}</span></td>
                     <td>{item.requestedCount}</td>
                     <td>{item.importedCount}</td>
-                    <td>{item.message}</td>
+                    <td>
+                      <div className="admin-user-main">
+                        <span>{item.message}</span>
+                        {(item.details?.candidateCount !== undefined || item.details?.attemptedCount !== undefined || item.details?.skippedCount !== undefined) ? (
+                          <small>
+                            candidates: {item.details?.candidateCount ?? 0} | attempted: {item.details?.attemptedCount ?? 0} | skipped: {item.details?.skippedCount ?? 0}
+                          </small>
+                        ) : null}
+                        {item.details?.errors?.[0] ? <code>{item.details.errors[0]}</code> : null}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -472,3 +488,4 @@ export default function AdminPage() {
     </main>
   );
 }
+

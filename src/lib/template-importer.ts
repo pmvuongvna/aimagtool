@@ -52,6 +52,11 @@ type PromptImportSummary = {
   items: PromptTemplate[];
 };
 
+type ListingCollectionResult = {
+  candidates: CandidateSummary[];
+  errors: string[];
+};
+
 type CandidateSummary = {
   title: string;
   detailUrl: string;
@@ -689,8 +694,9 @@ function shouldImportNow(settings: PromptImportSettings, now = new Date()) {
   return settings.enabled && (hour === settings.morningHour || hour === settings.eveningHour);
 }
 
-async function collectListingCandidates(listingUrls: string[]) {
+async function collectListingCandidates(listingUrls: string[]): Promise<ListingCollectionResult> {
   const collected: CandidateSummary[] = [];
+  const errors: string[] = [];
   for (const url of listingUrls) {
     try {
       const page = await fetchPage(url);
@@ -701,11 +707,15 @@ async function collectListingCandidates(listingUrls: string[]) {
       } else {
         collected.push(...extractMarkdownCandidates(page.body));
       }
-    } catch {
+    } catch (error) {
+      errors.push(`${url}: ${error instanceof Error ? error.message : "Unknown listing import error"}`);
       continue;
     }
   }
-  return dedupeCandidates(collected).filter((item) => item.title && item.detailUrl && item.detailUrl.startsWith("https://www.meigen.ai"));
+  return {
+    candidates: dedupeCandidates(collected).filter((item) => item.title && item.detailUrl && item.detailUrl.startsWith("https://www.meigen.ai")),
+    errors,
+  };
 }
 
 export async function runMeigenImport(options: PromptImportOptions = {}): Promise<PromptImportSummary> {
@@ -728,16 +738,23 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
   }
 
   const requestedCount = clampImportCount(options.count ?? settings.importCount);
-  const candidates = await collectListingCandidates(options.listingUrls || DEFAULT_LISTING_URLS);
+  const listingResult = await collectListingCandidates(options.listingUrls || DEFAULT_LISTING_URLS);
+  const candidates = listingResult.candidates;
   const imported: PromptTemplate[] = [];
-  const errors: string[] = [];
+  const errors: string[] = [...listingResult.errors];
+  let skippedCount = 0;
+  let attemptedCount = 0;
 
   for (const candidate of candidates.slice(0, Math.max(requestedCount * 4, 20))) {
     if (imported.length >= requestedCount) break;
+    attemptedCount += 1;
     try {
       const detail = await extractDetailPrompt(candidate);
       const normalized = templateFromCandidate(candidate, detail);
-      if (!normalized) continue;
+      if (!normalized) {
+        skippedCount += 1;
+        continue;
+      }
       const saved = await createOrUpdateTemplate(normalized);
       imported.push(saved);
     } catch (error) {
@@ -746,6 +763,8 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
   }
 
   const updatedSettings = await updatePromptImportSettings({ lastImportedAt: new Date().toISOString() });
+  const failureReason = errors[0]
+    || (candidates.length === 0 ? "No candidates were discovered from MeiGen listing pages." : "Candidates were found, but none could be normalized into prompt templates.");
   const run: PromptImportRun = {
     id: randomUUID(),
     source: "meigen",
@@ -753,12 +772,15 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
     status: imported.length > 0 ? "success" : "failed",
     requestedCount,
     importedCount: imported.length,
-    message: imported.length > 0 ? `Imported ${imported.length} prompt templates from MeiGen.` : "No prompt templates could be imported from MeiGen.",
+    message: imported.length > 0 ? `Imported ${imported.length} prompt templates from MeiGen.` : `No prompt templates could be imported from MeiGen. ${failureReason}`,
     details: {
       listingUrls: options.listingUrls || DEFAULT_LISTING_URLS,
       errors: errors.slice(0, 10),
       lastImportedAt: updatedSettings.lastImportedAt,
       titles: imported.map((item) => item.title).slice(0, 12),
+      candidateCount: candidates.length,
+      attemptedCount,
+      skippedCount,
     },
     createdAt: new Date().toISOString(),
   };
@@ -774,4 +796,5 @@ export async function getTemplateAdminSnapshot() {
   ]);
   return { importSettings, runs, templates };
 }
+
 
