@@ -1,0 +1,30 @@
+name: MeiGen Import
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "Optional import count override"
+        required: false
+        type: string
+  schedule:
+    - cron: "0 2,14 * * *"
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run MeiGen importer
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          IMPORT_COUNT: ${{ github.event.inputs.count || '' }}
+        run: node scripts/meigen-import.mjs

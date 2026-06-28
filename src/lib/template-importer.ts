@@ -239,6 +239,29 @@ async function writePromptImportRun(run: PromptImportRun) {
     [run.id, run.source, run.mode, run.status, run.requestedCount, run.importedCount, run.message, JSON.stringify(run.details || {})],
   );
 }
+export async function recordPromptImportRun(input: {
+  source?: string;
+  mode: string;
+  status: string;
+  requestedCount: number;
+  importedCount: number;
+  message: string;
+  details?: Record<string, unknown>;
+}) {
+  const run: PromptImportRun = {
+    id: randomUUID(),
+    source: input.source || "meigen",
+    mode: input.mode,
+    status: input.status,
+    requestedCount: input.requestedCount,
+    importedCount: input.importedCount,
+    message: input.message,
+    details: input.details || {},
+    createdAt: new Date().toISOString(),
+  };
+  await writePromptImportRun(run);
+  return run;
+}
 
 function pickString(obj: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
@@ -825,6 +848,7 @@ export async function getTemplateAdminSnapshot() {
   ]);
   return { importSettings, runs, templates };
 }
+
 
 
 
