@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
+import { request as httpsRequest } from "node:https";
 import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory, type TemplateMediaType } from "@/lib/template-catalog";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 
@@ -399,6 +400,32 @@ function buildJinaUrl(url: string) {
   return `https://r.jina.ai/http://${url.replace(/^https?:\/\//i, "")}`;
 }
 
+function buildJinaUrlVariants(url: string) {
+  const target = new URL(url);
+  return Array.from(new Set([
+    buildJinaUrl(url),
+    `https://r.jina.ai/http://${target.host}${target.pathname}${target.search}`,
+    `https://r.jina.ai/http://www.meigen.ai${target.pathname}${target.search}`,
+  ]));
+}
+
+function fetchTextViaHttps(url: string, headers: Record<string, string>) {
+  return new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
+    const req = httpsRequest(url, { method: "GET", headers }, (res: import("node:http").IncomingMessage) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk: string) => {
+        body += chunk;
+      });
+      res.on("end", () => {
+        resolve({ statusCode: res.statusCode || 0, body });
+      });
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 async function fetchDirectHtml(url: string) {
   const res = await fetch(url, {
     headers: {
@@ -418,18 +445,20 @@ async function fetchDirectHtml(url: string) {
 }
 
 async function fetchJinaMarkdown(url: string) {
-  const proxyUrl = buildJinaUrl(url);
-  const res = await fetch(proxyUrl, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (compatible; EscanorPromptBot/1.0; +https://escanor.app)",
-      accept: "text/plain,text/markdown;q=0.9,*/*;q=0.8",
-      "cache-control": "no-cache",
-    },
-    cache: "no-store",
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) throw new Error(`Fallback fetch failed ${res.status} for ${url}`);
-  return res.text();
+  const headers = {
+    "user-agent": "Mozilla/5.0 (compatible; EscanorPromptBot/1.0; +https://escanor.app)",
+    accept: "text/plain,text/markdown;q=0.9,*/*;q=0.8",
+    "cache-control": "no-cache",
+  };
+  const failures: string[] = [];
+  for (const proxyUrl of buildJinaUrlVariants(url)) {
+    const result = await fetchTextViaHttps(proxyUrl, headers);
+    if (result.statusCode >= 200 && result.statusCode < 300) {
+      return result.body;
+    }
+    failures.push(`${proxyUrl} -> ${result.statusCode}`);
+  }
+  throw new Error(`Fallback fetch failed for ${url}. Attempts: ${failures.join(" | ")}`);
 }
 
 async function fetchPage(url: string): Promise<FetchedPage> {
@@ -796,5 +825,7 @@ export async function getTemplateAdminSnapshot() {
   ]);
   return { importSettings, runs, templates };
 }
+
+
 
 
