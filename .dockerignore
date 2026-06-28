@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+New Text Document.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+Dockerfile*
+.dockerignore
+README.md
+AGENTS.md
+CLAUDE.md
+*.md
+*.tsbuildinfo
