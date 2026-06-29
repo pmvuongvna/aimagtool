@@ -194,6 +194,20 @@ async function parseResponseBody(response) {
   }
 }
 
+async function debugAdminEndpoint() {
+  const res = await fetch(`${APP_BASE_URL}/api/admin/templates`, {
+    headers: {
+      "x-admin-token": ADMIN_TOKEN,
+      accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
+    },
+  });
+  const payload = await parseResponseBody(res);
+  return {
+    status: res.status,
+    bodyPreview: (payload.raw || "<empty body>").slice(0, 600),
+  };
+}
+
 async function main() {
   const requestedCount = await getImportCount();
   const listingPages = await Promise.all(DEFAULT_LISTING_URLS.map((url) => fetchMarkdown(url).catch(() => "")));
@@ -211,6 +225,15 @@ async function main() {
       errors.push(error instanceof Error ? error.message : String(error));
     }
   }
+
+  const preflight = await debugAdminEndpoint();
+  console.log(JSON.stringify({
+    preflight,
+    requestedCount,
+    discovered: deduped.length,
+    prepared: templates.length,
+    firstError: errors[0] || null,
+  }, null, 2));
 
   const res = await fetch(`${APP_BASE_URL}/api/admin/templates`, {
     method: "POST",
