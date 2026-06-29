@@ -184,6 +184,16 @@ async function getImportCount() {
   return Math.max(1, Math.min(50, Math.floor(payload?.importSettings?.importCount || 12)));
 }
 
+async function parseResponseBody(response) {
+  const raw = await response.text();
+  if (!raw) return { raw: "", parsed: null };
+  try {
+    return { raw, parsed: JSON.parse(raw) };
+  } catch {
+    return { raw, parsed: null };
+  }
+}
+
 async function main() {
   const requestedCount = await getImportCount();
   const listingPages = await Promise.all(DEFAULT_LISTING_URLS.map((url) => fetchMarkdown(url).catch(() => "")));
@@ -215,9 +225,9 @@ async function main() {
     }),
   });
 
-  const payload = await res.json().catch(() => ({}));
+  const payload = await parseResponseBody(res);
   if (!res.ok) {
-    throw new Error(`Bulk import API failed: ${res.status} ${JSON.stringify(payload)}`);
+    throw new Error(`Bulk import API failed: ${res.status} ${payload.raw || "<empty body>"}`);
   }
 
   console.log(JSON.stringify({
@@ -226,7 +236,7 @@ async function main() {
     prepared: templates.length,
     apiStatus: res.status,
     firstError: errors[0] || null,
-    run: payload?.result?.run || null,
+    run: payload?.parsed?.result?.run || null,
   }, null, 2));
 }
 
