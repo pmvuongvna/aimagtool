@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
-import { getAdminToken } from "@/lib/env";
+import { getAdminToken, hasGitHubImportConfig } from "@/lib/env";
+import { dispatchMeiGenImportWorkflow } from "@/lib/github-actions";
 import {
   createOrUpdateTemplate,
   getTemplateAdminSnapshot,
   runMeigenImport,
   recordPromptImportRun,
+  rehostStoredTemplateThumbnails,
   updatePromptImportSettings,
   type PromptImportSettings,
   type PromptTemplateAdminInput,
@@ -56,16 +58,56 @@ export async function POST(request: NextRequest) {
     if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = (await request.json()) as {
-      action?: "import-now" | "create-manual" | "bulk-import";
+      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails";
       count?: number;
       manualTemplate?: PromptTemplateAdminInput;
       templates?: PromptTemplateAdminInput[];
       mode?: string;
+      limit?: number;
     };
 
     if (body.action === "import-now") {
+      if (hasGitHubImportConfig()) {
+        const dispatch = await dispatchMeiGenImportWorkflow(body.count);
+        const run = await recordPromptImportRun({
+          source: "meigen",
+          mode: "github-dispatch",
+          status: "queued",
+          requestedCount: body.count || 0,
+          importedCount: 0,
+          message: `Queued GitHub Actions import for ${dispatch.owner}/${dispatch.repo} (${dispatch.workflowFile}).`,
+          details: {
+            ref: dispatch.ref,
+            count: dispatch.count || null,
+            repo: `${dispatch.owner}/${dispatch.repo}`,
+          },
+        });
+        return NextResponse.json({ result: { run }, snapshot: await getTemplateAdminSnapshot() });
+      }
+
       const result = await runMeigenImport({ mode: "manual", count: body.count });
       return NextResponse.json({ result, snapshot: await getTemplateAdminSnapshot() });
+    }
+
+    if (body.action === "rehost-thumbnails") {
+      const result = await rehostStoredTemplateThumbnails(body.limit || body.count || 48);
+      const run = await recordPromptImportRun({
+        source: "meigen",
+        mode: "rehost-thumbnails",
+        status: result.updated > 0 ? "success" : result.errors.length > 0 ? "failed" : "success",
+        requestedCount: result.checked,
+        importedCount: result.updated,
+        message: result.updated > 0
+          ? `Rehosted ${result.updated} template thumbnails to R2.`
+          : result.errors[0] || "No thumbnails needed rehosting.",
+        details: {
+          checked: result.checked,
+          updated: result.updated,
+          skipped: result.skipped,
+          errors: result.errors.slice(0, 10),
+        },
+      });
+      return NextResponse.json({ result: { run, rehost: result }, snapshot: await getTemplateAdminSnapshot() });
     }
 
     if (body.action === "create-manual" && body.manualTemplate) {

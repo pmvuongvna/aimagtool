@@ -57,3 +57,21 @@ export function getR2Config() {
     publicBaseUrl: required("R2_PUBLIC_BASE_URL"),
   };
 }
+
+export function hasGitHubImportConfig() {
+  return Boolean(
+    process.env.GITHUB_IMPORT_TOKEN?.trim()
+    && process.env.GITHUB_IMPORT_OWNER?.trim()
+    && process.env.GITHUB_IMPORT_REPO?.trim(),
+  );
+}
+
+export function getGitHubImportConfig() {
+  return {
+    token: required("GITHUB_IMPORT_TOKEN"),
+    owner: required("GITHUB_IMPORT_OWNER"),
+    repo: required("GITHUB_IMPORT_REPO"),
+    workflowFile: (process.env.GITHUB_IMPORT_WORKFLOW_FILE || "meigen-import.yml").trim(),
+    ref: (process.env.GITHUB_IMPORT_REF || "master").trim(),
+  };
+}

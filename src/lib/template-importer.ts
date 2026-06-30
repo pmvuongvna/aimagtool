@@ -759,6 +759,79 @@ export async function createOrUpdateTemplate(input: PromptTemplateAdminInput) {
   return normalized;
 }
 
+
+export async function rehostStoredTemplateThumbnails(limit = 48) {
+  const max = Math.max(1, Math.min(250, Math.floor(limit)));
+  const errors: string[] = [];
+  let checked = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  if (!hasDatabase()) {
+    for (const item of memoryTemplates.values()) {
+      if (checked >= max) break;
+      if (item.source !== "meigen" || !item.thumbnailUrl) continue;
+      checked += 1;
+      try {
+        const mirrored = await mirrorRemoteImageToR2({
+          sourceUrl: item.thumbnailUrl,
+          keyPrefix: "templates/meigen",
+          cacheKey: `${item.id}|${item.thumbnailUrl}`,
+        });
+        if (mirrored !== item.thumbnailUrl) {
+          memoryTemplates.set(item.id, { ...item, thumbnailUrl: mirrored });
+          updated += 1;
+        } else {
+          skipped += 1;
+        }
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : "Unknown thumbnail rehost error");
+      }
+    }
+
+    return { checked, updated, skipped, errors };
+  }
+
+  await ensureSchema();
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT id, title, thumbnail_url, source_prompt_id, source_url
+     FROM prompt_templates
+     WHERE source = 'meigen' AND thumbnail_url <> ''
+     ORDER BY updated_at DESC, created_at DESC
+     LIMIT $1`,
+    [max],
+  );
+
+  for (const row of result.rows as Array<{ id: string; title: string; thumbnail_url: string; source_prompt_id: string | null; source_url: string | null }>) {
+    checked += 1;
+    try {
+      const currentUrl = String(row.thumbnail_url || "").trim();
+      if (!currentUrl) {
+        skipped += 1;
+        continue;
+      }
+
+      const mirrored = await mirrorRemoteImageToR2({
+        sourceUrl: currentUrl,
+        keyPrefix: "templates/meigen",
+        cacheKey: `${row.id}|${row.source_prompt_id || row.source_url || row.title}|${currentUrl}`,
+      });
+
+      if (mirrored === currentUrl) {
+        skipped += 1;
+        continue;
+      }
+
+      await pool.query("UPDATE prompt_templates SET thumbnail_url = $2, updated_at = NOW() WHERE id = $1", [row.id, mirrored]);
+      updated += 1;
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : "Unknown thumbnail rehost error");
+    }
+  }
+
+  return { checked, updated, skipped, errors };
+}
 function shouldImportNow(settings: PromptImportSettings, now = new Date()) {
   const hour = now.getHours();
   return settings.enabled && (hour === settings.morningHour || hour === settings.eveningHour);

@@ -200,13 +200,31 @@ export default function AdminPage() {
     if (res.ok && payload.snapshot) {
       setTemplateSnapshot(payload.snapshot);
       setManualImportCount(payload.snapshot.importSettings.importCount);
-      setStatus(payload.result?.run?.message || "Import complete");
+      setStatus(payload.result?.run?.message || "Import queued");
     } else {
       setStatus("Import failed");
     }
     setTemplateLoading(false);
   }
 
+
+  async function rehostThumbnails() {
+    setTemplateLoading(true);
+    setStatus("Rehosting MeiGen thumbnails to R2...");
+    const res = await apiFetch(apiPath("/api/admin/templates"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rehost-thumbnails", count: 48 }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { result?: { run?: ImportRun }; snapshot?: TemplateSnapshot };
+    if (res.ok && payload.snapshot) {
+      setTemplateSnapshot(payload.snapshot);
+      setStatus(payload.result?.run?.message || "Thumbnail rehost complete");
+    } else {
+      setStatus("Thumbnail rehost failed");
+    }
+    setTemplateLoading(false);
+  }
   async function saveManualTemplate(e: FormEvent) {
     e.preventDefault();
     setTemplateLoading(true);
@@ -312,7 +330,7 @@ export default function AdminPage() {
       <section className="admin-grid admin-grid-wide">
         <form className="admin-card" onSubmit={saveImportSettings}>
           <h2>Prompt Importer</h2>
-          <p className="admin-hint">Automatically import from MeiGen twice per day. Thumbnails are pulled directly from MeiGen, and you can adjust the count or run an import immediately.</p>
+          <p className="admin-hint">The server IP is blocked by MeiGen/Jina, so when GitHub import is configured, Import now will queue the external GitHub runner instead of scraping directly from Dokploy. Use rehost to repair older MeiGen thumbnails in R2.</p>
           <div className="admin-subgrid">
             <label>Auto Import
               <input type="checkbox" checked={templateSnapshot?.importSettings.enabled || false} onChange={(e) => setTemplateSnapshot((prev) => prev ? { ...prev, importSettings: { ...prev.importSettings, enabled: e.target.checked } } : prev)} />
