@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { request as httpsRequest } from "node:https";
 import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory, type TemplateMediaType } from "@/lib/template-catalog";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
+import { mirrorRemoteImageToR2 } from "@/lib/r2";
 
 export type PromptImportSettings = {
   enabled: boolean;
@@ -667,7 +668,24 @@ function templateFromCandidate(candidate: CandidateSummary, detail: Awaited<Retu
   };
 }
 
+async function resolveTemplateThumbnailUrl(input: PromptTemplateAdminInput) {
+  const thumbnailUrl = (input.thumbnailUrl || "").trim();
+  if (!thumbnailUrl || (input.source || "internal") !== "meigen") return thumbnailUrl;
+
+  try {
+    return await mirrorRemoteImageToR2({
+      sourceUrl: thumbnailUrl,
+      keyPrefix: "templates/meigen",
+      cacheKey: `${input.sourcePromptId || input.sourceUrl || input.title}|${thumbnailUrl}`,
+    });
+  } catch (error) {
+    console.error("Failed to mirror MeiGen thumbnail to R2", error);
+    return thumbnailUrl;
+  }
+}
+
 export async function createOrUpdateTemplate(input: PromptTemplateAdminInput) {
+  const resolvedThumbnailUrl = await resolveTemplateThumbnailUrl(input);
   const normalized: PromptTemplate = {
     id: buildTemplateId(input.source || "internal", input.sourcePromptId || input.sourceUrl || input.title, input.title, input.prompt),
     source: input.source || "internal",
@@ -675,7 +693,7 @@ export async function createOrUpdateTemplate(input: PromptTemplateAdminInput) {
     sourceUrl: input.sourceUrl,
     title: input.title.trim(),
     prompt: input.prompt.trim(),
-    thumbnailUrl: (input.thumbnailUrl || "").trim(),
+    thumbnailUrl: resolvedThumbnailUrl,
     mediaType: input.mediaType,
     model: input.model.trim(),
     aspectRatio: input.aspectRatio.trim() || (input.mediaType === "video" ? "16:9" : "1:1"),

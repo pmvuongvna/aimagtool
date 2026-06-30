@@ -36,3 +36,24 @@ export function allowDemoAuth() {
   if (isProd) return false;
   return process.env.ALLOW_DEMO_AUTH !== "false";
 }
+
+export function hasR2Config() {
+  return Boolean(
+    process.env.R2_ENDPOINT?.trim()
+    && process.env.R2_BUCKET_NAME?.trim()
+    && process.env.R2_ACCESS_KEY_ID?.trim()
+    && process.env.R2_SECRET_ACCESS_KEY?.trim()
+    && process.env.R2_PUBLIC_BASE_URL?.trim(),
+  );
+}
+
+export function getR2Config() {
+  return {
+    accountId: required("R2_ACCOUNT_ID"),
+    endpoint: required("R2_ENDPOINT"),
+    bucketName: required("R2_BUCKET_NAME"),
+    accessKeyId: required("R2_ACCESS_KEY_ID"),
+    secretAccessKey: required("R2_SECRET_ACCESS_KEY"),
+    publicBaseUrl: required("R2_PUBLIC_BASE_URL"),
+  };
+}
