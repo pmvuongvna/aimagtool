@@ -122,9 +122,22 @@ function extractThumbnailFromMarkdown(markdown) {
   return fallbackMatch?.[1] || "";
 }
 
+function classifyModel(rawValue) {
+  const raw = sanitize(rawValue).toLowerCase();
+  if (/(seedance|seedance mini|seedance 4k)/.test(raw)) return { model: "Seedance", mediaType: "video" };
+  if (/(grok imagine|grok-video|veo|kling|runway|luma)/.test(raw)) return { model: "Grok Imagine", mediaType: "video" };
+  if (/(seedream)/.test(raw)) return { model: "Seedream 5 Lite", mediaType: "image" };
+  if (/(midjourney)/.test(raw)) return { model: "Midjourney", mediaType: "image" };
+  if (/(nanobanana)/.test(raw)) return { model: "Nanobanana Pro", mediaType: "image" };
+  if (/(gpt image|gptimage|grok-image|\bgpt\b)/.test(raw)) return { model: "GPT Image 2", mediaType: "image" };
+  return null;
+}
+
 function inferMediaType({ title, prompt, model, detailUrl }) {
   const text = `${title} ${prompt} ${model} ${detailUrl}`.toLowerCase();
-  return /(video|motion|camera|shot|scene|clip|trailer|seedance|veo|grok-video)/.test(text) ? "video" : "image";
+  const classified = classifyModel(model || text);
+  if (classified) return classified.mediaType;
+  return /(video|motion|clip|trailer|timelapse|loop|animation|animate|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text) ? "video" : "image";
 }
 
 function inferAspectRatio(text, fallback) {
@@ -154,17 +167,18 @@ async function extractTemplate(candidate) {
   const model = candidate.model || extractModelFromMarkdown(markdown) || "GPT Image 2";
   const thumbnailUrl = candidate.thumbnailUrl || extractThumbnailFromMarkdown(markdown);
   const mediaType = inferMediaType({ title: candidate.title, prompt, model, detailUrl: candidate.detailUrl });
-  const category = inferCategory({ title: candidate.title, prompt, model, mediaType });
+  const canonicalModel = classifyModel(model)?.model || (mediaType === "video" ? "Grok Imagine" : "GPT Image 2");
+  const category = inferCategory({ title: candidate.title, prompt, model: canonicalModel, mediaType });
   const aspectRatio = inferAspectRatio(`${candidate.title} ${prompt}`, mediaType === "video" ? "16:9" : "1:1");
   return {
     title: candidate.title,
     prompt,
     thumbnailUrl,
     mediaType,
-    model: /seedream/i.test(model) ? "Seedream 5 Lite" : /grok|video|seedance/i.test(model) ? "Grok Imagine" : "GPT Image 2",
+    model: canonicalModel,
     aspectRatio,
     category,
-    tags: normalizeTags([category, mediaType === "video" ? "Videos" : model]),
+    tags: normalizeTags([category, canonicalModel, mediaType === "video" ? "AI Video" : "AI Image"]),
     authorName: candidate.authorName || "MeiGen",
     published: true,
     featured: false,

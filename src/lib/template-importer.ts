@@ -312,9 +312,22 @@ function sanitizePrompt(value: string) {
   return value.replace(/\s+/g, " ").replace(/&quot;/g, '"').trim();
 }
 
+function classifyModel(rawValue: string) {
+  const raw = sanitizePrompt(rawValue).toLowerCase();
+  if (/(seedance|seedance mini|seedance 4k)/.test(raw)) return { model: "Seedance", mediaType: "video" as const };
+  if (/(grok imagine|grok-video|veo|kling|runway|luma)/.test(raw)) return { model: "Grok Imagine", mediaType: "video" as const };
+  if (/(seedream)/.test(raw)) return { model: "Seedream 5 Lite", mediaType: "image" as const };
+  if (/(midjourney)/.test(raw)) return { model: "Midjourney", mediaType: "image" as const };
+  if (/(nanobanana)/.test(raw)) return { model: "Nanobanana Pro", mediaType: "image" as const };
+  if (/(gpt image|gptimage|grok-image|\bgpt\b)/.test(raw)) return { model: "GPT Image 2", mediaType: "image" as const };
+  return null;
+}
+
 function inferMediaType(input: { title: string; prompt: string; model: string; detailUrl: string; tags: string[]; categoryHint?: string }): TemplateMediaType {
   const text = `${input.title} ${input.prompt} ${input.model} ${input.detailUrl} ${input.tags.join(" ")} ${input.categoryHint || ""}`.toLowerCase();
-  if (/(video|motion|camera|shot|scene|clip|cinematic movement|trailer)/.test(text)) return "video";
+  const classified = classifyModel(input.model);
+  if (classified) return classified.mediaType;
+  if (/(video|motion|clip|cinematic movement|trailer|timelapse|loop|animation|animate|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text)) return "video";
   return "image";
 }
 
@@ -337,10 +350,49 @@ function inferCategory(input: { title: string; prompt: string; model: string; me
 
 function inferModel(input: { mediaType: TemplateMediaType; model?: string; title: string; prompt: string; detailUrl: string }) {
   const raw = `${input.model || ""} ${input.title} ${input.prompt} ${input.detailUrl}`.toLowerCase();
-  if (raw.includes("seedream")) return "Seedream 5 Lite";
-  if (raw.includes("video") || input.mediaType === "video") return "Grok Imagine";
-  if (raw.includes("gpt")) return "GPT Image 2";
+  const classified = classifyModel(raw);
+  if (classified) return classified.model;
+  if (input.mediaType === "video") return "Grok Imagine";
   return "GPT Image 2";
+}
+
+function normalizeMeigenTemplateInput(input: PromptTemplateAdminInput): PromptTemplateAdminInput {
+  if ((input.source || "internal") !== "meigen") return input;
+
+  const mediaType = inferMediaType({
+    title: input.title,
+    prompt: input.prompt,
+    model: input.model,
+    detailUrl: input.sourceUrl || input.sourcePromptId || "",
+    tags: input.tags || [],
+    categoryHint: input.category,
+  });
+  const model = inferModel({
+    mediaType,
+    model: input.model,
+    title: input.title,
+    prompt: input.prompt,
+    detailUrl: input.sourceUrl || input.sourcePromptId || "",
+  });
+  const category = inferCategory({
+    title: input.title,
+    prompt: input.prompt,
+    model,
+    mediaType,
+    tags: input.tags || [],
+    categoryHint: input.category,
+  });
+  const aspectRatio = inferAspectRatio(`${input.title} ${input.prompt} ${input.aspectRatio || ""}`, mediaType === "video" ? "16:9" : "1:1");
+  const tags = normalizeTags([category, model, ...(input.tags || []), mediaType === "video" ? "AI Video" : "AI Image"]);
+
+  return {
+    ...input,
+    mediaType,
+    model,
+    category,
+    aspectRatio,
+    tags,
+  };
 }
 
 function extractCandidateObjects(data: unknown, baseUrl: string) {
@@ -578,7 +630,7 @@ function extractPromptFromMarkdown(markdown: string) {
 }
 
 function extractModelFromMarkdown(markdown: string) {
-  const match = markdown.match(/\n(GPT Image(?: [0-9.]+)?|Nanobanana Pro|Seedance(?: mini\/4K)?|Midjourney|other)\n\s*\n1 Copy Prompt/i);
+  const match = markdown.match(/\n(GPT Image(?: [0-9.]+)?|Nanobanana Pro|Seedance(?: mini\/4K)?|Midjourney|other|grok-image)\n\s*\n1 Copy Prompt/i);
   return sanitizePrompt(match?.[1] || "");
 }
 
@@ -630,7 +682,7 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
   const title = candidate.title || extractMeta(html, "og:title") || extractMeta(html, "twitter:title") || extractTitleFromMarkdown(markdown);
   const thumbnailUrl = candidate.thumbnailUrl || extractMeta(html, "og:image") || extractMeta(html, "twitter:image") || extractThumbnailFromMarkdown(markdown);
   const authorName = candidate.authorName || extractMeta(html, "author") || extractAuthorFromMarkdown(markdown);
-  const model = candidate.model || stringHits.find((text) => /gpt|seedream|video/i.test(text)) || extractModelFromMarkdown(markdown) || "";
+  const model = candidate.model || stringHits.find((text) => /gpt|grok-image|seedream|seedance|midjourney|nanobanana|video/i.test(text)) || extractModelFromMarkdown(markdown) || "";
   return {
     title: sanitizePrompt(title || "Untitled prompt"),
     prompt: sanitizePrompt(prompt),
@@ -685,23 +737,24 @@ async function resolveTemplateThumbnailUrl(input: PromptTemplateAdminInput) {
 }
 
 export async function createOrUpdateTemplate(input: PromptTemplateAdminInput) {
-  const resolvedThumbnailUrl = await resolveTemplateThumbnailUrl(input);
+  const preparedInput = normalizeMeigenTemplateInput(input);
+  const resolvedThumbnailUrl = await resolveTemplateThumbnailUrl(preparedInput);
   const normalized: PromptTemplate = {
-    id: buildTemplateId(input.source || "internal", input.sourcePromptId || input.sourceUrl || input.title, input.title, input.prompt),
-    source: input.source || "internal",
-    sourcePromptId: input.sourcePromptId,
-    sourceUrl: input.sourceUrl,
-    title: input.title.trim(),
-    prompt: input.prompt.trim(),
+    id: buildTemplateId(preparedInput.source || "internal", preparedInput.sourcePromptId || preparedInput.sourceUrl || preparedInput.title, preparedInput.title, preparedInput.prompt),
+    source: preparedInput.source || "internal",
+    sourcePromptId: preparedInput.sourcePromptId,
+    sourceUrl: preparedInput.sourceUrl,
+    title: preparedInput.title.trim(),
+    prompt: preparedInput.prompt.trim(),
     thumbnailUrl: resolvedThumbnailUrl,
-    mediaType: input.mediaType,
-    model: input.model.trim(),
-    aspectRatio: input.aspectRatio.trim() || (input.mediaType === "video" ? "16:9" : "1:1"),
-    category: normalizeTemplateCategory(input.category),
-    tags: normalizeTags(input.tags || []),
-    authorName: (input.authorName || "").trim(),
-    published: input.published !== false,
-    featured: input.featured === true,
+    mediaType: preparedInput.mediaType,
+    model: preparedInput.model.trim(),
+    aspectRatio: preparedInput.aspectRatio.trim() || (preparedInput.mediaType === "video" ? "16:9" : "1:1"),
+    category: normalizeTemplateCategory(preparedInput.category),
+    tags: normalizeTags(preparedInput.tags || []),
+    authorName: (preparedInput.authorName || "").trim(),
+    published: preparedInput.published !== false,
+    featured: preparedInput.featured === true,
   };
 
   if (!hasDatabase()) {
