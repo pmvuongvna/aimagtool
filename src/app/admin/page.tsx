@@ -190,7 +190,7 @@ export default function AdminPage() {
 
   async function runImportNow() {
     setTemplateLoading(true);
-    setStatus("Importing prompts from MeiGen...");
+    setStatus("Queueing MeiGen import...");
     const res = await apiFetch(apiPath("/api/admin/templates"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -225,6 +225,28 @@ export default function AdminPage() {
     }
     setTemplateLoading(false);
   }
+
+  async function clearMeigenTemplates() {
+    const confirmed = window.confirm("Clear all imported MeiGen templates and import history? This keeps manual templates intact.");
+    if (!confirmed) return;
+
+    setTemplateLoading(true);
+    setStatus("Clearing MeiGen templates...");
+    const res = await apiFetch(apiPath("/api/admin/templates"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clear-meigen" }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { result?: { run?: ImportRun }; snapshot?: TemplateSnapshot };
+    if (res.ok && payload.snapshot) {
+      setTemplateSnapshot(payload.snapshot);
+      setStatus(payload.result?.run?.message || "MeiGen templates cleared");
+    } else {
+      setStatus("Clear MeiGen templates failed");
+    }
+    setTemplateLoading(false);
+  }
+
   async function saveManualTemplate(e: FormEvent) {
     e.preventDefault();
     setTemplateLoading(true);
@@ -355,7 +377,9 @@ export default function AdminPage() {
           </div>
           <div className="admin-inline-actions">
             <button className="generate-cta" type="submit" disabled={templateLoading}>Save Import Settings</button>
-            <button className="chip-btn dark" type="button" disabled={templateLoading} onClick={runImportNow}>Import now from MeiGen</button>
+            <button className="chip-btn dark" type="button" disabled={templateLoading} onClick={runImportNow}>Queue MeiGen import</button>
+            <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={rehostThumbnails}>Rehost old thumbnails</button>
+            <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={clearMeigenTemplates}>Clear MeiGen templates</button>
           </div>
         </form>
 

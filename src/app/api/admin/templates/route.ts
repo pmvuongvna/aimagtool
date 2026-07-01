@@ -8,6 +8,7 @@ import {
   runMeigenImport,
   recordPromptImportRun,
   rehostStoredTemplateThumbnails,
+  clearStoredMeigenTemplates,
   updatePromptImportSettings,
   type PromptImportSettings,
   type PromptTemplateAdminInput,
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = (await request.json()) as {
-      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails";
+      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails" | "clear-meigen";
       count?: number;
       manualTemplate?: PromptTemplateAdminInput;
       templates?: PromptTemplateAdminInput[];
@@ -108,6 +109,20 @@ export async function POST(request: NextRequest) {
         },
       });
       return NextResponse.json({ result: { run, rehost: result }, snapshot: await getTemplateAdminSnapshot() });
+    }
+
+    if (body.action === "clear-meigen") {
+      const result = await clearStoredMeigenTemplates();
+      const run = await recordPromptImportRun({
+        source: "meigen",
+        mode: "clear-meigen",
+        status: "success",
+        requestedCount: result.removedTemplates,
+        importedCount: 0,
+        message: `Cleared ${result.removedTemplates} MeiGen templates and ${result.removedRuns} import runs.`,
+        details: result,
+      });
+      return NextResponse.json({ result: { run, cleared: result }, snapshot: await getTemplateAdminSnapshot() });
     }
 
     if (body.action === "create-manual" && body.manualTemplate) {

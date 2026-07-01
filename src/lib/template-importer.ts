@@ -885,6 +885,32 @@ export async function rehostStoredTemplateThumbnails(limit = 48) {
 
   return { checked, updated, skipped, errors };
 }
+export async function clearStoredMeigenTemplates() {
+  if (!hasDatabase()) {
+    let removedTemplates = 0;
+    for (const [id, item] of memoryTemplates.entries()) {
+      if (item.source === "meigen") {
+        memoryTemplates.delete(id);
+        removedTemplates += 1;
+      }
+    }
+    const removedRuns = memoryRuns.filter((item) => item.source === "meigen").length;
+    for (let index = memoryRuns.length - 1; index >= 0; index -= 1) {
+      if (memoryRuns[index]?.source === "meigen") memoryRuns.splice(index, 1);
+    }
+    return { removedTemplates, removedRuns };
+  }
+
+  await ensureSchema();
+  const pool = getPool();
+  const templateResult = await pool.query("DELETE FROM prompt_templates WHERE source = 'meigen'");
+  const runResult = await pool.query("DELETE FROM prompt_import_runs WHERE source = 'meigen'");
+  return {
+    removedTemplates: templateResult.rowCount || 0,
+    removedRuns: runResult.rowCount || 0,
+  };
+}
+
 function shouldImportNow(settings: PromptImportSettings, now = new Date()) {
   const hour = now.getHours();
   return settings.enabled && (hour === settings.morningHour || hour === settings.eveningHour);
