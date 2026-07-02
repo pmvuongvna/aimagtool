@@ -12,6 +12,9 @@ if (!ADMIN_TOKEN) {
 const DEFAULT_LISTING_URLS = [
   "https://www.meigen.ai/",
   "https://www.meigen.ai/?model=gptimage",
+  "https://www.meigen.ai/?model=seedream",
+  "https://www.meigen.ai/?model=seedance",
+  "https://www.meigen.ai/?model=midjourney",
   "https://www.meigen.ai/?category=videos",
 ];
 
@@ -230,7 +233,7 @@ async function main() {
   const templates = [];
   const errors = [];
 
-  for (const candidate of deduped.slice(0, Math.max(requestedCount * 4, 20))) {
+  for (const candidate of deduped) {
     if (templates.length >= requestedCount) break;
     try {
       const item = await extractTemplate(candidate);

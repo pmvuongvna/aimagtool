@@ -83,6 +83,9 @@ const DEFAULT_IMPORT_SETTINGS: PromptImportSettings = {
 const DEFAULT_LISTING_URLS = [
   "https://www.meigen.ai/",
   "https://www.meigen.ai/?model=gptimage",
+  "https://www.meigen.ai/?model=seedream",
+  "https://www.meigen.ai/?model=seedance",
+  "https://www.meigen.ai/?model=midjourney",
   "https://www.meigen.ai/?category=videos",
 ];
 
@@ -967,7 +970,7 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
   let skippedCount = 0;
   let attemptedCount = 0;
 
-  for (const candidate of candidates.slice(0, Math.max(requestedCount * 4, 20))) {
+  for (const candidate of candidates) {
     if (imported.length >= requestedCount) break;
     attemptedCount += 1;
     try {
