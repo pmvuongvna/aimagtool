@@ -1,5 +1,6 @@
 ﻿import { DEFAULT_PROMPT_TEMPLATES, TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateMediaType } from "@/lib/template-catalog";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
+import { normalizeR2PublicImageUrl } from "@/lib/r2";
 
 export type PublicPromptTemplate = PromptTemplate;
 
@@ -13,7 +14,7 @@ function normalizeTemplate(row: Record<string, unknown>): PublicPromptTemplate {
     sourceUrl: row.source_url ? String(row.source_url) : undefined,
     title: String(row.title || "Untitled"),
     prompt: String(row.prompt || ""),
-    thumbnailUrl: String(row.thumbnail_url || ""),
+    thumbnailUrl: normalizeR2PublicImageUrl(String(row.thumbnail_url || "")),
     mediaType: row.media_type === "video" ? "video" : "image",
     model: String(row.model || ""),
     aspectRatio: String(row.aspect_ratio || ""),

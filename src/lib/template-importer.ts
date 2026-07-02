@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { request as httpsRequest } from "node:https";
 import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory, type TemplateMediaType } from "@/lib/template-catalog";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
-import { mirrorRemoteImageToR2 } from "@/lib/r2";
+import { mirrorRemoteImageToR2, normalizeR2PublicImageUrl } from "@/lib/r2";
 
 export type PromptImportSettings = {
   enabled: boolean;
@@ -175,7 +175,7 @@ function mapTemplateRow(row: Record<string, unknown>): PromptTemplate {
     sourceUrl: row.source_url ? String(row.source_url) : undefined,
     title: String(row.title || "Untitled"),
     prompt: String(row.prompt || ""),
-    thumbnailUrl: String(row.thumbnail_url || ""),
+    thumbnailUrl: normalizeR2PublicImageUrl(String(row.thumbnail_url || "")),
     mediaType: row.media_type === "video" ? "video" : "image",
     model: String(row.model || ""),
     aspectRatio: String(row.aspect_ratio || ""),
@@ -742,7 +742,7 @@ function templateFromCandidate(candidate: CandidateSummary, detail: Awaited<Retu
 }
 
 async function resolveTemplateThumbnailUrl(input: PromptTemplateAdminInput) {
-  const thumbnailUrl = (input.thumbnailUrl || "").trim();
+  const thumbnailUrl = normalizeR2PublicImageUrl((input.thumbnailUrl || "").trim());
   if (!thumbnailUrl || (input.source || "internal") !== "meigen") return thumbnailUrl;
 
   try {
@@ -880,9 +880,17 @@ export async function rehostStoredTemplateThumbnails(limit = 48) {
   for (const row of result.rows as Array<{ id: string; title: string; thumbnail_url: string; source_prompt_id: string | null; source_url: string | null }>) {
     checked += 1;
     try {
-      const currentUrl = String(row.thumbnail_url || "").trim();
+      const currentUrl = normalizeR2PublicImageUrl(String(row.thumbnail_url || "").trim());
       if (!currentUrl) {
         skipped += 1;
+        continue;
+      }
+
+      const normalizedCurrent = normalizeR2PublicImageUrl(currentUrl);
+
+      if (normalizedCurrent !== String(row.thumbnail_url || "").trim()) {
+        await pool.query("UPDATE prompt_templates SET thumbnail_url = $2, updated_at = NOW() WHERE id = $1", [row.id, normalizedCurrent]);
+        updated += 1;
         continue;
       }
 

@@ -34,6 +34,46 @@ function normalizePublicUrl(baseUrl: string, key: string) {
   return `${normalizedBase}/${normalizedKey}`;
 }
 
+function extractR2ObjectKey(url: string, config: ReturnType<typeof getR2Config>) {
+  try {
+    const target = new URL(url);
+    const endpoint = new URL(config.endpoint);
+    const publicBase = new URL(config.publicBaseUrl);
+    const cleanPath = target.pathname.replace(/^\/+/, "");
+
+    if (target.origin === publicBase.origin) {
+      const basePath = publicBase.pathname.replace(/^\/+|\/+$/g, "");
+      if (!basePath) return cleanPath;
+      if (cleanPath.startsWith(`${basePath}/`)) return cleanPath.slice(basePath.length + 1);
+      return cleanPath;
+    }
+
+    if (target.origin === endpoint.origin) {
+      if (cleanPath === config.bucketName) return "";
+      if (cleanPath.startsWith(`${config.bucketName}/`)) return cleanPath.slice(config.bucketName.length + 1);
+      return cleanPath;
+    }
+
+    if (/\.r2\.dev$/i.test(target.hostname)) {
+      if (cleanPath.startsWith(`${config.bucketName}/`)) return cleanPath.slice(config.bucketName.length + 1);
+      return cleanPath;
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+export function normalizeR2PublicImageUrl(url: string) {
+  const sourceUrl = url.trim();
+  if (!sourceUrl || !hasR2Config()) return sourceUrl;
+  const config = getR2Config();
+  const key = extractR2ObjectKey(sourceUrl, config);
+  if (!key) return sourceUrl;
+  return normalizePublicUrl(config.publicBaseUrl, key);
+}
+
 function inferExtension(contentType: string, sourceUrl: string) {
   const normalizedType = contentType.toLowerCase();
   if (normalizedType.includes("png")) return "png";
@@ -62,6 +102,9 @@ export async function mirrorRemoteImageToR2(input: {
   const sourceUrl = input.sourceUrl.trim();
   if (!sourceUrl || !/^https?:\/\//i.test(sourceUrl)) return sourceUrl;
   if (!hasR2Config()) return sourceUrl;
+
+  const normalizedExistingUrl = normalizeR2PublicImageUrl(sourceUrl);
+  if (normalizedExistingUrl !== sourceUrl) return normalizedExistingUrl;
 
   const config = getR2Config();
   if (sourceUrl.startsWith(config.publicBaseUrl)) return sourceUrl;
