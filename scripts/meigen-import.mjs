@@ -163,10 +163,34 @@ function normalizeTags(tags) {
   return [...new Set(tags.map((item) => sanitize(item)).filter(Boolean))].slice(0, 12);
 }
 
+function extractRelatedPromptCandidates(markdown, currentUrl) {
+  const found = [];
+  const regex = /\[([^\]]{3,180})\]\((https:\/\/www\.meigen\.ai\/prompt\/[0-9]+)\)/g;
+  let match;
+  while ((match = regex.exec(markdown))) {
+    const title = sanitize(match[1] || "").replace(/^view prompt details$/i, "").trim();
+    const detailUrl = sanitize(match[2] || "");
+    if (!detailUrl || detailUrl === currentUrl) continue;
+    found.push({
+      title: title || "Untitled prompt",
+      detailUrl,
+    });
+  }
+  const deduped = new Map();
+  for (const item of found) {
+    if (!item.detailUrl) continue;
+    if (!deduped.has(item.detailUrl)) deduped.set(item.detailUrl, item);
+  }
+  return [...deduped.values()];
+}
+
 async function extractTemplate(candidate) {
   const markdown = await fetchMarkdown(candidate.detailUrl);
   const prompt = extractPromptFromMarkdown(markdown);
-  if (!prompt || prompt.length < 24) return null;
+  const relatedCandidates = extractRelatedPromptCandidates(markdown, candidate.detailUrl);
+  if (!prompt || prompt.length < 24) {
+    return { item: null, relatedCandidates };
+  }
   const model = candidate.model || extractModelFromMarkdown(markdown) || "GPT Image 2";
   const thumbnailUrl = candidate.thumbnailUrl || extractThumbnailFromMarkdown(markdown);
   const mediaType = inferMediaType({ title: candidate.title, prompt, model, detailUrl: candidate.detailUrl });
@@ -174,20 +198,23 @@ async function extractTemplate(candidate) {
   const category = inferCategory({ title: candidate.title, prompt, model: canonicalModel, mediaType });
   const aspectRatio = inferAspectRatio(`${candidate.title} ${prompt}`, mediaType === "video" ? "16:9" : "1:1");
   return {
-    title: candidate.title,
-    prompt,
-    thumbnailUrl,
-    mediaType,
-    model: canonicalModel,
-    aspectRatio,
-    category,
-    tags: normalizeTags([category, canonicalModel, mediaType === "video" ? "AI Video" : "AI Image"]),
-    authorName: candidate.authorName || "MeiGen",
-    published: true,
-    featured: false,
-    source: "meigen",
-    sourcePromptId: candidate.detailUrl,
-    sourceUrl: candidate.detailUrl,
+    item: {
+      title: candidate.title,
+      prompt,
+      thumbnailUrl,
+      mediaType,
+      model: canonicalModel,
+      aspectRatio,
+      category,
+      tags: normalizeTags([category, canonicalModel, mediaType === "video" ? "AI Video" : "AI Image"]),
+      authorName: candidate.authorName || "MeiGen",
+      published: true,
+      featured: false,
+      source: "meigen",
+      sourcePromptId: candidate.detailUrl,
+      sourceUrl: candidate.detailUrl,
+    },
+    relatedCandidates,
   };
 }
 
@@ -232,12 +259,29 @@ async function main() {
   const deduped = [...new Map(candidates.map((item) => [item.detailUrl, item])).values()];
   const templates = [];
   const errors = [];
+  let attemptedCount = 0;
+  let skippedCount = 0;
 
-  for (const candidate of deduped) {
-    if (templates.length >= requestedCount) break;
+  const queue = [...deduped];
+  const seen = new Set(queue.map((item) => item.detailUrl));
+  const maxAttempts = Math.max(requestedCount * 12, 120);
+
+  while (queue.length > 0 && templates.length < requestedCount && attemptedCount < maxAttempts) {
+    const candidate = queue.shift();
+    if (!candidate) break;
+    attemptedCount += 1;
     try {
-      const item = await extractTemplate(candidate);
-      if (item) templates.push(item);
+      const result = await extractTemplate(candidate);
+      for (const related of result.relatedCandidates || []) {
+        if (!related.detailUrl || seen.has(related.detailUrl)) continue;
+        seen.add(related.detailUrl);
+        queue.push(related);
+      }
+      if (!result.item) {
+        skippedCount += 1;
+        continue;
+      }
+      templates.push(result.item);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }
@@ -249,6 +293,8 @@ async function main() {
     requestedCount,
     discovered: deduped.length,
     prepared: templates.length,
+    attemptedCount,
+    skippedCount,
     firstError: errors[0] || null,
   }, null, 2));
 
@@ -274,6 +320,8 @@ async function main() {
     requestedCount,
     discovered: deduped.length,
     prepared: templates.length,
+    attemptedCount,
+    skippedCount,
     apiStatus: res.status,
     firstError: errors[0] || null,
     run: payload?.parsed?.result?.run || null,

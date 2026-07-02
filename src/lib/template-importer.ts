@@ -465,6 +465,22 @@ function dedupeCandidates(items: CandidateSummary[]) {
   return Array.from(map.values());
 }
 
+function extractRelatedPromptCandidates(content: string, currentUrl: string) {
+  const found: CandidateSummary[] = [];
+  const regex = /\[([^\]]{3,180})\]\((https:\/\/www\.meigen\.ai\/prompt\/[0-9]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(content))) {
+    const title = sanitizePrompt(match[1] || "").replace(/^view prompt details$/i, "").trim();
+    const detailUrl = sanitizePrompt(match[2] || "");
+    if (!detailUrl || detailUrl === currentUrl) continue;
+    found.push({
+      title: title || "Untitled prompt",
+      detailUrl,
+    });
+  }
+  return dedupeCandidates(found);
+}
+
 type FetchedPage = {
   body: string;
   format: "html" | "markdown";
@@ -686,6 +702,7 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
   const thumbnailUrl = candidate.thumbnailUrl || extractMeta(html, "og:image") || extractMeta(html, "twitter:image") || extractThumbnailFromMarkdown(markdown);
   const authorName = candidate.authorName || extractMeta(html, "author") || extractAuthorFromMarkdown(markdown);
   const model = candidate.model || stringHits.find((text) => /gpt|grok-image|seedream|seedance|midjourney|nanobanana|video/i.test(text)) || extractModelFromMarkdown(markdown) || "";
+  const relatedCandidates = markdown ? extractRelatedPromptCandidates(markdown, candidate.detailUrl) : [];
   return {
     title: sanitizePrompt(title || "Untitled prompt"),
     prompt: sanitizePrompt(prompt),
@@ -693,6 +710,7 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
     authorName,
     model,
     html,
+    relatedCandidates,
   };
 }
 
@@ -970,11 +988,21 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
   let skippedCount = 0;
   let attemptedCount = 0;
 
-  for (const candidate of candidates) {
-    if (imported.length >= requestedCount) break;
+  const queue = [...candidates];
+  const seen = new Set(queue.map((item) => item.detailUrl));
+  const maxAttempts = Math.max(requestedCount * 12, 120);
+
+  while (queue.length > 0 && imported.length < requestedCount && attemptedCount < maxAttempts) {
+    const candidate = queue.shift();
+    if (!candidate) break;
     attemptedCount += 1;
     try {
       const detail = await extractDetailPrompt(candidate);
+      for (const related of detail.relatedCandidates || []) {
+        if (!related.detailUrl || seen.has(related.detailUrl)) continue;
+        seen.add(related.detailUrl);
+        queue.push(related);
+      }
       const normalized = templateFromCandidate(candidate, detail);
       if (!normalized) {
         skippedCount += 1;
