@@ -624,7 +624,7 @@ function extractMarkdownCandidates(markdown: string) {
     });
   }
 
-  return dedupeCandidates(candidates).filter((item) => item.thumbnailUrl && item.detailUrl);
+  return dedupeCandidates(candidates).filter((item) => item.detailUrl);
 }
 
 function extractMarkdownSection(markdown: string, startMarker: string, endMarkers: string[]) {
@@ -718,6 +718,8 @@ function templateFromCandidate(candidate: CandidateSummary, detail: Awaited<Retu
   const prompt = detail.prompt || candidate.prompt || "";
   if (prompt.length < 24) return null;
   const title = detail.title || candidate.title || prompt.slice(0, 48);
+  const thumbnailUrl = detail.thumbnailUrl || candidate.thumbnailUrl || "";
+  if (!thumbnailUrl) return null;
   const mediaType = inferMediaType({ title, prompt, model: detail.model || candidate.model || "", detailUrl: candidate.detailUrl, tags: candidate.tags || [] });
   const model = inferModel({ mediaType, model: detail.model || candidate.model, title, prompt, detailUrl: candidate.detailUrl });
   const category = inferCategory({ title, prompt, model, mediaType, tags: candidate.tags || [] });
@@ -726,7 +728,7 @@ function templateFromCandidate(candidate: CandidateSummary, detail: Awaited<Retu
   return {
     title,
     prompt,
-    thumbnailUrl: detail.thumbnailUrl || candidate.thumbnailUrl || "",
+    thumbnailUrl,
     mediaType,
     model,
     aspectRatio,
@@ -1057,6 +1059,8 @@ export async function getTemplateAdminSnapshot() {
   ]);
   return { importSettings, runs, templates };
 }
+
+
 
 
 

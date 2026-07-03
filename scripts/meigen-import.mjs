@@ -1,6 +1,14 @@
+import { createHash } from "node:crypto";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+
 const APP_BASE_URL = process.env.APP_BASE_URL?.replace(/\/$/, "") || process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN?.trim();
 const IMPORT_COUNT_ENV = Number(process.env.IMPORT_COUNT || "0");
+const R2_ENDPOINT = process.env.R2_ENDPOINT?.trim();
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME?.trim();
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID?.trim();
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY?.trim();
+const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL?.trim();
 
 if (!APP_BASE_URL) {
   throw new Error("APP_BASE_URL is required");
@@ -18,10 +26,98 @@ const DEFAULT_LISTING_URLS = [
   "https://www.meigen.ai/?category=videos",
 ];
 
+const MAX_FILE_SIZE = 12 * 1024 * 1024;
+let r2Client = null;
+
 function sanitize(value = "") {
   return String(value).replace(/\s+/g, " ").replace(/&quot;/g, '"').trim();
 }
 
+function hasR2Config() {
+  return Boolean(R2_ENDPOINT && R2_BUCKET_NAME && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_PUBLIC_BASE_URL);
+}
+
+function getR2Client() {
+  if (r2Client) return r2Client;
+  const endpointUrl = new URL(R2_ENDPOINT);
+  endpointUrl.pathname = "";
+  endpointUrl.search = "";
+  endpointUrl.hash = "";
+  r2Client = new S3Client({
+    region: "auto",
+    endpoint: endpointUrl.toString(),
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+    },
+  });
+  return r2Client;
+}
+
+function normalizePublicUrl(baseUrl, key) {
+  const normalizedBase = baseUrl.replace(/\/+$/, "");
+  const normalizedKey = key.split("/").map((part) => encodeURIComponent(part)).join("/");
+  return `${normalizedBase}/${normalizedKey}`;
+}
+
+function inferExtension(contentType, sourceUrl) {
+  const normalizedType = String(contentType || "").toLowerCase();
+  if (normalizedType.includes("png")) return "png";
+  if (normalizedType.includes("webp")) return "webp";
+  if (normalizedType.includes("gif")) return "gif";
+  if (normalizedType.includes("svg")) return "svg";
+  if (normalizedType.includes("avif")) return "avif";
+  if (normalizedType.includes("jpeg") || normalizedType.includes("jpg")) return "jpg";
+  try {
+    const pathname = new URL(sourceUrl).pathname;
+    const match = pathname.match(/\.([a-zA-Z0-9]+)$/);
+    if (match?.[1]) return match[1].toLowerCase();
+  } catch {}
+  return "jpg";
+}
+
+async function mirrorImageToR2(sourceUrl, cacheKey) {
+  if (!sourceUrl || !/^https?:\/\//i.test(sourceUrl)) return sourceUrl;
+  if (!hasR2Config()) return sourceUrl;
+  if (sourceUrl.startsWith(R2_PUBLIC_BASE_URL)) return sourceUrl;
+
+  const response = await fetch(sourceUrl, {
+    headers: {
+      "user-agent": "Mozilla/5.0 (compatible; EscanorExternalImporter/1.0)",
+      accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      "cache-control": "no-cache",
+      referer: "https://www.meigen.ai/",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Remote image fetch failed: ${response.status} ${sourceUrl}`);
+  }
+
+  const contentType = response.headers.get("content-type")?.split(";")[0]?.trim() || "image/jpeg";
+  if (!contentType.startsWith("image/")) {
+    throw new Error(`Remote asset is not an image: ${contentType}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length) throw new Error(`Remote image is empty: ${sourceUrl}`);
+  if (buffer.length > MAX_FILE_SIZE) throw new Error(`Remote image exceeds ${MAX_FILE_SIZE} bytes: ${sourceUrl}`);
+
+  const extension = inferExtension(contentType, sourceUrl);
+  const digest = createHash("sha1").update(cacheKey || sourceUrl).digest("hex");
+  const key = `templates/meigen/${digest}.${extension}`;
+
+  await getR2Client().send(new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+    CacheControl: "public, max-age=31536000, immutable",
+  }));
+
+  return normalizePublicUrl(R2_PUBLIC_BASE_URL, key);
+}
 function buildJinaVariants(url) {
   const target = new URL(url);
   return Array.from(new Set([
@@ -102,7 +198,7 @@ function extractListingCandidates(markdown) {
 
   const deduped = new Map();
   for (const item of candidates) {
-    if (!item.detailUrl || !item.thumbnailUrl || !item.title) continue;
+    if (!item.detailUrl || !item.title) continue;
     if (!deduped.has(item.detailUrl)) deduped.set(item.detailUrl, item);
   }
   return [...deduped.values()];
@@ -192,7 +288,11 @@ async function extractTemplate(candidate) {
     return { item: null, relatedCandidates };
   }
   const model = candidate.model || extractModelFromMarkdown(markdown) || "GPT Image 2";
-  const thumbnailUrl = candidate.thumbnailUrl || extractThumbnailFromMarkdown(markdown);
+  const originalThumbnailUrl = candidate.thumbnailUrl || extractThumbnailFromMarkdown(markdown);
+  if (!originalThumbnailUrl) {
+    return { item: null, relatedCandidates };
+  }
+  const thumbnailUrl = await mirrorImageToR2(originalThumbnailUrl, `${candidate.detailUrl}|${originalThumbnailUrl}`);
   const mediaType = inferMediaType({ title: candidate.title, prompt, model, detailUrl: candidate.detailUrl });
   const canonicalModel = classifyModel(model)?.model || (mediaType === "video" ? "Grok Imagine" : "GPT Image 2");
   const category = inferCategory({ title: candidate.title, prompt, model: canonicalModel, mediaType });
@@ -332,3 +432,5 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.stack || error.message : String(error));
   process.exit(1);
 });
+
+
