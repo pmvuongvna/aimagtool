@@ -315,6 +315,31 @@ function sanitizePrompt(value: string) {
   return value.replace(/\s+/g, " ").replace(/&quot;/g, '"').trim();
 }
 
+function normalizeCandidateThumbnailUrl(value: string) {
+  const url = sanitizePrompt(value || "");
+  if (!url || !/^https?:\/\//i.test(url)) return "";
+
+  try {
+    const target = new URL(url);
+    const host = target.hostname.toLowerCase();
+    const pathname = target.pathname.toLowerCase();
+
+    if ((host === "www.meigen.ai" || host === "meigen.ai") && (pathname === "/" || pathname === "")) return "";
+    if ((host === "www.meigen.ai" || host === "meigen.ai") && !pathname.startsWith("/cdn-cgi/image/") && !/\.(png|jpe?g|webp|gif|avif|svg)$/i.test(pathname)) return "";
+
+    const looksLikeImageHost = host === "images.meigen.ai"
+      || host === "images.escanor.app"
+      || host.endsWith(".r2.dev")
+      || host.endsWith(".cloudflarestorage.com")
+      || pathname.startsWith("/cdn-cgi/image/")
+      || /\.(png|jpe?g|webp|gif|avif|svg)$/i.test(pathname);
+
+    return looksLikeImageHost ? target.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 function classifyModel(rawValue: string) {
   const raw = sanitizePrompt(rawValue).toLowerCase();
   if (/(seedance|seedance mini|seedance 4k)/.test(raw)) return { model: "Seedance", mediaType: "video" as const };
@@ -579,7 +604,7 @@ function extractMarkdownCandidates(markdown: string) {
   let compactMatch: RegExpExecArray | null;
   while ((compactMatch = compactRegex.exec(markdown))) {
     const descriptor = sanitizePrompt(compactMatch[1] || "");
-    const thumbnailUrl = sanitizePrompt(compactMatch[2] || "");
+    const thumbnailUrl = normalizeCandidateThumbnailUrl(compactMatch[2] || "");
     const trailing = sanitizePrompt(compactMatch[3] || "");
     const detailUrl = sanitizePrompt(compactMatch[4] || "");
 
@@ -607,7 +632,7 @@ function extractMarkdownCandidates(markdown: string) {
   let blockMatch: RegExpExecArray | null;
   while ((blockMatch = blockRegex.exec(markdown))) {
     const descriptor = sanitizePrompt(blockMatch[1] || "");
-    const thumbnailUrl = sanitizePrompt(blockMatch[2] || "");
+    const thumbnailUrl = normalizeCandidateThumbnailUrl(blockMatch[2] || "");
     const headingTitle = sanitizePrompt(blockMatch[3] || "");
     const authorLine = sanitizePrompt(blockMatch[4] || "");
     const model = sanitizePrompt(blockMatch[5] || "");
@@ -674,10 +699,10 @@ function extractAuthorFromMarkdown(markdown: string) {
 function extractThumbnailFromMarkdown(markdown: string) {
   const mediaSection = extractMarkdownSection(markdown, "\n## Media Preview\n", ["\nUse as Prompt", "\n### More like this", "\n## "]);
   const mediaMatch = mediaSection.match(/\((https:\/\/images\.meigen\.ai\/[^\s)]+)\)/);
-  if (mediaMatch?.[1]) return mediaMatch[1];
+  if (mediaMatch?.[1]) return normalizeCandidateThumbnailUrl(mediaMatch[1]);
 
   const fallbackMatch = markdown.match(/\((https:\/\/images\.meigen\.ai\/cdn-cgi\/image\/[^\s)]+)\)/);
-  return fallbackMatch?.[1] || "";
+  return normalizeCandidateThumbnailUrl(fallbackMatch?.[1] || "");
 }
 
 async function extractDetailPrompt(candidate: CandidateSummary) {
@@ -699,7 +724,7 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
   }
   const prompt = promptCandidates.filter((value): value is string => Boolean(value)).sort((a, b) => b.length - a.length)[0] || "";
   const title = candidate.title || extractMeta(html, "og:title") || extractMeta(html, "twitter:title") || extractTitleFromMarkdown(markdown);
-  const thumbnailUrl = candidate.thumbnailUrl || extractMeta(html, "og:image") || extractMeta(html, "twitter:image") || extractThumbnailFromMarkdown(markdown);
+  const thumbnailUrl = normalizeCandidateThumbnailUrl(candidate.thumbnailUrl || extractMeta(html, "og:image") || extractMeta(html, "twitter:image") || extractThumbnailFromMarkdown(markdown));
   const authorName = candidate.authorName || extractMeta(html, "author") || extractAuthorFromMarkdown(markdown);
   const model = candidate.model || stringHits.find((text) => /gpt|grok-image|seedream|seedance|midjourney|nanobanana|video/i.test(text)) || extractModelFromMarkdown(markdown) || "";
   const relatedCandidates = markdown ? extractRelatedPromptCandidates(markdown, candidate.detailUrl) : [];

@@ -33,6 +33,31 @@ function sanitize(value = "") {
   return String(value).replace(/\s+/g, " ").replace(/&quot;/g, '"').trim();
 }
 
+function normalizeCandidateThumbnailUrl(value) {
+  const url = sanitize(value || "");
+  if (!url || !/^https?:\/\//i.test(url)) return "";
+
+  try {
+    const target = new URL(url);
+    const host = target.hostname.toLowerCase();
+    const pathname = target.pathname.toLowerCase();
+
+    if ((host === "www.meigen.ai" || host === "meigen.ai") && (pathname === "/" || pathname === "")) return "";
+    if ((host === "www.meigen.ai" || host === "meigen.ai") && !pathname.startsWith("/cdn-cgi/image/") && !/\.(png|jpe?g|webp|gif|avif|svg)$/i.test(pathname)) return "";
+
+    const looksLikeImageHost = host === "images.meigen.ai"
+      || host === "images.escanor.app"
+      || host.endsWith(".r2.dev")
+      || host.endsWith(".cloudflarestorage.com")
+      || pathname.startsWith("/cdn-cgi/image/")
+      || /\.(png|jpe?g|webp|gif|avif|svg)$/i.test(pathname);
+
+    return looksLikeImageHost ? target.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 function hasR2Config() {
   return Boolean(R2_ENDPOINT && R2_BUCKET_NAME && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_PUBLIC_BASE_URL);
 }
@@ -169,7 +194,7 @@ function extractListingCandidates(markdown) {
   let match;
   while ((match = compactRegex.exec(markdown))) {
     const descriptor = sanitize(match[1] || "");
-    const thumbnailUrl = sanitize(match[2] || "");
+    const thumbnailUrl = normalizeCandidateThumbnailUrl(match[2] || "");
     const trailing = sanitize(match[3] || "");
     const detailUrl = sanitize(match[4] || "");
     if (!descriptor || !detailUrl || descriptor.length < 8) continue;
@@ -189,7 +214,7 @@ function extractListingCandidates(markdown) {
     const authorLine = sanitize(match[4] || "");
     candidates.push({
       title: sanitize(match[3] || match[1] || ""),
-      thumbnailUrl: sanitize(match[2] || ""),
+      thumbnailUrl: normalizeCandidateThumbnailUrl(match[2] || ""),
       detailUrl: sanitize(match[6] || ""),
       model: sanitize(match[5] || ""),
       authorName: authorLine.match(/@([A-Za-z0-9_.-]+)/)?.[1] || authorLine,
@@ -216,9 +241,9 @@ function extractModelFromMarkdown(markdown) {
 function extractThumbnailFromMarkdown(markdown) {
   const mediaSection = extractMarkdownSection(markdown, "\n## Media Preview\n", ["\nUse as Prompt", "\n### More like this", "\n## "]);
   const mediaMatch = mediaSection.match(/\((https:\/\/images\.meigen\.ai\/[^\s)]+)\)/);
-  if (mediaMatch?.[1]) return mediaMatch[1];
+  if (mediaMatch?.[1]) return normalizeCandidateThumbnailUrl(mediaMatch[1]);
   const fallbackMatch = markdown.match(/\((https:\/\/images\.meigen\.ai\/cdn-cgi\/image\/[^\s)]+)\)/);
-  return fallbackMatch?.[1] || "";
+  return normalizeCandidateThumbnailUrl(fallbackMatch?.[1] || "");
 }
 
 function classifyModel(rawValue) {
