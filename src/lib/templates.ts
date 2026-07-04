@@ -108,7 +108,7 @@ export async function getPublicTemplates(options?: { mediaType?: TemplateMediaTy
     `SELECT id, source, source_prompt_id, source_url, title, prompt, thumbnail_url, media_type, model, aspect_ratio, category, tags, author_name, published, featured
      FROM prompt_templates
      WHERE ${clauses.join(" AND ")}
-     ORDER BY updated_at DESC, created_at DESC, featured DESC
+     ORDER BY updated_at DESC, created_at DESC, id DESC
      LIMIT 120`,
     values,
   );
