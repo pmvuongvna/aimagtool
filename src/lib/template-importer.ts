@@ -340,6 +340,30 @@ function normalizeCandidateThumbnailUrl(value: string) {
   }
 }
 
+function isUsableTemplateThumbnailUrl(value: string) {
+  const normalized = normalizeR2PublicImageUrl(String(value || "").trim());
+  if (!normalized) return false;
+
+  try {
+    const target = new URL(normalized);
+    const host = target.hostname.toLowerCase();
+    const pathname = target.pathname.toLowerCase();
+
+    if ((host === "www.meigen.ai" || host === "meigen.ai") && (pathname === "/" || pathname === "")) return false;
+
+    return (
+      host === "images.meigen.ai"
+      || host === "images.escanor.app"
+      || host.endsWith(".r2.dev")
+      || host.endsWith(".cloudflarestorage.com")
+      || pathname.startsWith("/cdn-cgi/image/")
+      || /\.(png|jpe?g|webp|gif|avif|svg)$/i.test(pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function classifyModel(rawValue: string) {
   const raw = sanitizePrompt(rawValue).toLowerCase();
   if (/(seedance|seedance mini|seedance 4k)/.test(raw)) return { model: "Seedance", mediaType: "video" as const };
@@ -965,6 +989,40 @@ export async function clearStoredMeigenTemplates() {
     removedTemplates: templateResult.rowCount || 0,
     removedRuns: runResult.rowCount || 0,
   };
+}
+
+export async function clearBrokenTemplateThumbnails() {
+  if (!hasDatabase()) {
+    const totalBefore = memoryTemplates.size;
+    let removedTemplates = 0;
+    for (const [id, item] of memoryTemplates.entries()) {
+      if (item.source === "meigen" && !isUsableTemplateThumbnailUrl(item.thumbnailUrl || "")) {
+        memoryTemplates.delete(id);
+        removedTemplates += 1;
+      }
+    }
+    return { checked: totalBefore, removedTemplates };
+  }
+
+  await ensureSchema();
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT id, thumbnail_url
+     FROM prompt_templates
+     WHERE source = 'meigen'`,
+  );
+
+  let checked = 0;
+  let removedTemplates = 0;
+
+  for (const row of result.rows as Array<{ id: string; thumbnail_url: string | null }>) {
+    checked += 1;
+    if (isUsableTemplateThumbnailUrl(String(row.thumbnail_url || ""))) continue;
+    await pool.query("DELETE FROM prompt_templates WHERE id = $1", [row.id]);
+    removedTemplates += 1;
+  }
+
+  return { checked, removedTemplates };
 }
 
 function shouldImportNow(settings: PromptImportSettings, now = new Date()) {

@@ -9,6 +9,7 @@ import {
   recordPromptImportRun,
   rehostStoredTemplateThumbnails,
   clearStoredMeigenTemplates,
+  clearBrokenTemplateThumbnails,
   updatePromptImportSettings,
   type PromptImportSettings,
   type PromptTemplateAdminInput,
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = (await request.json()) as {
-      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails" | "clear-meigen";
+      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails" | "clear-meigen" | "clean-broken-thumbnails";
       count?: number;
       manualTemplate?: PromptTemplateAdminInput;
       templates?: PromptTemplateAdminInput[];
@@ -109,6 +110,22 @@ export async function POST(request: NextRequest) {
         },
       });
       return NextResponse.json({ result: { run, rehost: result }, snapshot: await getTemplateAdminSnapshot() });
+    }
+
+    if (body.action === "clean-broken-thumbnails") {
+      const result = await clearBrokenTemplateThumbnails();
+      const run = await recordPromptImportRun({
+        source: "meigen",
+        mode: "clean-broken-thumbnails",
+        status: "success",
+        requestedCount: result.checked,
+        importedCount: 0,
+        message: result.removedTemplates > 0
+          ? `Removed ${result.removedTemplates} MeiGen templates with broken thumbnails.`
+          : "No broken MeiGen template thumbnails were found.",
+        details: result,
+      });
+      return NextResponse.json({ result: { run, cleaned: result }, snapshot: await getTemplateAdminSnapshot() });
     }
 
     if (body.action === "clear-meigen") {

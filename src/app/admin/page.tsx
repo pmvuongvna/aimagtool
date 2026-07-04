@@ -226,6 +226,27 @@ export default function AdminPage() {
     setTemplateLoading(false);
   }
 
+  async function cleanBrokenThumbnails() {
+    const confirmed = window.confirm("Remove MeiGen templates that have broken thumbnail URLs? This only deletes clearly invalid thumbnail records.");
+    if (!confirmed) return;
+
+    setTemplateLoading(true);
+    setStatus("Cleaning broken MeiGen thumbnails...");
+    const res = await apiFetch(apiPath("/api/admin/templates"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clean-broken-thumbnails" }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { result?: { run?: ImportRun }; snapshot?: TemplateSnapshot };
+    if (res.ok && payload.snapshot) {
+      setTemplateSnapshot(payload.snapshot);
+      setStatus(payload.result?.run?.message || "Broken MeiGen thumbnails cleaned");
+    } else {
+      setStatus("Clean broken thumbnails failed");
+    }
+    setTemplateLoading(false);
+  }
+
   async function clearMeigenTemplates() {
     const confirmed = window.confirm("Clear all imported MeiGen templates and import history? This keeps manual templates intact.");
     if (!confirmed) return;
@@ -379,6 +400,7 @@ export default function AdminPage() {
             <button className="generate-cta" type="submit" disabled={templateLoading}>Save Import Settings</button>
             <button className="chip-btn dark" type="button" disabled={templateLoading} onClick={runImportNow}>Queue MeiGen import</button>
             <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={rehostThumbnails}>Rehost old thumbnails</button>
+            <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={cleanBrokenThumbnails}>Clean broken thumbnails</button>
             <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={clearMeigenTemplates}>Clear MeiGen templates</button>
           </div>
         </form>
