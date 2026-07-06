@@ -61,12 +61,13 @@ export async function POST(request: NextRequest) {
     if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = (await request.json()) as {
-      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails" | "clear-meigen" | "clean-broken-thumbnails";
+      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails" | "clear-meigen" | "clean-broken-thumbnails" | "check-existing";
       count?: number;
       manualTemplate?: PromptTemplateAdminInput;
       templates?: PromptTemplateAdminInput[];
       mode?: string;
       limit?: number;
+      urls?: string[];
     };
 
     if (body.action === "import-now") {
