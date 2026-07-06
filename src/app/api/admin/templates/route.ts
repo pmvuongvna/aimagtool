@@ -11,6 +11,7 @@ import {
   clearStoredMeigenTemplates,
   clearBrokenTemplateThumbnails,
   updatePromptImportSettings,
+  checkExistingTemplates,
   type PromptImportSettings,
   type PromptTemplateAdminInput,
 } from "@/lib/template-importer";
@@ -140,6 +141,11 @@ export async function POST(request: NextRequest) {
         details: result,
       });
       return NextResponse.json({ result: { run, cleared: result }, snapshot: await getTemplateAdminSnapshot() });
+    }
+
+    if (body.action === "check-existing" && Array.isArray(body.urls)) {
+      const existing = await checkExistingTemplates(body.urls);
+      return NextResponse.json({ existing });
     }
 
     if (body.action === "create-manual" && body.manualTemplate) {

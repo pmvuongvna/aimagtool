@@ -81,6 +81,7 @@ const DEFAULT_IMPORT_SETTINGS: PromptImportSettings = {
 };
 
 const DEFAULT_LISTING_URLS = [
+  "https://www.meigen.ai/sitemap.xml",
   "https://www.meigen.ai/",
   "https://www.meigen.ai/?model=gptimage",
   "https://www.meigen.ai/?model=seedream",
@@ -1036,7 +1037,15 @@ async function collectListingCandidates(listingUrls: string[]): Promise<ListingC
   for (const url of listingUrls) {
     try {
       const page = await fetchPage(url);
-      if (page.format === "html") {
+      if (url.includes("sitemap.xml") || /https:\/\/www\.meigen\.ai\/prompt\/[a-zA-Z0-9_-]+/.test(page.body)) {
+        const urls = [...page.body.matchAll(/https:\/\/www\.meigen\.ai\/prompt\/[a-zA-Z0-9_-]+/g)].map((m) => m[0]);
+        for (const u of urls) {
+          collected.push({
+            title: "MeiGen Prompt",
+            detailUrl: u,
+          });
+        }
+      } else if (page.format === "html") {
         const nextData = extractNextData(page.body);
         if (nextData) collected.push(...extractCandidateObjects(nextData, url));
         collected.push(...extractAnchorCandidates(page.body, url));
@@ -1052,6 +1061,22 @@ async function collectListingCandidates(listingUrls: string[]): Promise<ListingC
     candidates: dedupeCandidates(collected).filter((item) => item.title && item.detailUrl && item.detailUrl.startsWith("https://www.meigen.ai")),
     errors,
   };
+}
+
+async function checkIfTemplateExists(detailUrl: string): Promise<boolean> {
+  if (!hasDatabase()) {
+    for (const item of memoryTemplates.values()) {
+      if (item.sourceUrl === detailUrl || item.sourcePromptId === detailUrl) return true;
+    }
+    return false;
+  }
+  await ensureSchema();
+  const pool = getPool();
+  const result = await pool.query(
+    "SELECT 1 FROM prompt_templates WHERE source_url = $1 OR source_prompt_id = $1 LIMIT 1",
+    [detailUrl]
+  );
+  return (result.rowCount || 0) > 0;
 }
 
 export async function runMeigenImport(options: PromptImportOptions = {}): Promise<PromptImportSummary> {
@@ -1090,6 +1115,13 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
     if (!candidate) break;
     attemptedCount += 1;
     try {
+      if (candidate.detailUrl) {
+        const exists = await checkIfTemplateExists(candidate.detailUrl);
+        if (exists) {
+          skippedCount += 1;
+          continue;
+        }
+      }
       const detail = await extractDetailPrompt(candidate);
       for (const related of detail.relatedCandidates || []) {
         if (!related.detailUrl || seen.has(related.detailUrl)) continue;
@@ -1141,6 +1173,29 @@ export async function getTemplateAdminSnapshot() {
     listAdminTemplates(32),
   ]);
   return { importSettings, runs, templates };
+}
+
+export async function checkExistingTemplates(urls: string[]) {
+  const cleanUrls = urls.map((u) => String(u).trim()).filter(Boolean);
+  if (cleanUrls.length === 0) return [];
+
+  if (!hasDatabase()) {
+    const memoryUrls = Array.from(memoryTemplates.values())
+      .map((t) => t.sourceUrl || t.sourcePromptId || "")
+      .filter(Boolean);
+    return cleanUrls.filter((u) => memoryUrls.includes(u));
+  }
+
+  await ensureSchema();
+  const pool = getPool();
+  const result = await pool.query(
+    "SELECT source_url, source_prompt_id FROM prompt_templates WHERE source_url = ANY($1) OR source_prompt_id = ANY($1)",
+    [cleanUrls]
+  );
+  const dbUrls = result.rows
+    .map((row) => row.source_url || row.source_prompt_id || "")
+    .filter(Boolean);
+  return cleanUrls.filter((u) => dbUrls.includes(u));
 }
 
 

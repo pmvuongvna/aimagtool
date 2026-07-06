@@ -18,6 +18,7 @@ if (!ADMIN_TOKEN) {
 }
 
 const DEFAULT_LISTING_URLS = [
+  "https://www.meigen.ai/sitemap.xml",
   "https://www.meigen.ai/",
   "https://www.meigen.ai/?model=gptimage",
   "https://www.meigen.ai/?model=seedream",
@@ -190,6 +191,16 @@ function extractMarkdownSection(markdown, startMarker, endMarkers) {
 
 function extractListingCandidates(markdown) {
   const candidates = [];
+  if (markdown.includes("sitemap.xml") || /https:\/\/www\.meigen\.ai\/prompt\/[a-zA-Z0-9_-]+/.test(markdown)) {
+    const urls = [...markdown.matchAll(/https:\/\/www\.meigen\.ai\/prompt\/[a-zA-Z0-9_-]+/g)].map((m) => m[0]);
+    for (const u of urls) {
+      candidates.push({
+        title: "MeiGen Prompt",
+        detailUrl: u,
+      });
+    }
+    return candidates;
+  }
   const compactRegex = /\[!\[Image\s+\d+:\s*AI art:\s*([\s\S]*?)\]\((https?:\/\/[^\s)]+)\)([\s\S]{0,220}?)\]\((https?:\/\/www\.meigen\.ai\/prompt\/[^\s)]+)\)/g;
   let match;
   while ((match = compactRegex.exec(markdown))) {
@@ -377,6 +388,29 @@ async function debugAdminEndpoint() {
   };
 }
 
+async function checkExistingTemplatesRemote(urls) {
+  if (!urls || urls.length === 0) return [];
+  try {
+    const res = await fetch(`${APP_BASE_URL}/api/admin/templates`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-admin-token": ADMIN_TOKEN,
+      },
+      body: JSON.stringify({
+        action: "check-existing",
+        urls,
+      }),
+    });
+    if (!res.ok) return [];
+    const payload = await res.json();
+    return payload.existing || [];
+  } catch (error) {
+    console.error("Failed to check existing templates remotely", error);
+    return [];
+  }
+}
+
 async function main() {
   const requestedCount = await getImportCount();
   const listingPages = await Promise.all(DEFAULT_LISTING_URLS.map((url) => fetchMarkdown(url).catch(() => "")));
@@ -387,8 +421,12 @@ async function main() {
   let attemptedCount = 0;
   let skippedCount = 0;
 
-  const queue = [...deduped];
-  const seen = new Set(queue.map((item) => item.detailUrl));
+  const candidateUrls = deduped.map((item) => item.detailUrl).filter(Boolean);
+  const existingUrls = await checkExistingTemplatesRemote(candidateUrls);
+  const existingSet = new Set(existingUrls);
+
+  const queue = deduped.filter((item) => !existingSet.has(item.detailUrl));
+  const seen = new Set(deduped.map((item) => item.detailUrl));
   const maxAttempts = Math.max(requestedCount * 12, 120);
 
   while (queue.length > 0 && templates.length < requestedCount && attemptedCount < maxAttempts) {
