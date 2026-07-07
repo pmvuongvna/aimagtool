@@ -390,8 +390,32 @@ function inferAspectRatio(text: string, fallback: string) {
 }
 
 function inferCategory(input: { title: string; prompt: string; model: string; mediaType: TemplateMediaType; tags: string[]; categoryHint?: string }): TemplateCategory {
-  const joined = `${input.title} ${input.prompt} ${input.model} ${input.tags.join(" ")} ${input.categoryHint || ""}`.toLowerCase();
-  if (input.mediaType === "video") return "Videos";
+  const lowercaseTags = input.tags.map((t) => t.toLowerCase());
+  if (lowercaseTags.includes("portrait") || lowercaseTags.includes("portraits") || lowercaseTags.includes("girl") || lowercaseTags.includes("woman") || lowercaseTags.includes("man") || lowercaseTags.includes("model")) {
+    return "Portraits";
+  }
+  if (lowercaseTags.includes("brand") || lowercaseTags.includes("logo") || lowercaseTags.includes("branding") || lowercaseTags.includes("wordmark")) {
+    return "Brand & Logo";
+  }
+  if (lowercaseTags.includes("product") || lowercaseTags.includes("ads") || lowercaseTags.includes("ad") || lowercaseTags.includes("advertising") || lowercaseTags.includes("commercial")) {
+    return "Ads & Product";
+  }
+  if (lowercaseTags.includes("wallpaper") || lowercaseTags.includes("background")) {
+    return "Wallpaper";
+  }
+  if (lowercaseTags.includes("illustration") || lowercaseTags.includes("3d") || lowercaseTags.includes("anime") || lowercaseTags.includes("rendering") || lowercaseTags.includes("render")) {
+    return "Illustration & 3D";
+  }
+  if (lowercaseTags.includes("poster") || lowercaseTags.includes("posters") || lowercaseTags.includes("visuals") || lowercaseTags.includes("cover") || lowercaseTags.includes("banner")) {
+    return "Posters & Visuals";
+  }
+  if (input.mediaType === "video" || lowercaseTags.includes("video") || lowercaseTags.includes("videos")) {
+    return "Videos";
+  }
+
+  let joined = `${input.title} ${input.prompt} ${input.model} ${input.tags.join(" ")} ${input.categoryHint || ""}`.toLowerCase();
+  joined = joined.replace(/\b(no|without|avoid)\s+(logo|watermark|brand)s?\b/g, "");
+
   if (/(logo|branding|identity|brand|wordmark|packaging)/.test(joined)) return "Brand & Logo";
   if (/(product|perfume|bottle|watch|sneaker|commercial|ad campaign|advertising|cosmetic)/.test(joined)) return "Ads & Product";
   if (/(portrait|face|woman|man|girl|boy|model|editorial|lifestyle)/.test(joined)) return "Portraits";
@@ -606,6 +630,24 @@ async function fetchJinaMarkdown(url: string) {
   throw new Error(`Fallback fetch failed for ${url}. Attempts: ${failures.join(" | ")}`);
 }
 
+async function fetchJinaHtml(url: string) {
+  const headers = {
+    "user-agent": "Mozilla/5.0 (compatible; EscanorPromptBot/1.0; +https://escanor.app)",
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "cache-control": "no-cache",
+    "X-Respond-With": "html",
+  };
+  const failures: string[] = [];
+  for (const proxyUrl of buildJinaUrlVariants(url)) {
+    const result = await fetchTextViaHttps(proxyUrl, headers);
+    if (result.statusCode >= 200 && result.statusCode < 300) {
+      return result.body;
+    }
+    failures.push(`${proxyUrl} -> ${result.statusCode}`);
+  }
+  throw new Error(`Fallback HTML fetch failed for ${url}. Attempts: ${failures.join(" | ")}`);
+}
+
 async function fetchPage(url: string): Promise<FetchedPage> {
   try {
     return {
@@ -615,10 +657,17 @@ async function fetchPage(url: string): Promise<FetchedPage> {
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (!/Cloudflare challenge|Fetch failed 403/i.test(message)) throw error;
-    return {
-      body: await fetchJinaMarkdown(url),
-      format: "markdown",
-    };
+    try {
+      return {
+        body: await fetchJinaHtml(url),
+        format: "html",
+      };
+    } catch {
+      return {
+        body: await fetchJinaMarkdown(url),
+        format: "markdown",
+      };
+    }
   }
 }
 
@@ -730,19 +779,56 @@ function extractThumbnailFromMarkdown(markdown: string) {
   return normalizeCandidateThumbnailUrl(fallbackMatch?.[1] || "");
 }
 
+function extractNextFData(html: string): string[] {
+  const strings: string[] = [];
+  const regex = /self\.__next_f\.push\(\s*\[\s*\d+\s*,\s*"([\s\S]*?)"\s*\]\s*\)/g;
+  let match;
+  while ((match = regex.exec(html))) {
+    const content = match[1];
+    try {
+      const decoded = JSON.parse(`"${content}"`);
+      strings.push(decoded);
+    } catch {
+      const decoded = content
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\t/g, "\t")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+      strings.push(decoded);
+    }
+  }
+  return strings;
+}
+
 async function extractDetailPrompt(candidate: CandidateSummary) {
   const page = candidate.detailUrl ? await fetchPage(candidate.detailUrl) : { body: "", format: "html" as const };
   const html = page.format === "html" ? page.body : "";
   const markdown = page.format === "markdown" ? page.body : "";
   const nextData = html ? extractNextData(html) : null;
   const stringHits: string[] = [];
+  
   walk(nextData, (value) => {
     if (typeof value !== "string") return;
     const normalized = sanitizePrompt(value);
-    if (normalized.length < 30 || normalized.length > 4000) return;
+    if (normalized.length < 30 || normalized.length > 50000) return;
     if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) return;
     stringHits.push(normalized);
   });
+
+  if (html) {
+    const nextFStrings = extractNextFData(html);
+    for (const rawStr of nextFStrings) {
+      const jsonMatches = rawStr.match(/\{(?:[^{}]|({[^{}]*}))*\}/g) || [];
+      for (const jsonStr of [rawStr, ...jsonMatches]) {
+        const normalized = sanitizePrompt(jsonStr);
+        if (normalized.length < 30 || normalized.length > 50000) continue;
+        if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) continue;
+        stringHits.push(normalized);
+      }
+    }
+  }
+
   const promptCandidates = [candidate.prompt, ...stringHits];
   if (markdown) {
     promptCandidates.push(extractPromptFromMarkdown(markdown));
@@ -753,6 +839,24 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
   const authorName = candidate.authorName || extractMeta(html, "author") || extractAuthorFromMarkdown(markdown);
   const model = candidate.model || stringHits.find((text) => /gpt|grok-image|seedream|seedance|midjourney|nanobanana|video/i.test(text)) || extractModelFromMarkdown(markdown) || "";
   const relatedCandidates = markdown ? extractRelatedPromptCandidates(markdown, candidate.detailUrl) : [];
+
+  const tags: string[] = [];
+  if (html) {
+    const keywords = extractMeta(html, "keywords");
+    if (keywords) {
+      tags.push(...keywords.split(",").map((k) => k.trim()).filter(Boolean));
+    }
+    const categoriesMatch = html.match(/"content_categories"\s*:\s*\[([\s\S]*?)\]/);
+    if (categoriesMatch?.[1]) {
+      try {
+        const parsed = JSON.parse(`[${categoriesMatch[1]}]`);
+        if (Array.isArray(parsed)) {
+          tags.push(...parsed.map((c) => String(c).trim()).filter(Boolean));
+        }
+      } catch {}
+    }
+  }
+
   return {
     title: sanitizePrompt(title || "Untitled prompt"),
     prompt: sanitizePrompt(prompt),
@@ -760,6 +864,7 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
     authorName,
     model,
     html,
+    tags,
     relatedCandidates,
   };
 }
@@ -770,11 +875,11 @@ function templateFromCandidate(candidate: CandidateSummary, detail: Awaited<Retu
   const title = detail.title || candidate.title || prompt.slice(0, 48);
   const thumbnailUrl = detail.thumbnailUrl || candidate.thumbnailUrl || "";
   if (!thumbnailUrl) return null;
-  const mediaType = inferMediaType({ title, prompt, model: detail.model || candidate.model || "", detailUrl: candidate.detailUrl, tags: candidate.tags || [] });
+  const mediaType = inferMediaType({ title, prompt, model: detail.model || candidate.model || "", detailUrl: candidate.detailUrl, tags: [...(candidate.tags || []), ...(detail.tags || [])] });
   const model = inferModel({ mediaType, model: detail.model || candidate.model, title, prompt, detailUrl: candidate.detailUrl });
-  const category = inferCategory({ title, prompt, model, mediaType, tags: candidate.tags || [] });
+  const category = inferCategory({ title, prompt, model, mediaType, tags: [...(candidate.tags || []), ...(detail.tags || [])] });
   const aspectRatio = inferAspectRatio(`${prompt} ${title}`, mediaType === "video" ? "16:9" : "1:1");
-  const tags = normalizeTags([category, ...(candidate.tags || []), mediaType === "video" ? "Videos" : model]);
+  const tags = normalizeTags([category, ...(candidate.tags || []), ...(detail.tags || []), mediaType === "video" ? "Videos" : model]);
   return {
     title,
     prompt,

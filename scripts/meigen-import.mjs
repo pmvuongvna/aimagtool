@@ -177,6 +177,30 @@ async function fetchMarkdown(url) {
   throw new Error(`Unable to fetch ${url}. ${failures.join(" | ")}`);
 }
 
+async function fetchJinaHtml(url) {
+  const failures = [];
+  for (const proxyUrl of buildJinaVariants(url)) {
+    const result = await fetchText(proxyUrl, {
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "cache-control": "no-cache",
+      "X-Respond-With": "html",
+    });
+    if (result.status >= 200 && result.status < 300) return result.body;
+    failures.push(`${proxyUrl} -> ${result.status}`);
+  }
+  throw new Error(`Unable to fetch HTML via Jina for ${url}. ${failures.join(" | ")}`);
+}
+
+async function fetchPage(url) {
+  try {
+    const html = await fetchJinaHtml(url);
+    return { body: html, format: "html" };
+  } catch (error) {
+    const md = await fetchMarkdown(url);
+    return { body: md, format: "markdown" };
+  }
+}
+
 function extractMarkdownSection(markdown, startMarker, endMarkers) {
   const startIndex = markdown.indexOf(startMarker);
   if (startIndex === -1) return "";
@@ -219,52 +243,29 @@ function extractListingCandidates(markdown) {
       authorName: parts.find((item) => item.startsWith("@"))?.replace(/^@/, "") || trailing.match(/@([A-Za-z0-9_.-]+)/)?.[1] || "",
     });
   }
+  return candidates;
+}
 
-  const blockRegex = /\*\s+!\[Image\s+\d+:\s*AI art:\s*([^\]]+)\]\((https?:\/\/[^\s)]+)\)\s+###\s+([^\n]+)\s+[\s\S]*?By\s+([^\n]+?)\s+[\s\S]*?Model:\s*([^\n]+)\s+[\s\S]*?\[View prompt details\]\((https?:\/\/www\.meigen\.ai\/prompt\/[^\s)]+)\)/g;
-  while ((match = blockRegex.exec(markdown))) {
-    const authorLine = sanitize(match[4] || "");
-    candidates.push({
-      title: sanitize(match[3] || match[1] || ""),
-      thumbnailUrl: normalizeCandidateThumbnailUrl(match[2] || ""),
-      detailUrl: sanitize(match[6] || ""),
-      model: sanitize(match[5] || ""),
-      authorName: authorLine.match(/@([A-Za-z0-9_.-]+)/)?.[1] || authorLine,
-    });
+function classifyModel(text) {
+  const t = (text || "").toLowerCase();
+  if (/(seedance|mini|4k)/.test(t)) {
+    return { model: "Seedance", mediaType: "video" };
   }
-
-  const deduped = new Map();
-  for (const item of candidates) {
-    if (!item.detailUrl || !item.title) continue;
-    if (!deduped.has(item.detailUrl)) deduped.set(item.detailUrl, item);
+  if (/(seedream|dream)/.test(t)) {
+    return { model: "Seedream", mediaType: "video" };
   }
-  return [...deduped.values()];
-}
-
-function extractPromptFromMarkdown(markdown) {
-  return sanitize(extractMarkdownSection(markdown, "\nPrompt\n", ["\nShow more", "\n### More like this", "\nUse as Prompt", "\nUse as Ref", "\n## "]));
-}
-
-function extractModelFromMarkdown(markdown) {
-  const match = markdown.match(/\n(GPT Image(?: [0-9.]+)?|Nanobanana Pro|Seedance(?: mini\/4K)?|Midjourney|other|grok-image)\n\s*\n1 Copy Prompt/i);
-  return sanitize(match?.[1] || "");
-}
-
-function extractThumbnailFromMarkdown(markdown) {
-  const mediaSection = extractMarkdownSection(markdown, "\n## Media Preview\n", ["\nUse as Prompt", "\n### More like this", "\n## "]);
-  const mediaMatch = mediaSection.match(/\((https:\/\/images\.meigen\.ai\/[^\s)]+)\)/);
-  if (mediaMatch?.[1]) return normalizeCandidateThumbnailUrl(mediaMatch[1]);
-  const fallbackMatch = markdown.match(/\((https:\/\/images\.meigen\.ai\/cdn-cgi\/image\/[^\s)]+)\)/);
-  return normalizeCandidateThumbnailUrl(fallbackMatch?.[1] || "");
-}
-
-function classifyModel(rawValue) {
-  const raw = sanitize(rawValue).toLowerCase();
-  if (/(seedance|seedance mini|seedance 4k)/.test(raw)) return { model: "Seedance", mediaType: "video" };
-  if (/(grok imagine|grok-video|veo|kling|runway|luma)/.test(raw)) return { model: "Grok Imagine", mediaType: "video" };
-  if (/(seedream)/.test(raw)) return { model: "Seedream 5 Lite", mediaType: "image" };
-  if (/(midjourney)/.test(raw)) return { model: "Midjourney", mediaType: "image" };
-  if (/(nanobanana)/.test(raw)) return { model: "Nanobanana Pro", mediaType: "image" };
-  if (/(gpt image|gptimage|grok-image|\bgpt\b)/.test(raw)) return { model: "GPT Image 2", mediaType: "image" };
+  if (/(gpt|dall-e|dalle|chatgpt)/.test(t)) {
+    return { model: "GPT Image 2", mediaType: "image" };
+  }
+  if (/(grok|grok-image|xai|grok image)/.test(t)) {
+    return { model: "Grok Imagine", mediaType: "image" };
+  }
+  if (/(midjourney|mj)/.test(t)) {
+    return { model: "Midjourney", mediaType: "image" };
+  }
+  if (/(nanobanana|banana)/.test(t)) {
+    return { model: "Nanobanana Pro", mediaType: "image" };
+  }
   return null;
 }
 
@@ -279,8 +280,80 @@ function inferAspectRatio(text, fallback) {
   return text.match(/\b(1:1|16:9|9:16|4:3|3:4|2:3|3:2)\b/)?.[1] || fallback;
 }
 
-function inferCategory({ title, prompt, model, mediaType }) {
-  const joined = `${title} ${prompt} ${model}`.toLowerCase();
+function extractMeta(html, property) {
+  const regex = new RegExp(`<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["']`, "i");
+  return html.match(regex)?.[1]?.trim() || "";
+}
+
+function walk(node, callback) {
+  if (!node) return;
+  callback(node);
+  if (Array.isArray(node)) {
+    for (const child of node) walk(child, callback);
+  } else if (typeof node === "object") {
+    for (const key of Object.keys(node)) walk(node[key], callback);
+  }
+}
+
+function extractNextData(html) {
+  const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function extractNextFData(html) {
+  const strings = [];
+  const regex = /self\.__next_f\.push\(\s*\[\s*\d+\s*,\s*"([\s\S]*?)"\s*\]\s*\)/g;
+  let match;
+  while ((match = regex.exec(html))) {
+    const content = match[1];
+    try {
+      const decoded = JSON.parse(`"${content}"`);
+      strings.push(decoded);
+    } catch {
+      const decoded = content
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\t/g, "\t")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+      strings.push(decoded);
+    }
+  }
+  return strings;
+}
+
+function inferCategory({ title, prompt, model, mediaType, tags = [] }) {
+  const lowercaseTags = tags.map((t) => t.toLowerCase());
+  if (lowercaseTags.includes("portrait") || lowercaseTags.includes("portraits") || lowercaseTags.includes("girl") || lowercaseTags.includes("woman") || lowercaseTags.includes("man") || lowercaseTags.includes("model")) {
+    return "Portraits";
+  }
+  if (lowercaseTags.includes("brand") || lowercaseTags.includes("logo") || lowercaseTags.includes("branding") || lowercaseTags.includes("wordmark")) {
+    return "Brand & Logo";
+  }
+  if (lowercaseTags.includes("product") || lowercaseTags.includes("ads") || lowercaseTags.includes("ad") || lowercaseTags.includes("advertising") || lowercaseTags.includes("commercial")) {
+    return "Ads & Product";
+  }
+  if (lowercaseTags.includes("wallpaper") || lowercaseTags.includes("background")) {
+    return "Wallpaper";
+  }
+  if (lowercaseTags.includes("illustration") || lowercaseTags.includes("3d") || lowercaseTags.includes("anime") || lowercaseTags.includes("rendering") || lowercaseTags.includes("render")) {
+    return "Illustration & 3D";
+  }
+  if (lowercaseTags.includes("poster") || lowercaseTags.includes("posters") || lowercaseTags.includes("visuals") || lowercaseTags.includes("cover") || lowercaseTags.includes("banner")) {
+    return "Posters & Visuals";
+  }
+  if (mediaType === "video" || lowercaseTags.includes("video") || lowercaseTags.includes("videos")) {
+    return "Videos";
+  }
+
+  let joined = `${title} ${prompt} ${model} ${tags.join(" ")}`.toLowerCase();
+  joined = joined.replace(/\b(no|without|avoid)\s+(logo|watermark|brand)s?\b/g, "");
+
   if (mediaType === "video") return "Videos";
   if (/(logo|branding|identity|brand|wordmark|packaging)/.test(joined)) return "Brand & Logo";
   if (/(product|perfume|bottle|watch|sneaker|commercial|ad campaign|advertising|cosmetic)/.test(joined)) return "Ads & Product";
@@ -316,33 +389,109 @@ function extractRelatedPromptCandidates(markdown, currentUrl) {
   return [...deduped.values()];
 }
 
+function extractPromptFromMarkdown(markdown) {
+  return sanitize(extractMarkdownSection(markdown, "\nPrompt\n", ["\nShow more", "\n### More like this", "\nUse as Prompt", "\nUse as Ref", "\n## "]));
+}
+
+function extractTitleFromMarkdown(markdown) {
+  const match = markdown.match(/^#\s+(.+)$/m);
+  return sanitize(match?.[1] || "");
+}
+
+function extractModelFromMarkdown(markdown) {
+  const match = markdown.match(/\n(GPT Image(?: [0-9.]+)?|Nanobanana Pro|Seedance(?: mini\/4K)?|Midjourney|other|grok-image)\n\s*\n1 Copy Prompt/i);
+  return sanitize(match?.[1] || "");
+}
+
+function extractThumbnailFromMarkdown(markdown) {
+  const mediaSection = extractMarkdownSection(markdown, "\n## Media Preview\n", ["\nUse as Prompt", "\n### More like this", "\n## "]);
+  const mediaMatch = mediaSection.match(/\((https:\/\/images\.meigen\.ai\/[^\s)]+)\)/);
+  if (mediaMatch?.[1]) return normalizeCandidateThumbnailUrl(mediaMatch[1]);
+  const fallbackMatch = markdown.match(/\((https:\/\/images\.meigen\.ai\/cdn-cgi\/image\/[^\s)]+)\)/);
+  return normalizeCandidateThumbnailUrl(fallbackMatch?.[1] || "");
+}
+
 async function extractTemplate(candidate) {
-  const markdown = await fetchMarkdown(candidate.detailUrl);
-  const prompt = extractPromptFromMarkdown(markdown);
-  const relatedCandidates = extractRelatedPromptCandidates(markdown, candidate.detailUrl);
+  const page = await fetchPage(candidate.detailUrl);
+  const html = page.format === "html" ? page.body : "";
+  const markdown = page.format === "markdown" ? page.body : "";
+  
+  const stringHits = [];
+  if (html) {
+    const nextData = extractNextData(html);
+    walk(nextData, (value) => {
+      if (typeof value !== "string") return;
+      const normalized = sanitize(value);
+      if (normalized.length < 30 || normalized.length > 50000) return;
+      if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) return;
+      stringHits.push(normalized);
+    });
+    
+    const nextFStrings = extractNextFData(html);
+    for (const rawStr of nextFStrings) {
+      const jsonMatches = rawStr.match(/\{(?:[^{}]|({[^{}]*}))*\}/g) || [];
+      for (const jsonStr of [rawStr, ...jsonMatches]) {
+        const normalized = sanitize(jsonStr);
+        if (normalized.length < 30 || normalized.length > 50000) continue;
+        if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) continue;
+        stringHits.push(normalized);
+      }
+    }
+  }
+
+  const promptCandidates = [candidate.prompt, ...stringHits];
+  if (markdown) {
+    promptCandidates.push(extractPromptFromMarkdown(markdown));
+  }
+  const prompt = promptCandidates.filter(Boolean).sort((a, b) => b.length - a.length)[0] || "";
+
   if (!prompt || prompt.length < 24) {
-    return { item: null, relatedCandidates };
+    return { item: null, relatedCandidates: [] };
   }
-  const model = candidate.model || extractModelFromMarkdown(markdown) || "GPT Image 2";
-  const originalThumbnailUrl = candidate.thumbnailUrl || extractThumbnailFromMarkdown(markdown);
+
+  const model = candidate.model || stringHits.find((text) => /gpt|grok-image|seedream|seedance|midjourney|nanobanana|video/i.test(text)) || (markdown ? extractModelFromMarkdown(markdown) : "") || "GPT Image 2";
+  const title = candidate.title || extractMeta(html, "og:title") || extractMeta(html, "twitter:title") || (markdown ? extractTitleFromMarkdown(markdown) : "") || "MeiGen Prompt";
+  const originalThumbnailUrl = candidate.thumbnailUrl || extractMeta(html, "og:image") || extractMeta(html, "twitter:image") || (markdown ? extractThumbnailFromMarkdown(markdown) : "");
   if (!originalThumbnailUrl) {
-    return { item: null, relatedCandidates };
+    return { item: null, relatedCandidates: [] };
   }
+
+  const relatedCandidates = markdown ? extractRelatedPromptCandidates(markdown, candidate.detailUrl) : [];
+
+  const detailTags = [];
+  if (html) {
+    const keywords = extractMeta(html, "keywords");
+    if (keywords) {
+      detailTags.push(...keywords.split(",").map((k) => k.trim()).filter(Boolean));
+    }
+    const categoriesMatch = html.match(/"content_categories"\s*:\s*\[([\s\S]*?)\]/);
+    if (categoriesMatch?.[1]) {
+      try {
+        const parsed = JSON.parse(`[${categoriesMatch[1]}]`);
+        if (Array.isArray(parsed)) {
+          detailTags.push(...parsed.map((c) => String(c).trim()).filter(Boolean));
+        }
+      } catch {}
+    }
+  }
+
+  const mergedTags = [...(candidate.tags || []), ...detailTags];
   const thumbnailUrl = await mirrorImageToR2(originalThumbnailUrl, `${candidate.detailUrl}|${originalThumbnailUrl}`);
-  const mediaType = inferMediaType({ title: candidate.title, prompt, model, detailUrl: candidate.detailUrl });
+  const mediaType = inferMediaType({ title, prompt, model, detailUrl: candidate.detailUrl });
   const canonicalModel = classifyModel(model)?.model || (mediaType === "video" ? "Grok Imagine" : "GPT Image 2");
-  const category = inferCategory({ title: candidate.title, prompt, model: canonicalModel, mediaType });
-  const aspectRatio = inferAspectRatio(`${candidate.title} ${prompt}`, mediaType === "video" ? "16:9" : "1:1");
+  const category = inferCategory({ title, prompt, model: canonicalModel, mediaType, tags: mergedTags });
+  const aspectRatio = inferAspectRatio(`${title} ${prompt}`, mediaType === "video" ? "16:9" : "1:1");
+
   return {
     item: {
-      title: candidate.title,
+      title,
       prompt,
       thumbnailUrl,
       mediaType,
       model: canonicalModel,
       aspectRatio,
       category,
-      tags: normalizeTags([category, canonicalModel, mediaType === "video" ? "AI Video" : "AI Image"]),
+      tags: normalizeTags([category, ...mergedTags, mediaType === "video" ? "AI Video" : canonicalModel]),
       authorName: candidate.authorName || "MeiGen",
       published: true,
       featured: false,
