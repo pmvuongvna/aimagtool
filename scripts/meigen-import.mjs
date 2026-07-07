@@ -144,12 +144,14 @@ async function mirrorImageToR2(sourceUrl, cacheKey) {
 
   return normalizePublicUrl(R2_PUBLIC_BASE_URL, key);
 }
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function buildJinaVariants(url) {
   const target = new URL(url);
   return Array.from(new Set([
-    `https://r.jina.ai/http://${url.replace(/^https?:\/\//i, "")}`,
-    `https://r.jina.ai/http://${target.host}${target.pathname}${target.search}`,
-    `https://r.jina.ai/http://www.meigen.ai${target.pathname}${target.search}`,
+    `https://r.jina.ai/${url}`,
+    `https://r.jina.ai/https://${target.host}${target.pathname}${target.search}`,
+    `https://r.jina.ai/https://www.meigen.ai${target.pathname}${target.search}`,
   ]));
 }
 
@@ -167,12 +169,22 @@ async function fetchText(url, headers = {}) {
 async function fetchMarkdown(url) {
   const failures = [];
   for (const proxyUrl of buildJinaVariants(url)) {
-    const result = await fetchText(proxyUrl, {
-      accept: "text/plain,text/markdown;q=0.9,*/*;q=0.8",
-      "cache-control": "no-cache",
-    });
-    if (result.status >= 200 && result.status < 300) return result.body;
-    failures.push(`${proxyUrl} -> ${result.status}`);
+    let attempts = 0;
+    while (attempts < 3) {
+      const result = await fetchText(proxyUrl, {
+        accept: "text/plain,text/markdown;q=0.9,*/*;q=0.8",
+        "cache-control": "no-cache",
+      });
+      if (result.status >= 200 && result.status < 300) return result.body;
+      if (result.status === 429) {
+        attempts += 1;
+        console.log(`Jina Reader 429 rate limit hit. Waiting 5s before retry (attempt ${attempts}/3)...`);
+        await sleep(5000);
+        continue;
+      }
+      failures.push(`${proxyUrl} -> ${result.status}`);
+      break;
+    }
   }
   throw new Error(`Unable to fetch ${url}. ${failures.join(" | ")}`);
 }
@@ -180,13 +192,23 @@ async function fetchMarkdown(url) {
 async function fetchJinaHtml(url) {
   const failures = [];
   for (const proxyUrl of buildJinaVariants(url)) {
-    const result = await fetchText(proxyUrl, {
-      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "cache-control": "no-cache",
-      "X-Respond-With": "html",
-    });
-    if (result.status >= 200 && result.status < 300) return result.body;
-    failures.push(`${proxyUrl} -> ${result.status}`);
+    let attempts = 0;
+    while (attempts < 3) {
+      const result = await fetchText(proxyUrl, {
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "cache-control": "no-cache",
+        "X-Respond-With": "html",
+      });
+      if (result.status >= 200 && result.status < 300) return result.body;
+      if (result.status === 429) {
+        attempts += 1;
+        console.log(`Jina Reader 429 rate limit hit. Waiting 5s before retry (attempt ${attempts}/3)...`);
+        await sleep(5000);
+        continue;
+      }
+      failures.push(`${proxyUrl} -> ${result.status}`);
+      break;
+    }
   }
   throw new Error(`Unable to fetch HTML via Jina for ${url}. ${failures.join(" | ")}`);
 }
@@ -583,6 +605,9 @@ async function main() {
     if (!candidate) break;
     attemptedCount += 1;
     try {
+      if (attemptedCount > 1) {
+        await sleep(2500);
+      }
       const result = await extractTemplate(candidate);
       for (const related of result.relatedCandidates || []) {
         if (!related.detailUrl || seen.has(related.detailUrl)) continue;

@@ -565,16 +565,14 @@ function looksLikeCloudflareChallenge(body: string) {
   return normalized.includes("just a moment") || normalized.includes("cf-browser-verification") || normalized.includes("cloudflare");
 }
 
-function buildJinaUrl(url: string) {
-  return `https://r.jina.ai/http://${url.replace(/^https?:\/\//i, "")}`;
-}
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function buildJinaUrlVariants(url: string) {
   const target = new URL(url);
   return Array.from(new Set([
-    buildJinaUrl(url),
-    `https://r.jina.ai/http://${target.host}${target.pathname}${target.search}`,
-    `https://r.jina.ai/http://www.meigen.ai${target.pathname}${target.search}`,
+    `https://r.jina.ai/${url}`,
+    `https://r.jina.ai/https://${target.host}${target.pathname}${target.search}`,
+    `https://r.jina.ai/https://www.meigen.ai${target.pathname}${target.search}`,
   ]));
 }
 
@@ -621,11 +619,21 @@ async function fetchJinaMarkdown(url: string) {
   };
   const failures: string[] = [];
   for (const proxyUrl of buildJinaUrlVariants(url)) {
-    const result = await fetchTextViaHttps(proxyUrl, headers);
-    if (result.statusCode >= 200 && result.statusCode < 300) {
-      return result.body;
+    let attempts = 0;
+    while (attempts < 3) {
+      const result = await fetchTextViaHttps(proxyUrl, headers);
+      if (result.statusCode >= 200 && result.statusCode < 300) {
+        return result.body;
+      }
+      if (result.statusCode === 429) {
+        attempts += 1;
+        console.log(`Jina Reader 429 rate limit hit. Waiting 5s before retry (attempt ${attempts}/3)...`);
+        await sleep(5000);
+        continue;
+      }
+      failures.push(`${proxyUrl} -> ${result.statusCode}`);
+      break;
     }
-    failures.push(`${proxyUrl} -> ${result.statusCode}`);
   }
   throw new Error(`Fallback fetch failed for ${url}. Attempts: ${failures.join(" | ")}`);
 }
@@ -639,11 +647,21 @@ async function fetchJinaHtml(url: string) {
   };
   const failures: string[] = [];
   for (const proxyUrl of buildJinaUrlVariants(url)) {
-    const result = await fetchTextViaHttps(proxyUrl, headers);
-    if (result.statusCode >= 200 && result.statusCode < 300) {
-      return result.body;
+    let attempts = 0;
+    while (attempts < 3) {
+      const result = await fetchTextViaHttps(proxyUrl, headers);
+      if (result.statusCode >= 200 && result.statusCode < 300) {
+        return result.body;
+      }
+      if (result.statusCode === 429) {
+        attempts += 1;
+        console.log(`Jina Reader 429 rate limit hit. Waiting 5s before retry (attempt ${attempts}/3)...`);
+        await sleep(5000);
+        continue;
+      }
+      failures.push(`${proxyUrl} -> ${result.statusCode}`);
+      break;
     }
-    failures.push(`${proxyUrl} -> ${result.statusCode}`);
   }
   throw new Error(`Fallback HTML fetch failed for ${url}. Attempts: ${failures.join(" | ")}`);
 }
@@ -1226,6 +1244,9 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
           skippedCount += 1;
           continue;
         }
+      }
+      if (attemptedCount > 1) {
+        await sleep(2500);
       }
       const detail = await extractDetailPrompt(candidate);
       for (const related of detail.relatedCandidates || []) {
