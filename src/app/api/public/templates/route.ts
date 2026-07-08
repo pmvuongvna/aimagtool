@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TEMPLATE_CATEGORIES } from "@/lib/template-catalog";
 import { getPublicTemplates } from "@/lib/templates";
+import { getPool, hasDatabase } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   const mediaTypeParam = request.nextUrl.searchParams.get("mediaType");
@@ -12,7 +13,6 @@ export async function GET(request: NextRequest) {
   
   let diag: any[] = [];
   try {
-    const { getPool, hasDatabase } = require("@/lib/db");
     if (hasDatabase()) {
       const pool = getPool();
       const diagRes = await pool.query("SELECT id, title, published, media_type, category FROM prompt_templates ORDER BY id DESC LIMIT 5");
