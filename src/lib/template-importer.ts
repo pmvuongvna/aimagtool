@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { request as httpsRequest } from "node:https";
-import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory, type TemplateMediaType } from "@/lib/template-catalog";
+import { TEMPLATE_CATEGORIES, DEFAULT_PROMPT_TEMPLATES, type PromptTemplate, type TemplateCategory, type TemplateMediaType } from "@/lib/template-catalog";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 import { mirrorRemoteImageToR2, normalizeR2PublicImageUrl } from "@/lib/r2";
 
@@ -92,7 +92,17 @@ const DEFAULT_LISTING_URLS = [
 
 let memorySettings: PromptImportSettings = { ...DEFAULT_IMPORT_SETTINGS };
 const memoryRuns: PromptImportRun[] = [];
-const memoryTemplates = new Map<string, PromptTemplate>();
+const globalTemplatesKey = "__aistudio_memory_templates__";
+const memoryTemplates = (() => {
+  const g = globalThis as typeof globalThis & { [globalTemplatesKey]?: Map<string, PromptTemplate> };
+  if (!g[globalTemplatesKey]) {
+    g[globalTemplatesKey] = new Map<string, PromptTemplate>();
+    for (const item of DEFAULT_PROMPT_TEMPLATES) {
+      g[globalTemplatesKey].set(item.id, item);
+    }
+  }
+  return g[globalTemplatesKey];
+})();
 
 function clampImportCount(value: number | undefined) {
   if (!Number.isFinite(value)) return DEFAULT_IMPORT_SETTINGS.importCount;

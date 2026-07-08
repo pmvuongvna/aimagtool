@@ -1,10 +1,20 @@
-﻿import { DEFAULT_PROMPT_TEMPLATES, TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateMediaType } from "@/lib/template-catalog";
+import { DEFAULT_PROMPT_TEMPLATES, TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateMediaType } from "@/lib/template-catalog";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 import { normalizeR2PublicImageUrl } from "@/lib/r2";
 
 export type PublicPromptTemplate = PromptTemplate;
 
-const memoryTemplates = [...DEFAULT_PROMPT_TEMPLATES];
+const globalTemplatesKey = "__aistudio_memory_templates__";
+const memoryTemplatesMap = (() => {
+  const g = globalThis as typeof globalThis & { [globalTemplatesKey]?: Map<string, PromptTemplate> };
+  if (!g[globalTemplatesKey]) {
+    g[globalTemplatesKey] = new Map<string, PromptTemplate>();
+    for (const item of DEFAULT_PROMPT_TEMPLATES) {
+      g[globalTemplatesKey].set(item.id, item);
+    }
+  }
+  return g[globalTemplatesKey];
+})();
 
 function normalizeTemplate(row: Record<string, unknown>): PublicPromptTemplate {
   return {
@@ -71,7 +81,7 @@ export async function getPublicTemplates(options?: { mediaType?: TemplateMediaTy
   const query = options?.query?.trim().toLowerCase();
 
   if (!hasDatabase()) {
-    return memoryTemplates.filter((item) => {
+    return Array.from(memoryTemplatesMap.values()).filter((item) => {
       if (mediaType && item.mediaType !== mediaType) return false;
       if (category && item.category !== category && !item.tags.includes(category)) return false;
       if (query) {
