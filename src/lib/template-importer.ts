@@ -847,11 +847,29 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
   if (html) {
     const nextFStrings = extractNextFData(html);
     for (const rawStr of nextFStrings) {
-      const jsonMatches = rawStr.match(/\{(?:[^{}]|({[^{}]*}))*\}/g) || [];
-      for (const jsonStr of [rawStr, ...jsonMatches]) {
-        const normalized = sanitizePrompt(jsonStr);
-        if (normalized.length < 30 || normalized.length > 50000) continue;
+      const stringMatches = rawStr.match(/"(?:[^"\\]|\\.)*"/g) || [];
+      for (const quotedStr of stringMatches) {
+        let cleanStr = "";
+        try {
+          cleanStr = JSON.parse(quotedStr);
+        } catch {
+          cleanStr = quotedStr.slice(1, -1).replace(/\\"/g, '"');
+        }
+        const normalized = sanitizePrompt(cleanStr);
+        if (normalized.length < 30 || normalized.length > 8000) continue;
         if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) continue;
+        if (
+          normalized.includes('"$') ||
+          normalized.includes('["$') ||
+          normalized.includes('"$L') ||
+          normalized.includes('section') ||
+          normalized.includes('children') ||
+          normalized.includes('className') ||
+          normalized.includes('Related creations') ||
+          normalized.includes('aria-hidden')
+        ) {
+          continue;
+        }
         stringHits.push(normalized);
       }
     }
