@@ -13,13 +13,16 @@ export async function GET(request: NextRequest) {
   
   let diag: any[] = [];
   try {
-    if (hasDatabase()) {
-      const pool = getPool();
-      const diagRes = await pool.query("SELECT id, title, published, media_type, category FROM prompt_templates ORDER BY id DESC LIMIT 5");
-      diag = diagRes.rows;
-    } else {
-      diag = [{ info: "No database connected" }];
-    }
+    const globalTemplatesKey = "__aistudio_memory_templates__";
+    const g = globalThis as typeof globalThis & { [globalTemplatesKey]?: Map<string, any> };
+    const list = g[globalTemplatesKey] ? Array.from(g[globalTemplatesKey].values()) : [];
+    diag = list.map((item) => ({
+      id: item.id,
+      title: item.title,
+      published: item.published,
+      mediaType: item.mediaType,
+      category: item.category,
+    }));
   } catch (err: any) {
     diag = [{ error: err.message }];
   }
