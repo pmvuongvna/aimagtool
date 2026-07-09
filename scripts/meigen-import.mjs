@@ -296,11 +296,11 @@ function extractListingCandidates(markdown) {
 
 function classifyModel(text) {
   const t = (text || "").toLowerCase();
-  if (/(seedance|mini|4k)/.test(t)) {
-    return { model: "Seedance", mediaType: "video" };
+  if (/(seedance|seedance mini|seedance 4k)/.test(t)) {
+    return { model: "Seedance", mediaType: "image" };
   }
   if (/(seedream|dream)/.test(t)) {
-    return { model: "Seedream", mediaType: "video" };
+    return { model: "Seedream 5 Lite", mediaType: "image" };
   }
   if (/(gpt|dall-e|dalle|chatgpt)/.test(t)) {
     return { model: "GPT Image 2", mediaType: "image" };
@@ -319,9 +319,10 @@ function classifyModel(text) {
 
 function inferMediaType({ title, prompt, model, detailUrl }) {
   const text = `${title} ${prompt} ${model} ${detailUrl}`.toLowerCase();
+  if (/(image to video|text to video|video generation|video|motion|clip|trailer|timelapse|loop|animation|animate|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text)) return "video";
   const classified = classifyModel(model || text);
   if (classified) return classified.mediaType;
-  return /(video|motion|clip|trailer|timelapse|loop|animation|animate|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text) ? "video" : "image";
+  return "image";
 }
 
 function inferAspectRatio(text, fallback) {
@@ -713,6 +714,7 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.stack || error.message : String(error));
   process.exit(1);
 });
+
 
 
 

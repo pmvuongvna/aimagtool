@@ -16,22 +16,52 @@ const memoryTemplatesMap = (() => {
   return g[globalTemplatesKey];
 })();
 
+function normalizeCategory(value: string) {
+  return TEMPLATE_CATEGORIES.includes(value as (typeof TEMPLATE_CATEGORIES)[number])
+    ? (value as (typeof TEMPLATE_CATEGORIES)[number])
+    : "All";
+}
+
+function inferMeigenMediaType(input: { title: string; prompt: string; model: string; category: string; tags: string[] }): TemplateMediaType {
+  const text = `${input.title} ${input.prompt} ${input.model} ${input.category} ${input.tags.join(" ")}`.toLowerCase();
+
+  if (/\b(video|videos|image to video|text to video|video generation|animation|animated|motion|clip|trailer|timelapse|loop|fps|camera movement|dolly|pan left|pan right|tracking shot)\b/.test(text)) {
+    return "video";
+  }
+
+  if (/\b(grok-video|veo|kling|runway|luma)\b/.test(text)) {
+    return "video";
+  }
+
+  return "image";
+}
+
 function normalizeTemplate(row: Record<string, unknown>): PublicPromptTemplate {
+  const source = String(row.source || "internal");
+  const title = String(row.title || "Untitled");
+  const prompt = String(row.prompt || "");
+  const model = String(row.model || "");
+  const aspectRatio = String(row.aspect_ratio || "");
+  const rawCategory = String(row.category || "All");
+  const tags = Array.isArray(row.tags) ? row.tags.map((item) => String(item)) : [];
+  const storedMediaType = row.media_type === "video" ? "video" : "image";
+  const mediaType = source === "meigen"
+    ? inferMeigenMediaType({ title, prompt, model, category: rawCategory, tags })
+    : storedMediaType;
+
   return {
     id: String(row.id),
-    source: String(row.source || "internal"),
+    source,
     sourcePromptId: row.source_prompt_id ? String(row.source_prompt_id) : undefined,
     sourceUrl: row.source_url ? String(row.source_url) : undefined,
-    title: String(row.title || "Untitled"),
-    prompt: String(row.prompt || ""),
+    title,
+    prompt,
     thumbnailUrl: normalizeR2PublicImageUrl(String(row.thumbnail_url || "")),
-    mediaType: row.media_type === "video" ? "video" : "image",
-    model: String(row.model || ""),
-    aspectRatio: String(row.aspect_ratio || ""),
-    category: TEMPLATE_CATEGORIES.includes(String(row.category || "All") as (typeof TEMPLATE_CATEGORIES)[number])
-      ? (String(row.category || "All") as (typeof TEMPLATE_CATEGORIES)[number])
-      : "All",
-    tags: Array.isArray(row.tags) ? row.tags.map((item) => String(item)) : [],
+    mediaType,
+    model,
+    aspectRatio,
+    category: normalizeCategory(rawCategory),
+    tags,
     authorName: row.author_name ? String(row.author_name) : undefined,
     published: Boolean(row.published),
     featured: Boolean(row.featured),
@@ -99,11 +129,6 @@ export async function getPublicTemplates(options?: { mediaType?: TemplateMediaTy
   const clauses = ["published = TRUE"];
   const values: unknown[] = [];
 
-  if (mediaType) {
-    values.push(mediaType);
-    clauses.push(`media_type = $${values.length}`);
-  }
-
   if (category) {
     values.push(category);
     clauses.push(`(category = $${values.length} OR tags ? $${values.length})`);
@@ -119,9 +144,19 @@ export async function getPublicTemplates(options?: { mediaType?: TemplateMediaTy
      FROM prompt_templates
      WHERE ${clauses.join(" AND ")}
      ORDER BY updated_at DESC, created_at DESC, id DESC
-     LIMIT 120`,
+     LIMIT 240`,
     values,
   );
 
-  return result.rows.map((row) => normalizeTemplate(row as Record<string, unknown>));
+  return result.rows
+    .map((row) => normalizeTemplate(row as Record<string, unknown>))
+    .filter((item) => {
+      if (mediaType && item.mediaType !== mediaType) return false;
+      if (category && item.category !== category && !item.tags.includes(category)) return false;
+      if (query) {
+        const haystack = `${item.title} ${item.prompt} ${item.tags.join(" ")} ${item.model}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return item.published;
+    });
 }
