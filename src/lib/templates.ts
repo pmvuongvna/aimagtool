@@ -23,9 +23,9 @@ function normalizeCategory(value: string) {
 }
 
 function inferMeigenMediaType(input: { title: string; prompt: string; model: string; category: string; tags: string[] }): TemplateMediaType {
-  const text = `${input.title} ${input.prompt} ${input.model} ${input.category} ${input.tags.join(" ")}`.toLowerCase();
+  const text = `${input.title} ${input.prompt} ${input.model}`.toLowerCase();
 
-  if (/\b(video|videos|image to video|text to video|video generation|animation|animated|motion|clip|trailer|timelapse|loop|fps|camera movement|dolly|pan left|pan right|tracking shot)\b/.test(text)) {
+  if (/\b(image to video|text to video|video generation|animation|animated|motion|clip|trailer|timelapse|loop|fps|camera movement|dolly|pan left|pan right|tracking shot)\b/.test(text)) {
     return "video";
   }
 
@@ -160,3 +160,4 @@ export async function getPublicTemplates(options?: { mediaType?: TemplateMediaTy
       return item.published;
     });
 }
+

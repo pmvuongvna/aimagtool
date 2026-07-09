@@ -387,9 +387,8 @@ function classifyModel(rawValue: string) {
 }
 
 function inferMediaType(input: { title: string; prompt: string; model: string; detailUrl: string; tags: string[]; categoryHint?: string }): TemplateMediaType {
-  const text = `${input.title} ${input.prompt} ${input.model} ${input.detailUrl} ${input.tags.join(" ")} ${input.categoryHint || ""}`.toLowerCase();
+  const text = `${input.title} ${input.prompt} ${input.model} ${input.detailUrl}`.toLowerCase();
   const classified = classifyModel(input.model);
-  if ((input.categoryHint || "").toLowerCase().includes("video") || input.tags.some((tag) => /^(video|videos|ai video)$/i.test(tag))) return "video";
   if (/(image to video|text to video|video generation|animation|animated|motion|clip|trailer|timelapse|loop|fps|camera movement|dolly|pan left|pan right|tracking shot)/.test(text)) return "video";
   if (classified) return classified.mediaType;
   if (/(video|motion|clip|cinematic movement|trailer|timelapse|loop|animation|animate|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text)) return "video";
@@ -1353,6 +1352,8 @@ export async function checkExistingTemplates(urls: string[]) {
     .filter(Boolean);
   return cleanUrls.filter((u) => dbUrls.includes(u));
 }
+
+
 
 
 
