@@ -1,7 +1,36 @@
 import { createHash } from "node:crypto";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
-const APP_BASE_URL = process.env.APP_BASE_URL?.replace(/\/$/, "") || process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
+function resolveAppBaseUrl() {
+  const raw = process.env.IMPORT_API_BASE_URL?.trim()
+    || process.env.APP_BASE_URL?.trim()
+    || process.env.NEXT_PUBLIC_API_BASE_URL?.trim()
+    || "";
+
+  if (!raw) {
+    throw new Error("IMPORT_API_BASE_URL or APP_BASE_URL is required");
+  }
+
+  const normalized = raw.replace(/\/$/, "");
+
+  try {
+    const url = new URL(normalized);
+    const host = url.hostname.toLowerCase();
+
+    // This project runs frontend and backend on separate public hosts.
+    // If the workflow was pointed at the frontend domain by mistake, force it to the API host.
+    if (host === "escanor.app" || host === "www.escanor.app") {
+      url.hostname = "api.escanor.app";
+      return url.toString().replace(/\/$/, "");
+    }
+  } catch {
+    // Keep the raw value if it is not a valid URL so the downstream fetch fails loudly.
+  }
+
+  return normalized;
+}
+
+const APP_BASE_URL = resolveAppBaseUrl();
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN?.trim();
 const IMPORT_COUNT_ENV = Number(process.env.IMPORT_COUNT || "0");
 const R2_ENDPOINT = process.env.R2_ENDPOINT?.trim();
@@ -10,9 +39,6 @@ const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID?.trim();
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY?.trim();
 const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL?.trim();
 
-if (!APP_BASE_URL) {
-  throw new Error("APP_BASE_URL is required");
-}
 if (!ADMIN_TOKEN) {
   throw new Error("ADMIN_TOKEN is required");
 }
@@ -687,5 +713,6 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.stack || error.message : String(error));
   process.exit(1);
 });
+
 
 
