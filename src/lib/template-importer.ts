@@ -1205,6 +1205,127 @@ export async function clearBrokenTemplateThumbnails() {
   return { checked, removedTemplates };
 }
 
+export async function repairStoredMeigenTemplates() {
+  if (!hasDatabase()) {
+    let checked = 0;
+    let updated = 0;
+    for (const [id, item] of memoryTemplates.entries()) {
+      if (item.source !== "meigen") continue;
+      checked += 1;
+      const repaired = normalizeMeigenTemplateInput({
+        title: item.title,
+        prompt: item.prompt,
+        thumbnailUrl: item.thumbnailUrl,
+        mediaType: item.mediaType,
+        model: item.model,
+        aspectRatio: item.aspectRatio,
+        category: item.category,
+        tags: item.tags,
+        authorName: item.authorName,
+        published: item.published,
+        featured: item.featured,
+        source: item.source,
+        sourcePromptId: item.sourcePromptId,
+        sourceUrl: item.sourceUrl,
+      });
+
+      const nextItem: PromptTemplate = {
+        ...item,
+        mediaType: repaired.mediaType,
+        model: repaired.model.trim(),
+        aspectRatio: repaired.aspectRatio.trim() || (repaired.mediaType === "video" ? "16:9" : "1:1"),
+        category: normalizeTemplateCategory(repaired.category),
+        tags: normalizeTags(repaired.tags || []),
+      };
+
+      if (JSON.stringify(nextItem) !== JSON.stringify(item)) {
+        memoryTemplates.set(id, nextItem);
+        updated += 1;
+      }
+    }
+
+    return { checked, updated };
+  }
+
+  await ensureSchema();
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT id, source, source_prompt_id, source_url, title, prompt, thumbnail_url, media_type, model, aspect_ratio, category, tags, author_name, published, featured
+     FROM prompt_templates
+     WHERE source = 'meigen'`,
+  );
+
+  let checked = 0;
+  let updated = 0;
+
+  for (const row of result.rows as Array<Record<string, unknown>>) {
+    checked += 1;
+    const current: {
+      mediaType: TemplateMediaType;
+      model: string;
+      aspectRatio: string;
+      category: TemplateCategory;
+      tags: string[];
+    } = {
+      mediaType: row.media_type === "video" ? "video" : "image",
+      model: String(row.model || "").trim(),
+      aspectRatio: String(row.aspect_ratio || "").trim(),
+      category: normalizeTemplateCategory(String(row.category || "All")),
+      tags: Array.isArray(row.tags) ? row.tags.map((item) => String(item)) : [],
+    };
+
+    const repaired = normalizeMeigenTemplateInput({
+      title: String(row.title || ""),
+      prompt: String(row.prompt || ""),
+      thumbnailUrl: normalizeR2PublicImageUrl(String(row.thumbnail_url || "")),
+      mediaType: current.mediaType,
+      model: current.model,
+      aspectRatio: current.aspectRatio,
+      category: current.category,
+      tags: current.tags,
+      authorName: row.author_name ? String(row.author_name) : undefined,
+      published: Boolean(row.published),
+      featured: Boolean(row.featured),
+      source: "meigen",
+      sourcePromptId: row.source_prompt_id ? String(row.source_prompt_id) : undefined,
+      sourceUrl: row.source_url ? String(row.source_url) : undefined,
+    });
+
+    const next = {
+      mediaType: repaired.mediaType,
+      model: repaired.model.trim(),
+      aspectRatio: repaired.aspectRatio.trim() || (repaired.mediaType === "video" ? "16:9" : "1:1"),
+      category: normalizeTemplateCategory(repaired.category),
+      tags: normalizeTags(repaired.tags || []),
+    };
+
+    if (
+      current.mediaType === next.mediaType
+      && current.model === next.model
+      && current.aspectRatio === next.aspectRatio
+      && current.category === next.category
+      && JSON.stringify(current.tags) === JSON.stringify(next.tags)
+    ) {
+      continue;
+    }
+
+    await pool.query(
+      `UPDATE prompt_templates
+       SET media_type = $2,
+           model = $3,
+           aspect_ratio = $4,
+           category = $5,
+           tags = $6::jsonb,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [String(row.id), next.mediaType, next.model, next.aspectRatio, next.category, JSON.stringify(next.tags)],
+    );
+    updated += 1;
+  }
+
+  return { checked, updated };
+}
+
 function shouldImportNow(settings: PromptImportSettings, now = new Date()) {
   const hour = now.getHours();
   return settings.enabled && (hour === settings.morningHour || hour === settings.eveningHour);

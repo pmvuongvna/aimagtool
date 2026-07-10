@@ -268,6 +268,24 @@ export default function AdminPage() {
     setTemplateLoading(false);
   }
 
+  async function repairMeigenTemplates() {
+    setTemplateLoading(true);
+    setStatus("Repairing MeiGen metadata...");
+    const res = await apiFetch(apiPath("/api/admin/templates"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "repair-meigen" }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { result?: { run?: ImportRun }; snapshot?: TemplateSnapshot };
+    if (res.ok && payload.snapshot) {
+      setTemplateSnapshot(payload.snapshot);
+      setStatus(payload.result?.run?.message || "MeiGen metadata repaired");
+    } else {
+      setStatus("Repair MeiGen metadata failed");
+    }
+    setTemplateLoading(false);
+  }
+
   async function saveManualTemplate(e: FormEvent) {
     e.preventDefault();
     setTemplateLoading(true);
@@ -400,6 +418,7 @@ export default function AdminPage() {
             <button className="generate-cta" type="submit" disabled={templateLoading}>Save Import Settings</button>
             <button className="chip-btn dark" type="button" disabled={templateLoading} onClick={runImportNow}>Queue MeiGen import</button>
             <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={rehostThumbnails}>Rehost old thumbnails</button>
+            <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={repairMeigenTemplates}>Repair MeiGen metadata</button>
             <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={cleanBrokenThumbnails}>Clean broken thumbnails</button>
             <button className="chip-btn ghost" type="button" disabled={templateLoading} onClick={clearMeigenTemplates}>Clear MeiGen templates</button>
           </div>
@@ -552,4 +571,3 @@ export default function AdminPage() {
     </main>
   );
 }
-

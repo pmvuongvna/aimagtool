@@ -10,6 +10,7 @@ import {
   rehostStoredTemplateThumbnails,
   clearStoredMeigenTemplates,
   clearBrokenTemplateThumbnails,
+  repairStoredMeigenTemplates,
   updatePromptImportSettings,
   checkExistingTemplates,
   type PromptImportSettings,
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
     if (!(await isAdmin(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = (await request.json()) as {
-      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails" | "clear-meigen" | "clean-broken-thumbnails" | "check-existing";
+      action?: "import-now" | "create-manual" | "bulk-import" | "rehost-thumbnails" | "clear-meigen" | "clean-broken-thumbnails" | "repair-meigen" | "check-existing";
       count?: number;
       manualTemplate?: PromptTemplateAdminInput;
       templates?: PromptTemplateAdminInput[];
@@ -142,6 +143,22 @@ export async function POST(request: NextRequest) {
         details: result,
       });
       return NextResponse.json({ result: { run, cleared: result }, snapshot: await getTemplateAdminSnapshot() });
+    }
+
+    if (body.action === "repair-meigen") {
+      const result = await repairStoredMeigenTemplates();
+      const run = await recordPromptImportRun({
+        source: "meigen",
+        mode: "repair-meigen",
+        status: "success",
+        requestedCount: result.checked,
+        importedCount: result.updated,
+        message: result.updated > 0
+          ? `Repaired metadata for ${result.updated} MeiGen templates.`
+          : "No MeiGen templates needed metadata repair.",
+        details: result,
+      });
+      return NextResponse.json({ result: { run, repaired: result }, snapshot: await getTemplateAdminSnapshot() });
     }
 
     if (body.action === "check-existing" && Array.isArray(body.urls)) {
