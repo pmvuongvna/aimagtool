@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -20,6 +20,11 @@ function truncate(value: string, max = 120) {
   const clean = value.trim();
   if (clean.length <= max) return clean;
   return `${clean.slice(0, max - 1)}...`;
+}
+
+function getTemplateCardMeta(item: PromptTemplate) {
+  if (item.source === "meigen") return item.model;
+  return [item.aspectRatio, item.model].filter(Boolean).join(" · ");
 }
 
 export default function TemplatesClient() {
@@ -209,7 +214,7 @@ export default function TemplatesClient() {
                     <button key={item.id} type="button" className={styles.card} onClick={() => setSelectedTemplate(item)}>
                       <img className={styles.cardImage} src={item.thumbnailUrl} alt={item.title} loading="lazy" />
                       <div className={styles.cardOverlay}>
-                        <div className={styles.cardMeta}>{item.aspectRatio} · {item.model}</div>
+                        <div className={styles.cardMeta}>{getTemplateCardMeta(item)}</div>
                         <strong>{item.title}</strong>
                         <p>{truncate(item.prompt)}</p>
                       </div>
@@ -231,18 +236,25 @@ export default function TemplatesClient() {
             </div>
             <div className={styles.modalBody}>
               <div className={styles.modalTopline}>
-                <span>{selectedTemplate.category}</span>
-                <span>{selectedTemplate.aspectRatio}</span>
+                <span>{selectedTemplate.source === "meigen" ? "MeiGen" : selectedTemplate.category}</span>
+                {selectedTemplate.source !== "meigen" && selectedTemplate.aspectRatio ? <span>{selectedTemplate.aspectRatio}</span> : null}
               </div>
               <h2>{selectedTemplate.title}</h2>
               <div className={styles.modalInfo}>
                 <span>{selectedTemplate.model}</span>
-                <span>{selectedTemplate.mediaType === "image" ? "AI Image" : "AI Video"}</span>
+                {selectedTemplate.source !== "meigen" ? <span>{selectedTemplate.mediaType === "image" ? "AI Image" : "AI Video"}</span> : null}
               </div>
+              {selectedTemplate.source === "meigen" ? (
+                <p className={styles.modalMetaText}>
+                  Source: MeiGen{selectedTemplate.aspectRatio ? ` · Format ${selectedTemplate.aspectRatio}` : ""}
+                </p>
+              ) : null}
               <p className={styles.modalPrompt}>{selectedTemplate.prompt}</p>
-              <div className={styles.modalTags}>
-                {selectedTemplate.tags.map((tag) => <span key={tag}>{tag}</span>)}
-              </div>
+              {selectedTemplate.tags.length ? (
+                <div className={styles.modalTags}>
+                  {selectedTemplate.tags.map((tag) => <span key={tag}>{tag}</span>)}
+                </div>
+              ) : null}
               <div className={styles.modalActions}>
                 <button type="button" className={styles.copyBtn} onClick={copyPrompt}>{copied ? "Copied" : "Copy prompt"}</button>
                 <Link

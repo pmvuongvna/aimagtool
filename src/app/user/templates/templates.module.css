@@ -276,7 +276,14 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 16px 0 20px;
+  margin: 16px 0 12px;
+}
+
+.modalMetaText {
+  margin: 0 0 18px;
+  color: #7b7891;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .modalPrompt {

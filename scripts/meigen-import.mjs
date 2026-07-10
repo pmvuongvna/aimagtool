@@ -319,14 +319,42 @@ function classifyModel(text) {
 
 function inferMediaType({ title, prompt, model, detailUrl }) {
   const text = `${title} ${prompt} ${model} ${detailUrl}`.toLowerCase();
-  if (/(image to video|text to video|video generation|video|motion|clip|trailer|timelapse|loop|animation|animate|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text)) return "video";
+  if (/(image to video|text to video|video generation)/.test(text)) return "video";
   const classified = classifyModel(model || text);
   if (classified) return classified.mediaType;
+  if (/(grok-video|veo|kling|runway|luma)/.test(text)) return "video";
+  if (/(motion|clip|trailer|timelapse|loop|animation|animate|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text)) return "video";
   return "image";
 }
 
 function inferAspectRatio(text, fallback) {
   return text.match(/\b(1:1|16:9|9:16|4:3|3:4|2:3|3:2)\b/)?.[1] || fallback;
+}
+
+function buildMeigenTags(tags, model, category) {
+  const blocked = new Set([
+    "ai image",
+    "ai video",
+    "video",
+    "videos",
+    "all",
+    "ads & product",
+    "brand & logo",
+    "illustration & 3d",
+    "posters & visuals",
+    "portraits",
+    "wallpaper",
+    String(model || "").toLowerCase(),
+    String(category || "").toLowerCase(),
+  ]);
+
+  return normalizeTags(
+    (tags || [])
+      .map((tag) => String(tag || "").trim())
+      .filter(Boolean)
+      .filter((tag) => !/^(1:1|16:9|9:16|4:3|3:4|2:3|3:2)$/i.test(tag))
+      .filter((tag) => !blocked.has(tag.toLowerCase())),
+  );
 }
 
 function extractMeta(html, property) {
@@ -558,7 +586,7 @@ async function extractTemplate(candidate) {
       model: canonicalModel,
       aspectRatio,
       category,
-      tags: normalizeTags([category, ...mergedTags, mediaType === "video" ? "AI Video" : canonicalModel]),
+      tags: buildMeigenTags(mergedTags, canonicalModel, category),
       authorName: candidate.authorName || "MeiGen",
       published: true,
       featured: false,
@@ -714,7 +742,3 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.stack || error.message : String(error));
   process.exit(1);
 });
-
-
-
-

@@ -387,11 +387,12 @@ function classifyModel(rawValue: string) {
 }
 
 function inferMediaType(input: { title: string; prompt: string; model: string; detailUrl: string; tags: string[]; categoryHint?: string }): TemplateMediaType {
-  const text = `${input.title} ${input.prompt} ${input.model} ${input.detailUrl}`.toLowerCase();
-  const classified = classifyModel(input.model);
-  if (/(image to video|text to video|video generation|animation|animated|motion|clip|trailer|timelapse|loop|fps|camera movement|dolly|pan left|pan right|tracking shot)/.test(text)) return "video";
+  const text = `${input.title} ${input.prompt} ${input.model} ${input.detailUrl} ${input.tags.join(" ")}`.toLowerCase();
+  const classified = classifyModel(input.model || text);
+  if (/(image to video|text to video|video generation)/.test(text)) return "video";
   if (classified) return classified.mediaType;
-  if (/(video|motion|clip|cinematic movement|trailer|timelapse|loop|animation|animate|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text)) return "video";
+  if (/(grok-video|veo|kling|runway|luma)/.test(text)) return "video";
+  if (/(animation|animated|motion|clip|cinematic movement|trailer|timelapse|loop|fps|camera movement|dolly zoom|tracking shot|pan left|pan right)/.test(text)) return "video";
   return "image";
 }
 
@@ -444,6 +445,32 @@ function inferModel(input: { mediaType: TemplateMediaType; model?: string; title
   return "GPT Image 2";
 }
 
+function buildMeigenTags(tags: string[], model: string, category: string) {
+  const blocked = new Set([
+    "ai image",
+    "ai video",
+    "video",
+    "videos",
+    "all",
+    "ads & product",
+    "brand & logo",
+    "illustration & 3d",
+    "posters & visuals",
+    "portraits",
+    "wallpaper",
+    model.toLowerCase(),
+    category.toLowerCase(),
+  ]);
+
+  return normalizeTags(
+    tags
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .filter((tag) => !/^(1:1|16:9|9:16|4:3|3:4|2:3|3:2)$/i.test(tag))
+      .filter((tag) => !blocked.has(tag.toLowerCase())),
+  );
+}
+
 function normalizeMeigenTemplateInput(input: PromptTemplateAdminInput): PromptTemplateAdminInput {
   if ((input.source || "internal") !== "meigen") return input;
 
@@ -471,7 +498,7 @@ function normalizeMeigenTemplateInput(input: PromptTemplateAdminInput): PromptTe
     categoryHint: input.category,
   });
   const aspectRatio = inferAspectRatio(`${input.title} ${input.prompt} ${input.aspectRatio || ""}`, mediaType === "video" ? "16:9" : "1:1");
-  const tags = normalizeTags([category, model, ...(input.tags || []), mediaType === "video" ? "AI Video" : "AI Image"]);
+  const tags = buildMeigenTags(input.tags || [], model, category);
 
   return {
     ...input,
@@ -926,7 +953,7 @@ function templateFromCandidate(candidate: CandidateSummary, detail: Awaited<Retu
   const model = inferModel({ mediaType, model: detail.model || candidate.model, title, prompt, detailUrl: candidate.detailUrl });
   const category = inferCategory({ title, prompt, model, mediaType, tags: [...(candidate.tags || []), ...(detail.tags || [])] });
   const aspectRatio = inferAspectRatio(`${prompt} ${title}`, mediaType === "video" ? "16:9" : "1:1");
-  const tags = normalizeTags([category, ...(candidate.tags || []), ...(detail.tags || []), mediaType === "video" ? "Videos" : model]);
+  const tags = buildMeigenTags([...(candidate.tags || []), ...(detail.tags || [])], model, category);
   return {
     title,
     prompt,
@@ -1352,13 +1379,3 @@ export async function checkExistingTemplates(urls: string[]) {
     .filter(Boolean);
   return cleanUrls.filter((u) => dbUrls.includes(u));
 }
-
-
-
-
-
-
-
-
-
-
