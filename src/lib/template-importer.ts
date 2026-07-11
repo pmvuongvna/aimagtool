@@ -12,6 +12,7 @@ export type PromptImportSettings = {
   eveningHour: number;
   source: "meigen";
   lastImportedAt: string | null;
+  listingUrls: string[];
 };
 
 export type PromptImportRun = {
@@ -69,6 +70,9 @@ type CandidateSummary = {
   mediaType?: TemplateMediaType;
   aspectRatio?: string;
   tags?: string[];
+  categoryHint?: string;
+  sourceTags?: string[];
+  sourceListingUrl?: string;
 };
 
 const DEFAULT_IMPORT_SETTINGS: PromptImportSettings = {
@@ -78,16 +82,16 @@ const DEFAULT_IMPORT_SETTINGS: PromptImportSettings = {
   eveningHour: 21,
   source: "meigen",
   lastImportedAt: null,
+  listingUrls: [],
 };
 
 const DEFAULT_LISTING_URLS = [
-  "https://www.meigen.ai/sitemap.xml",
-  "https://www.meigen.ai/",
-  "https://www.meigen.ai/?model=gptimage",
-  "https://www.meigen.ai/?model=seedream",
-  "https://www.meigen.ai/?model=seedance",
-  "https://www.meigen.ai/?model=midjourney",
-  "https://www.meigen.ai/?category=videos",
+  "https://www.meigen.ai/?category=product",
+  "https://www.meigen.ai/?category=logo",
+  "https://www.meigen.ai/?category=3d",
+  "https://www.meigen.ai/?category=design",
+  "https://www.meigen.ai/?category=photograph",
+  "https://www.meigen.ai/?category=wallpaper",
 ];
 
 let memorySettings: PromptImportSettings = { ...DEFAULT_IMPORT_SETTINGS };
@@ -118,6 +122,65 @@ function normalizeTags(tags: string[]) {
   return Array.from(new Set(tags.map((item) => item.trim()).filter(Boolean))).slice(0, 12);
 }
 
+function normalizeListingUrls(urls?: string[]) {
+  const source = Array.isArray(urls) && urls.length > 0 ? urls : DEFAULT_LISTING_URLS;
+  const normalized = Array.from(new Set(
+    source
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .filter((item) => /^https:\/\/www\.meigen\.ai\/?/i.test(item)),
+  ));
+  return normalized.length > 0 ? normalized : [...DEFAULT_LISTING_URLS];
+}
+
+function getConfiguredListingUrls(urls?: string[]) {
+  return normalizeListingUrls(urls);
+}
+
+function getMeigenCategoryMeta(listingUrl: string) {
+  try {
+    const url = new URL(listingUrl);
+    const slug = (url.searchParams.get("category") || "").trim().toLowerCase();
+    switch (slug) {
+      case "product":
+        return { slug, category: "Ads & Product" as TemplateCategory, tags: ["Product"] };
+      case "logo":
+        return { slug, category: "Brand & Logo" as TemplateCategory, tags: ["Logo"] };
+      case "3d":
+        return { slug, category: "Illustration & 3D" as TemplateCategory, tags: ["3D"] };
+      case "design":
+        return { slug, category: "Posters & Visuals" as TemplateCategory, tags: ["Design"] };
+      case "photograph":
+        return { slug, category: "Portraits" as TemplateCategory, tags: ["Photograph"] };
+      case "wallpaper":
+        return { slug, category: "Wallpaper" as TemplateCategory, tags: ["Wallpaper"] };
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+function applyListingMeta(candidate: CandidateSummary, listingUrl: string): CandidateSummary {
+  const meta = getMeigenCategoryMeta(listingUrl);
+  if (!meta) {
+    return {
+      ...candidate,
+      sourceListingUrl: candidate.sourceListingUrl || listingUrl,
+    };
+  }
+
+  return {
+    ...candidate,
+    categoryHint: candidate.categoryHint || meta.category,
+    mediaType: candidate.mediaType || "image",
+    tags: normalizeTags([...(candidate.tags || []), ...meta.tags]),
+    sourceTags: normalizeTags([...(candidate.sourceTags || []), ...meta.tags]),
+    sourceListingUrl: candidate.sourceListingUrl || listingUrl,
+  };
+}
+
 function normalizeTemplateCategory(value?: string): TemplateCategory {
   const matched = TEMPLATE_CATEGORIES.find((item) => item === value);
   return matched || "All";
@@ -145,6 +208,7 @@ async function readImportSettings() {
     eveningHour: normalizeHour(row?.eveningHour, DEFAULT_IMPORT_SETTINGS.eveningHour),
     source: "meigen",
     lastImportedAt: typeof row?.lastImportedAt === "string" ? row.lastImportedAt : null,
+    listingUrls: normalizeListingUrls(row?.listingUrls),
   } satisfies PromptImportSettings;
 }
 
@@ -172,6 +236,7 @@ export async function updatePromptImportSettings(next: Partial<PromptImportSetti
     eveningHour: normalizeHour(next.eveningHour ?? current.eveningHour, current.eveningHour),
     source: "meigen",
     lastImportedAt: next.lastImportedAt ?? current.lastImportedAt,
+    listingUrls: normalizeListingUrls(next.listingUrls ?? current.listingUrls),
   };
   memorySettings = { ...updated };
   if (hasDatabase()) await writeImportSettings(updated);
@@ -402,6 +467,10 @@ function inferAspectRatio(text: string, fallback: string) {
 }
 
 function inferCategory(input: { title: string; prompt: string; model: string; mediaType: TemplateMediaType; tags: string[]; categoryHint?: string }): TemplateCategory {
+  if (input.categoryHint) {
+    const normalized = normalizeTemplateCategory(input.categoryHint);
+    if (normalized !== "All") return normalized;
+  }
   const lowercaseTags = input.tags.map((t) => t.toLowerCase());
   if (lowercaseTags.includes("portrait") || lowercaseTags.includes("portraits") || lowercaseTags.includes("girl") || lowercaseTags.includes("woman") || lowercaseTags.includes("man") || lowercaseTags.includes("model")) {
     return "Portraits";
@@ -539,7 +608,17 @@ function extractCandidateObjects(data: unknown, baseUrl: string) {
 
     if (!title) return;
     if (!detailUrl && !prompt) return;
-    candidates.push({ title, detailUrl, thumbnailUrl, prompt, model, authorName, tags, mediaType: categoryHint.toLowerCase().includes("video") ? "video" : undefined });
+    candidates.push({
+      title,
+      detailUrl,
+      thumbnailUrl,
+      prompt,
+      model,
+      authorName,
+      tags,
+      categoryHint: categoryHint || undefined,
+      mediaType: categoryHint.toLowerCase().includes("video") ? "video" : undefined,
+    });
   });
   return candidates;
 }
@@ -570,9 +649,23 @@ function dedupeCandidates(items: CandidateSummary[]) {
     const key = item.detailUrl || `${item.title}|${item.prompt || ""}`;
     if (!key) continue;
     const prev = map.get(key);
-    if (!prev || (!prev.prompt && item.prompt) || (!prev.thumbnailUrl && item.thumbnailUrl)) {
+    if (!prev) {
       map.set(key, item);
+      continue;
     }
+    map.set(key, {
+      ...prev,
+      ...item,
+      prompt: prev.prompt || item.prompt,
+      thumbnailUrl: prev.thumbnailUrl || item.thumbnailUrl,
+      model: prev.model || item.model,
+      authorName: prev.authorName || item.authorName,
+      mediaType: prev.mediaType || item.mediaType,
+      categoryHint: prev.categoryHint || item.categoryHint,
+      sourceListingUrl: prev.sourceListingUrl || item.sourceListingUrl,
+      tags: normalizeTags([...(prev.tags || []), ...(item.tags || [])]),
+      sourceTags: normalizeTags([...(prev.sourceTags || []), ...(item.sourceTags || [])]),
+    });
   }
   return Array.from(map.values());
 }
@@ -949,11 +1042,19 @@ function templateFromCandidate(candidate: CandidateSummary, detail: Awaited<Retu
   const title = detail.title || candidate.title || prompt.slice(0, 48);
   const thumbnailUrl = detail.thumbnailUrl || candidate.thumbnailUrl || "";
   if (!thumbnailUrl) return null;
-  const mediaType = inferMediaType({ title, prompt, model: detail.model || candidate.model || "", detailUrl: candidate.detailUrl, tags: [...(candidate.tags || []), ...(detail.tags || [])] });
+  const mergedTags = [...(candidate.tags || []), ...(candidate.sourceTags || []), ...(detail.tags || [])];
+  const mediaType = inferMediaType({
+    title,
+    prompt,
+    model: detail.model || candidate.model || "",
+    detailUrl: candidate.detailUrl,
+    tags: mergedTags,
+    categoryHint: candidate.categoryHint,
+  });
   const model = inferModel({ mediaType, model: detail.model || candidate.model, title, prompt, detailUrl: candidate.detailUrl });
-  const category = inferCategory({ title, prompt, model, mediaType, tags: [...(candidate.tags || []), ...(detail.tags || [])] });
+  const category = inferCategory({ title, prompt, model, mediaType, tags: mergedTags, categoryHint: candidate.categoryHint });
   const aspectRatio = inferAspectRatio(`${prompt} ${title}`, mediaType === "video" ? "16:9" : "1:1");
-  const tags = buildMeigenTags([...(candidate.tags || []), ...(detail.tags || [])], model, category);
+  const tags = buildMeigenTags(mergedTags, model, category);
   return {
     title,
     prompt,
@@ -1340,17 +1441,17 @@ async function collectListingCandidates(listingUrls: string[]): Promise<ListingC
       if (url.includes("sitemap.xml") || /https:\/\/www\.meigen\.ai\/prompt\/[a-zA-Z0-9_-]+/.test(page.body)) {
         const urls = [...page.body.matchAll(/https:\/\/www\.meigen\.ai\/prompt\/[a-zA-Z0-9_-]+/g)].map((m) => m[0]);
         for (const u of urls) {
-          collected.push({
+          collected.push(applyListingMeta({
             title: "MeiGen Prompt",
             detailUrl: u,
-          });
+          }, url));
         }
       } else if (page.format === "html") {
         const nextData = extractNextData(page.body);
-        if (nextData) collected.push(...extractCandidateObjects(nextData, url));
-        collected.push(...extractAnchorCandidates(page.body, url));
+        if (nextData) collected.push(...extractCandidateObjects(nextData, url).map((item) => applyListingMeta(item, url)));
+        collected.push(...extractAnchorCandidates(page.body, url).map((item) => applyListingMeta(item, url)));
       } else {
-        collected.push(...extractMarkdownCandidates(page.body));
+        collected.push(...extractMarkdownCandidates(page.body).map((item) => applyListingMeta(item, url)));
       }
     } catch (error) {
       errors.push(`${url}: ${error instanceof Error ? error.message : "Unknown listing import error"}`);
@@ -1399,7 +1500,8 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
   }
 
   const requestedCount = clampImportCount(options.count ?? settings.importCount);
-  const listingResult = await collectListingCandidates(options.listingUrls || DEFAULT_LISTING_URLS);
+  const listingUrls = getConfiguredListingUrls(options.listingUrls || settings.listingUrls);
+  const listingResult = await collectListingCandidates(listingUrls);
   const candidates = listingResult.candidates;
   const imported: PromptTemplate[] = [];
   const errors: string[] = [...listingResult.errors];
@@ -1426,11 +1528,6 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
         await sleep(2500);
       }
       const detail = await extractDetailPrompt(candidate);
-      for (const related of detail.relatedCandidates || []) {
-        if (!related.detailUrl || seen.has(related.detailUrl)) continue;
-        seen.add(related.detailUrl);
-        queue.push(related);
-      }
       const normalized = templateFromCandidate(candidate, detail);
       if (!normalized) {
         skippedCount += 1;
@@ -1455,7 +1552,7 @@ export async function runMeigenImport(options: PromptImportOptions = {}): Promis
     importedCount: imported.length,
     message: imported.length > 0 ? `Imported ${imported.length} prompt templates from MeiGen.` : `No prompt templates could be imported from MeiGen. ${failureReason}`,
     details: {
-      listingUrls: options.listingUrls || DEFAULT_LISTING_URLS,
+      listingUrls,
       errors: errors.slice(0, 10),
       lastImportedAt: updatedSettings.lastImportedAt,
       titles: imported.map((item) => item.title).slice(0, 12),

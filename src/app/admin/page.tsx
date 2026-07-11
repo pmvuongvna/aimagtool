@@ -34,6 +34,7 @@ type ImportSettings = {
   eveningHour: number;
   source: "meigen";
   lastImportedAt: string | null;
+  listingUrls: string[];
 };
 
 type ImportRun = {
@@ -414,6 +415,20 @@ export default function AdminPage() {
               <input value={templateSnapshot?.importSettings.lastImportedAt ? new Date(templateSnapshot.importSettings.lastImportedAt).toLocaleString("vi-VN") : "Not yet"} readOnly />
             </label>
           </div>
+          <label>Listing URLs (one MeiGen category URL per line)
+            <textarea
+              rows={7}
+              value={(templateSnapshot?.importSettings.listingUrls || []).join("\n")}
+              onChange={(e) => setTemplateSnapshot((prev) => prev ? {
+                ...prev,
+                importSettings: {
+                  ...prev.importSettings,
+                  listingUrls: e.target.value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
+                },
+              } : prev)}
+              placeholder={["https://www.meigen.ai/?category=product", "https://www.meigen.ai/?category=logo"].join("\n")}
+            />
+          </label>
           <div className="admin-inline-actions">
             <button className="generate-cta" type="submit" disabled={templateLoading}>Save Import Settings</button>
             <button className="chip-btn dark" type="button" disabled={templateLoading} onClick={runImportNow}>Queue MeiGen import</button>

@@ -44,13 +44,12 @@ if (!ADMIN_TOKEN) {
 }
 
 const DEFAULT_LISTING_URLS = [
-  "https://www.meigen.ai/sitemap.xml",
-  "https://www.meigen.ai/",
-  "https://www.meigen.ai/?model=gptimage",
-  "https://www.meigen.ai/?model=seedream",
-  "https://www.meigen.ai/?model=seedance",
-  "https://www.meigen.ai/?model=midjourney",
-  "https://www.meigen.ai/?category=videos",
+  "https://www.meigen.ai/?category=product",
+  "https://www.meigen.ai/?category=logo",
+  "https://www.meigen.ai/?category=3d",
+  "https://www.meigen.ai/?category=design",
+  "https://www.meigen.ai/?category=photograph",
+  "https://www.meigen.ai/?category=wallpaper",
 ];
 
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
@@ -58,6 +57,60 @@ let r2Client = null;
 
 function sanitize(value = "") {
   return String(value).replace(/\s+/g, " ").replace(/&quot;/g, '"').trim();
+}
+
+function normalizeListingUrls(urls = []) {
+  const source = Array.isArray(urls) && urls.length > 0 ? urls : DEFAULT_LISTING_URLS;
+  const normalized = [...new Set(
+    source
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .filter((item) => /^https:\/\/www\.meigen\.ai\/?/i.test(item))
+  )];
+  return normalized.length > 0 ? normalized : [...DEFAULT_LISTING_URLS];
+}
+
+function getMeigenCategoryMeta(listingUrl) {
+  try {
+    const url = new URL(listingUrl);
+    const slug = (url.searchParams.get("category") || "").trim().toLowerCase();
+    switch (slug) {
+      case "product":
+        return { slug, category: "Ads & Product", tags: ["Product"], mediaType: "image" };
+      case "logo":
+        return { slug, category: "Brand & Logo", tags: ["Logo"], mediaType: "image" };
+      case "3d":
+        return { slug, category: "Illustration & 3D", tags: ["3D"], mediaType: "image" };
+      case "design":
+        return { slug, category: "Posters & Visuals", tags: ["Design"], mediaType: "image" };
+      case "photograph":
+        return { slug, category: "Portraits", tags: ["Photograph"], mediaType: "image" };
+      case "wallpaper":
+        return { slug, category: "Wallpaper", tags: ["Wallpaper"], mediaType: "image" };
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+function applyListingMeta(candidate, listingUrl) {
+  const meta = getMeigenCategoryMeta(listingUrl);
+  if (!meta) {
+    return {
+      ...candidate,
+      sourceListingUrl: candidate.sourceListingUrl || listingUrl,
+    };
+  }
+  return {
+    ...candidate,
+    categoryHint: candidate.categoryHint || meta.category,
+    mediaType: candidate.mediaType || meta.mediaType,
+    tags: normalizeTags([...(candidate.tags || []), ...meta.tags]),
+    sourceTags: normalizeTags([...(candidate.sourceTags || []), ...meta.tags]),
+    sourceListingUrl: candidate.sourceListingUrl || listingUrl,
+  };
 }
 
 function normalizeCandidateThumbnailUrl(value) {
@@ -404,7 +457,11 @@ function extractNextFData(html) {
   return strings;
 }
 
-function inferCategory({ title, prompt, model, mediaType, tags = [] }) {
+function inferCategory({ title, prompt, model, mediaType, tags = [], categoryHint = "" }) {
+  if (categoryHint) {
+    const mapped = ["Ads & Product", "Brand & Logo", "Illustration & 3D", "Posters & Visuals", "Portraits", "Wallpaper", "Videos"].find((item) => item === categoryHint);
+    if (mapped) return mapped;
+  }
   const lowercaseTags = tags.map((t) => t.toLowerCase());
   if (lowercaseTags.includes("portrait") || lowercaseTags.includes("portraits") || lowercaseTags.includes("girl") || lowercaseTags.includes("woman") || lowercaseTags.includes("man") || lowercaseTags.includes("model")) {
     return "Portraits";
@@ -428,7 +485,7 @@ function inferCategory({ title, prompt, model, mediaType, tags = [] }) {
     return "Videos";
   }
 
-  let joined = `${title} ${prompt} ${model} ${tags.join(" ")}`.toLowerCase();
+  let joined = `${title} ${prompt} ${model} ${tags.join(" ")} ${categoryHint}`.toLowerCase();
   joined = joined.replace(/\b(no|without|avoid)\s+(logo|watermark|brand)s?\b/g, "");
 
   if (mediaType === "video") return "Videos";
@@ -570,11 +627,11 @@ async function extractTemplate(candidate) {
     }
   }
 
-  const mergedTags = [...(candidate.tags || []), ...detailTags];
+  const mergedTags = [...(candidate.tags || []), ...(candidate.sourceTags || []), ...detailTags];
   const thumbnailUrl = await mirrorImageToR2(originalThumbnailUrl, `${candidate.detailUrl}|${originalThumbnailUrl}`);
   const mediaType = inferMediaType({ title, prompt, model, detailUrl: candidate.detailUrl });
   const canonicalModel = classifyModel(model)?.model || (mediaType === "video" ? "Grok Imagine" : "GPT Image 2");
-  const category = inferCategory({ title, prompt, model: canonicalModel, mediaType, tags: mergedTags });
+  const category = inferCategory({ title, prompt, model: canonicalModel, mediaType, tags: mergedTags, categoryHint: candidate.categoryHint || "" });
   const aspectRatio = inferAspectRatio(`${title} ${prompt}`, mediaType === "video" ? "16:9" : "1:1");
 
   return {
@@ -598,14 +655,22 @@ async function extractTemplate(candidate) {
   };
 }
 
-async function getImportCount() {
-  if (IMPORT_COUNT_ENV > 0) return Math.max(1, Math.min(50, Math.floor(IMPORT_COUNT_ENV)));
+async function getImportConfig() {
   const res = await fetch(`${APP_BASE_URL}/api/admin/templates`, {
     headers: { "x-admin-token": ADMIN_TOKEN },
   });
-  if (!res.ok) return 12;
+  if (!res.ok) {
+    return {
+      requestedCount: IMPORT_COUNT_ENV > 0 ? Math.max(1, Math.min(50, Math.floor(IMPORT_COUNT_ENV))) : 12,
+      listingUrls: [...DEFAULT_LISTING_URLS],
+    };
+  }
   const payload = await res.json();
-  return Math.max(1, Math.min(50, Math.floor(payload?.importSettings?.importCount || 12)));
+  const requestedCount = IMPORT_COUNT_ENV > 0
+    ? Math.max(1, Math.min(50, Math.floor(IMPORT_COUNT_ENV)))
+    : Math.max(1, Math.min(50, Math.floor(payload?.importSettings?.importCount || 12)));
+  const listingUrls = normalizeListingUrls(payload?.importSettings?.listingUrls || DEFAULT_LISTING_URLS);
+  return { requestedCount, listingUrls };
 }
 
 async function parseResponseBody(response) {
@@ -656,9 +721,12 @@ async function checkExistingTemplatesRemote(urls) {
 }
 
 async function main() {
-  const requestedCount = await getImportCount();
-  const listingPages = await Promise.all(DEFAULT_LISTING_URLS.map((url) => fetchMarkdown(url).catch(() => "")));
-  const candidates = listingPages.flatMap((page) => page ? extractListingCandidates(page) : []);
+  const { requestedCount, listingUrls } = await getImportConfig();
+  const listingPages = await Promise.all(listingUrls.map(async (url) => ({
+    url,
+    page: await fetchMarkdown(url).catch(() => ""),
+  })));
+  const candidates = listingPages.flatMap(({ url, page }) => page ? extractListingCandidates(page).map((item) => applyListingMeta(item, url)) : []);
   const deduped = [...new Map(candidates.map((item) => [item.detailUrl, item])).values()];
   const templates = [];
   const errors = [];
@@ -682,11 +750,7 @@ async function main() {
         await sleep(2500);
       }
       const result = await extractTemplate(candidate);
-      for (const related of result.relatedCandidates || []) {
-        if (!related.detailUrl || seen.has(related.detailUrl)) continue;
-        seen.add(related.detailUrl);
-        queue.push(related);
-      }
+
       if (!result.item) {
         skippedCount += 1;
         continue;
@@ -701,6 +765,7 @@ async function main() {
   console.log(JSON.stringify({
     preflight,
     requestedCount,
+    listingUrls,
     discovered: deduped.length,
     prepared: templates.length,
     attemptedCount,
