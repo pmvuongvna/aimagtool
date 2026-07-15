@@ -123,7 +123,7 @@ export default function TemplatesClient() {
             <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>▧</span><span className={shellStyles.navText}>Image</span></Link>
             <Link className={shellStyles.navItem} href="/user/video"><span className={shellStyles.navIcon}>▶</span><span className={shellStyles.navText}>Video</span></Link>
             <Link className={`${shellStyles.navItem} ${shellStyles.activeNav}`} href="/user/templates"><span className={shellStyles.navIcon}>▦</span><span className={shellStyles.navText}>Templates</span></Link>
-            <Link className={shellStyles.navItem} href="/user#recent"><span className={shellStyles.navIcon}>↺</span><span className={shellStyles.navText}>History</span></Link>
+            <Link className={shellStyles.navItem} href="/user/history"><span className={shellStyles.navIcon}>↺</span><span className={shellStyles.navText}>History</span></Link>
             <Link className={shellStyles.navItem} href="/user#styles"><span className={shellStyles.navIcon}>♡</span><span className={shellStyles.navText}>Styles</span></Link>
             <Link className={shellStyles.navItem} href="/admin"><span className={shellStyles.navIcon}>⚙</span><span className={shellStyles.navText}>Settings</span></Link>
           </nav>

@@ -404,8 +404,8 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
             <Link className={styles.navItem} href="/user"><span className={styles.navIcon}>⌂</span><span className={styles.navText}>Dashboard</span></Link>
             <Link className={styles.navItem} href="/user"><span className={styles.navIcon}>▧</span><span className={styles.navText}>Tạo ảnh</span></Link>
             <a className={`${styles.navItem} ${styles.activeNav}`} href="#generator"><span className={styles.navIcon}>▶</span><span className={styles.navText}>Tạo video</span></a>
-            <a className={styles.navItem} href="/user/templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></a>
-            <a className={styles.navItem} href="#recent"><span className={styles.navIcon}>↺</span><span className={styles.navText}>Lịch sử</span></a>
+            <Link className={styles.navItem} href="/user/templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></Link>
+            <Link className={styles.navItem} href="/user/history"><span className={styles.navIcon}>↺</span><span className={styles.navText}>Lịch sử</span></Link>
             <a className={styles.navItem} href="#styles"><span className={styles.navIcon}>♡</span><span className={styles.navText}>Phong cách</span></a>
             <Link className={styles.navItem} href="/admin"><span className={styles.navIcon}>⚙</span><span className={styles.navText}>Cài đặt</span></Link>
           </nav>
@@ -631,7 +631,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                 <div className={styles.creationGrid}>
                   {filteredCards.slice(0, 8).map((item) => (
                     <button key={item.id} type="button" className={styles.creationCard} onClick={() => setLightboxUrl(item.videoUrl)}>
-                      <div className={`${styles.creationThumb} ${styles.creationThumbContain}`}><span className={styles.creationType}>▶</span><video src={item.videoUrl} muted playsInline /><span className={styles.playBadge}>▶</span></div>
+                      <div className={styles.creationThumb}><span className={styles.creationType}>▶</span><video src={item.videoUrl} muted playsInline /><span className={styles.playBadge}>▶</span></div>
                       <div className={styles.creationMeta}><strong>{item.title}</strong><span>{item.meta}</span></div>
                     </button>
                   ))}

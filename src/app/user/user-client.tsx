@@ -96,7 +96,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [imageResolution, setImageResolution] = useState<ImageResolution>("2k");
   const [activeTab, setActiveTab] = useState<"result" | "history">("result");
   const [activeStyle, setActiveStyle] = useState("Cinematic");
-  const [resultAspectRatio, setResultAspectRatio] = useState("16:9");
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [openControl, setOpenControl] = useState<ControlDropdown>(null);
   const controlsRef = useRef<HTMLDivElement | null>(null);
@@ -267,7 +266,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     if (!canGenerate) return;
     setLoading(true);
     setResultUrls([]);
-    setResultAspectRatio(aspectRatio);
     setStatusText("Đang tạo ảnh...");
     setActiveTab("result");
 
@@ -394,8 +392,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
             <a className={`${styles.navItem} ${styles.activeNav}`} href="#dashboard"><span className={styles.navIcon}>⌂</span><span className={styles.navText}>Dashboard</span></a>
             <a className={styles.navItem} href="#generator"><span className={styles.navIcon}>▧</span><span className={styles.navText}>Tạo ảnh</span></a>
             <Link className={styles.navItem} href="/user/video"><span className={styles.navIcon}>▶</span><span className={styles.navText}>Tạo video</span></Link>
-            <a className={styles.navItem} href="/user/templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></a>
-            <a className={styles.navItem} href="#recent"><span className={styles.navIcon}>↺</span><span className={styles.navText}>Lịch sử</span></a>
+            <Link className={styles.navItem} href="/user/templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></Link>
+            <Link className={styles.navItem} href="/user/history"><span className={styles.navIcon}>↺</span><span className={styles.navText}>Lịch sử</span></Link>
             <a className={styles.navItem} href="#styles"><span className={styles.navIcon}>♡</span><span className={styles.navText}>Phong cách</span></a>
             <Link className={styles.navItem} href="/admin"><span className={styles.navIcon}>⚙</span><span className={styles.navText}>Cài đặt</span></Link>
           </nav>
@@ -662,7 +660,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                 <div className={styles.creationGrid}>
                   {filteredCards.slice(0, 8).map((item) => (
                     <button key={item.id} type="button" className={styles.creationCard} onClick={() => openUrls(item.urls)}>
-                      <div className={`${styles.creationThumb} ${styles.creationThumbContain}`} style={activeTab === "result" && item.urls.length === 1 ? { aspectRatio: resultAspectRatio } : undefined}>
+                      <div className={styles.creationThumb}>
                         <span className={styles.creationType}>▧</span>
                         <img src={item.thumbUrl} alt={item.title} />
                       </div>
