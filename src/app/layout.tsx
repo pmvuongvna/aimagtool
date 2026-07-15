@@ -1,8 +1,8 @@
 ﻿import type { Metadata } from "next";
-import { JetBrains_Mono, Roboto } from "next/font/google";
+import { JetBrains_Mono, Quicksand } from "next/font/google";
 import "./globals.css";
 
-const roboto = Roboto({
+const quicksand = Quicksand({
   variable: "--font-display",
   subsets: ["latin", "latin-ext", "vietnamese"],
 });
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${roboto.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${quicksand.variable} ${jetbrainsMono.variable}`}>
       <body>{children}</body>
     </html>
   );

@@ -10,7 +10,7 @@
   --shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
   min-height: 100vh;
   color: var(--text);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-display), sans-serif;
   background:
     radial-gradient(circle at 80% 10%, rgba(255, 198, 64, 0.16), transparent 30%),
     linear-gradient(180deg, #050403 0%, #090604 48%, #030302 100%);
@@ -33,7 +33,7 @@
   border: 1px solid rgba(255, 218, 142, 0.24);
   background: rgba(255, 255, 255, 0.045);
   color: var(--text);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-weight: 900;
   cursor: pointer;
   transition: 0.22s ease;
@@ -211,7 +211,7 @@
 }
 
 .heroContent h1 {
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display), sans-serif;
   margin: 0;
   font-size: clamp(52px, 6.2vw, 92px);
   line-height: 1.05;
@@ -277,7 +277,7 @@
 }
 
 .quote b {
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display), sans-serif;
   color: var(--gold);
   font-size: 28px;
 }
@@ -328,7 +328,7 @@
 }
 
 .toolCard h3 {
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display), sans-serif;
   margin: 0 0 10px;
   font-size: 25px;
 }
@@ -369,7 +369,7 @@
 }
 
 .sectionHead h2 {
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display), sans-serif;
   margin: 0 0 14px;
   font-size: clamp(36px, 4vw, 58px);
   line-height: 1.06;
@@ -538,7 +538,7 @@
 }
 
 .cta h2 {
-  font-family: "Playfair Display", serif;
+  font-family: var(--font-display), sans-serif;
   margin: 0 0 16px;
   font-size: clamp(38px, 5vw, 66px);
   line-height: 1.04;

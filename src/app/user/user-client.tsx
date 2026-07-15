@@ -34,13 +34,6 @@ type CardItem = {
 };
 
 const CACHE_KEY = "aistudio_user_dashboard_cache_v1";
-const styleCards = [
-  { title: "Cinematic", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=300&q=80" },
-  { title: "Realistic", image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=300&q=80" },
-  { title: "Anime", image: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=300&q=80" },
-  { title: "3D Render", image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=300&q=80" },
-];
-
 const aspectOptions = ["1:1", "16:9", "4:3", "3:4", "9:16"];
 const styleOptions = ["Cinematic", "Ảnh thực", "Anime", "3D Render", "Editorial"];
 const quantityOptions = [1, 2];
@@ -370,7 +363,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   const displayCards = (activeTab === "result" && (loading || recentResultCards.length > 0)) ? recentResultCards : historyCards;
   const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
-  const activityItems = historyCards.slice(0, 4);
   const progressWidth = Math.max(8, Math.min(100, Math.round((credits / Math.max(credits + (currentCost || 0), 1000)) * 100)));
   const createdImageCount = history.reduce((sum, item) => sum + item.urls.length, 0) + resultUrls.length;
   const projectCount = history.length;
@@ -682,36 +674,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                   ))}
                 </div>
               )}
-            </div>
-
-            <div className={styles.panel}>
-              <div className={styles.panelHead}><h2>Hoạt động gần đây</h2></div>
-              <div className={styles.activityList}>
-                {activityItems.length === 0 ? (
-                  <div className={styles.emptyState}>Chưa có hoạt động nào được lưu.</div>
-                ) : activityItems.map((item) => (
-                  <button key={item.id} type="button" className={styles.activityItem} onClick={() => openUrls(item.urls)}>
-                    <div className={styles.activityImg}><img src={item.thumbUrl} alt={item.title} /></div>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <span>{item.meta}</span>
-                    </div>
-                    <time>{new Date(item.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</time>
-                  </button>
-                ))}
-              </div>
-              <button type="button" className={styles.fullBtn} onClick={() => setActiveTab("history")}>Xem toàn bộ hoạt động</button>
-            </div>
-          </section>
-
-          <section className={styles.bottomGrid}>
-            <div className={styles.panel} id="styles">
-              <div className={styles.panelHead}><h2>Popular styles</h2><button type="button" className={styles.viewBtn}>View all</button></div>
-              <div className={styles.stylesGrid}>
-                {styleCards.map((item) => (
-                  <div key={item.title} className={styles.styleCard} style={{ backgroundImage: `url(${item.image})` }}><strong>{item.title}</strong></div>
-                ))}
-              </div>
             </div>
           </section>
         </main>

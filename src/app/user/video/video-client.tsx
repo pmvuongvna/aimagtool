@@ -34,13 +34,6 @@ type CardItem = {
 };
 
 const CACHE_KEY = "aistudio_video_dashboard_cache_v1";
-const styleCards = [
-  { title: "Cinematic", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=300&q=80" },
-  { title: "Documentary", image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=300&q=80" },
-  { title: "Anime Motion", image: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=300&q=80" },
-  { title: "3D Trailer", image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=300&q=80" },
-];
-
 const videoAspectOptions = ["auto", "2:3", "16:9", "9:16", "4:3", "3:4", "1:1"];
 const durationOptions = [5, 10, 15, 20, 25, 30];
 const videoResolutionOptions: VideoResolution[] = ["480p", "720p"];
@@ -386,7 +379,6 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
 
   const displayCards = (activeTab === "result" && (loading || resultCards.length > 0)) ? resultCards : historyCards;
   const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
-  const activityItems = historyCards.slice(0, 4);
   const progressWidth = Math.max(8, Math.min(100, Math.round((credits / Math.max(credits + (currentCost || 0), 1000)) * 100)));
 
   const filteredTemplates = useMemo(() => {
@@ -645,33 +637,6 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                   ))}
                 </div>
               )}
-            </div>
-
-            <div className={styles.panel}>
-              <div className={styles.panelHead}><h2>Hoạt động gần đây</h2></div>
-              <div className={styles.activityList}>
-                {activityItems.length === 0 ? (
-                  <div className={styles.emptyState}>Chưa có hoạt động video nào được lưu.</div>
-                ) : activityItems.map((item) => (
-                  <button key={item.id} type="button" className={styles.activityItem} onClick={() => setLightboxUrl(item.videoUrl)}>
-                    <div className={styles.activityImg}><video src={item.videoUrl} muted playsInline /></div>
-                    <div><strong>{item.title}</strong><span>{item.meta}</span></div>
-                    <time>{new Date(item.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</time>
-                  </button>
-                ))}
-              </div>
-              <button type="button" className={styles.fullBtn} onClick={() => setActiveTab("history")}>Xem toàn bộ hoạt động</button>
-            </div>
-          </section>
-
-          <section className={styles.bottomGrid}>
-            <div className={styles.panel} id="styles">
-              <div className={styles.panelHead}><h2>Popular styles</h2><button type="button" className={styles.viewBtn}>View all</button></div>
-              <div className={styles.stylesGrid}>
-                {styleCards.map((item) => (
-                  <div key={item.title} className={styles.styleCard} style={{ backgroundImage: `url(${item.image})` }}><strong>{item.title}</strong></div>
-                ))}
-              </div>
             </div>
           </section>
         </main>
