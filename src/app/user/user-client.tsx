@@ -442,10 +442,10 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
             <form onSubmit={onGenerate}>
               <div className={styles.promptBox}>
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value.slice(0, 1000))} placeholder="Mô tả nội dung anh muốn tạo... Ví dụ: poster sản phẩm, phong cách cinematic, ánh sáng cao cấp." />
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Mô tả nội dung anh muốn tạo... Ví dụ: poster sản phẩm, phong cách cinematic, ánh sáng cao cấp." />
                 <div className={styles.promptSide}>
                   <button type="button" className={styles.magicBtn}>✦</button>
-                  <span>{prompt.length} / 1000</span>
+                  <span>{prompt.length} chars</span>
                 </div>
               </div>
 
@@ -619,7 +619,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
                     <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
                       <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt</span></div>
-                      <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value.slice(0, 1000))} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
+                      <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
                       <div style={{ marginTop: 10 }} className={styles.subtleNote}>
                         {imageModel === "seedream" ? "Seedream 5 Lite đang được khóa về 1K để đúng workflow của model." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
                       </div>
@@ -657,7 +657,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
               ) : filteredCards.length === 0 ? (
                 <div className={styles.emptyState}>{activeTab === "result" ? "Chưa có ảnh kết quả. Hãy nhập prompt và bấm Generate." : "Chưa có lịch sử phù hợp với bộ lọc hiện tại."}</div>
               ) : (
-                <div className={styles.creationGrid}>
+                <div className={`${styles.creationGrid} ${activeTab === "result" ? styles.creationGridCompact : ""}`}>
                   {filteredCards.slice(0, 8).map((item) => (
                     <button key={item.id} type="button" className={styles.creationCard} onClick={() => openUrls(item.urls)}>
                       <div className={styles.creationThumb}>

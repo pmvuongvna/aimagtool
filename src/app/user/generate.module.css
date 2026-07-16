@@ -991,6 +991,12 @@
   width: 100%;
 }
 
+.creationGridCompact {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 360px));
+  justify-content: flex-start;
+  align-items: start;
+}
+
 .creationCard {
   width: 100%;
   border: 1px solid rgba(122, 143, 210, 0.14);
