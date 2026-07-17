@@ -135,6 +135,14 @@ export default function AdminPage() {
   const adminCount = useMemo(() => users.filter((item) => item.role === "admin").length, [users]);
   const userCount = useMemo(() => users.filter((item) => item.role === "user").length, [users]);
   const featuredTemplateCount = useMemo(() => (templateSnapshot?.templates || []).filter((item) => item.featured).length, [templateSnapshot]);
+  const publishedTemplateCount = useMemo(() => (templateSnapshot?.templates || []).filter((item) => item.published).length, [templateSnapshot]);
+  const activePackageCount = useMemo(() => (settings?.creditPackages || []).filter((item) => item.active).length, [settings]);
+  const averageCredits = useMemo(() => users.length ? Math.round(totalCreditsAllocated / users.length) : 0, [totalCreditsAllocated, users]);
+  const recentUsersCount = useMemo(() => {
+    const threshold = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return users.filter((item) => new Date(item.createdAt).getTime() >= threshold).length;
+  }, [users]);
+  const latestImportRun = useMemo(() => templateSnapshot?.runs?.[0] || null, [templateSnapshot]);
 
   const filteredUsers = useMemo(() => users.filter((item) => {
     const matchesRole = userRoleFilter === "all" || item.role === userRoleFilter;
@@ -347,7 +355,7 @@ export default function AdminPage() {
 
   if (!settings) {
     return (
-      <main className="admin-v2">
+      <main className="admin-v2 admin-v3-shell">
         <div className="admin-loading-card">
           <p className="admin-kicker">CONTROL PLANE</p>
           <h1>Admin Console</h1>
@@ -356,118 +364,73 @@ export default function AdminPage() {
       </main>
     );
   }
+
   return (
-    <main className="admin-v2">
-      <header className="admin-header">
-        <div className="admin-header-main">
-          <p className="admin-kicker">SYSTEM CONTROL</p>
-          <h1>Admin Console</h1>
-          <p className="admin-status">Status: {status}</p>
+    <main className="admin-v2 admin-v3-shell">
+      <header className="admin-shell-header">
+        <div className="admin-command-card">
+          <div className="admin-command-top">
+            <div>
+              <p className="admin-kicker">Escanor control plane</p>
+              <h1>Admin Dashboard</h1>
+              <p className="admin-status">Monitor users, tune credit policy, and manage template ingestion from one workspace.</p>
+            </div>
+            <div className="admin-header-actions">
+              <Link href="/user" className="chip-btn dark">Open Studio</Link>
+              <Link href="/" className="chip-btn ghost">Landing</Link>
+              <button type="button" className="chip-btn dark" onClick={handleLogout}>Logout</button>
+            </div>
+          </div>
+
           <div className="admin-status-row">
+            <span className="admin-status-chip">{status}</span>
             <span className="admin-status-chip">{userCount} users</span>
             <span className="admin-status-chip">{adminCount} admins</span>
             <span className="admin-status-chip">{templateSnapshot?.templates.length || 0} templates</span>
+            <span className="admin-status-chip">{activePackageCount} active packages</span>
           </div>
         </div>
-        <div className="admin-header-actions">
-          <Link href="/user" className="chip-btn dark">Open Studio</Link>
-          <Link href="/" className="chip-btn ghost">Landing</Link>
-          <button type="button" className="chip-btn dark" onClick={handleLogout}>Logout</button>
-        </div>
+
+        <section className="admin-health-grid">
+          <article className="admin-health-card admin-health-card-primary">
+            <span>Allocated credits</span>
+            <strong>{formatNumber(totalCreditsAllocated)}</strong>
+            <small>Distributed across all user accounts.</small>
+          </article>
+          <article className="admin-health-card">
+            <span>New users (7d)</span>
+            <strong>{recentUsersCount}</strong>
+            <small>Recent growth in the last 7 days.</small>
+          </article>
+          <article className="admin-health-card">
+            <span>Avg credits / user</span>
+            <strong>{formatNumber(averageCredits)}</strong>
+            <small>Quick read on account balance health.</small>
+          </article>
+          <article className="admin-health-card">
+            <span>Latest import</span>
+            <strong>{latestImportRun?.status || "idle"}</strong>
+            <small>{latestImportRun ? formatDate(latestImportRun.createdAt) : "No import run yet"}</small>
+          </article>
+        </section>
       </header>
 
-      <section className="admin-overview-grid">
-        <article className="admin-overview-card admin-overview-highlight">
-          <div className="admin-overview-top"><span>Credit strategy</span><b>Live policy</b></div>
-          <h3>{imageCostTotal + videoCostTotal}</h3>
-          <p>Total base cost pool across image + video policies. Use this block to sanity-check your pricing ladder.</p>
-        </article>
-        <article className="admin-overview-card">
-          <div className="admin-overview-top"><span>Allocated credits</span><b>All users</b></div>
-          <h3>{formatNumber(totalCreditsAllocated)}</h3>
-          <p>Current credits assigned to all registered users in the database.</p>
-        </article>
-        <article className="admin-overview-card">
-          <div className="admin-overview-top"><span>Featured templates</span><b>Gallery</b></div>
-          <h3>{featuredTemplateCount}</h3>
-          <p>Templates highlighted in the gallery for quicker discovery and onboarding.</p>
-        </article>
-        <article className="admin-overview-card">
-          <div className="admin-overview-top"><span>Grok rate / sec</span><b>480p / 720p</b></div>
-          <h3>{settings.grokVideoCreditsPerSecond["480p"]} / {settings.grokVideoCreditsPerSecond["720p"]}</h3>
-          <p>Per-second pricing used only for Grok video workflows.</p>
-        </article>
-      </section>
-
-      <section className="admin-layout-grid">
-        <div className="admin-stack">
-          <form className="admin-card" onSubmit={saveSettings}>
-            <div className="admin-section-head">
-              <div>
-                <p className="admin-kicker">Credit policy</p>
-                <h2>Credit Matrix</h2>
-              </div>
-              <div className="admin-mini-stats">
-                <span>Default user: {settings.defaultUserCredits}</span>
-                <span>Packages: {settings.creditPackages.length}</span>
-              </div>
-            </div>
-            <p className="admin-hint">Tune image tiers, Grok per-second rates, Veo fallback pricing, and the default credit balance new users receive.</p>
-
-            <div className="admin-form-block">
-              <h3>Image generation</h3>
-              <div className="admin-subgrid">
-                <label>Image 1K<input type="number" value={settings.imageCredits["1k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "1k": Number(e.target.value) } })} /></label>
-                <label>Image 2K<input type="number" value={settings.imageCredits["2k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "2k": Number(e.target.value) } })} /></label>
-                <label>Image 4K<input type="number" value={settings.imageCredits["4k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "4k": Number(e.target.value) } })} /></label>
-              </div>
-            </div>
-
-            <div className="admin-form-block">
-              <h3>Video generation</h3>
-              <div className="admin-subgrid">
-                <label>Video 480p<input type="number" value={settings.videoCredits["480p"]} onChange={(e) => setSettings({ ...settings, videoCredits: { ...settings.videoCredits, "480p": Number(e.target.value) } })} /></label>
-                <label>Video 720p<input type="number" value={settings.videoCredits["720p"]} onChange={(e) => setSettings({ ...settings, videoCredits: { ...settings.videoCredits, "720p": Number(e.target.value) } })} /></label>
-                <label>Image Edit Extra<input type="number" value={settings.imageEditExtraCost} onChange={(e) => setSettings({ ...settings, imageEditExtraCost: Number(e.target.value) })} /></label>
-              </div>
-            </div>
-
-            <div className="admin-form-block">
-              <h3>Grok runtime pricing</h3>
-              <div className="admin-subgrid admin-subgrid-two">
-                <label>Grok 480p (credit/sec)<input type="number" step="0.1" value={settings.grokVideoCreditsPerSecond["480p"]} onChange={(e) => setSettings({ ...settings, grokVideoCreditsPerSecond: { ...settings.grokVideoCreditsPerSecond, "480p": Number(e.target.value) } })} /></label>
-                <label>Grok 720p (credit/sec)<input type="number" step="0.1" value={settings.grokVideoCreditsPerSecond["720p"]} onChange={(e) => setSettings({ ...settings, grokVideoCreditsPerSecond: { ...settings.grokVideoCreditsPerSecond, "720p": Number(e.target.value) } })} /></label>
-              </div>
-            </div>
-
-            <div className="admin-subgrid admin-subgrid-two">
-              <label>Default User Credits<input type="number" value={settings.defaultUserCredits} onChange={(e) => setSettings({ ...settings, defaultUserCredits: Number(e.target.value) })} /></label>
-              <div className="admin-note-box">
-                <strong>Policy note</strong>
-                <span>Video 480p / 720p here remain the fallback pool for future Veo-style models.</span>
-              </div>
-            </div>
-
-            <label>Credit Packages (JSON)
-              <textarea rows={10} value={packageJson} onChange={(e) => setPackageJson(e.target.value)} placeholder='[{"id":"starter","name":"Starter","credits":500,"priceVnd":99000,"badge":"Pho bien","active":true}]' />
-            </label>
-            <button className="generate-cta">Save Credit Settings</button>
-          </form>
-
-          <section className="admin-card">
-            <div className="admin-section-head">
+      <section className="admin-workspace-grid">
+        <div className="admin-primary-stack">
+          <section className="admin-card admin-user-console-card">
+            <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Users</p>
                 <h2>User Management</h2>
+                <p className="admin-hint">Search accounts, review role mix, inspect balances, and push credit updates without leaving the console.</p>
               </div>
               <div className="admin-mini-stats">
                 <span>{filteredUsers.length} visible</span>
                 <span>{users.length} total</span>
               </div>
             </div>
-            <p className="admin-hint">Search accounts, filter by role, inspect balances, and push a top-up without leaving the dashboard.</p>
 
-            <div className="admin-user-toolbar">
+            <div className="admin-user-toolbar admin-user-toolbar-v2">
               <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search by name, email, or user ID" />
               <div className="admin-filter-pills">
                 <button type="button" className={`admin-filter-pill ${userRoleFilter === "all" ? "active" : ""}`} onClick={() => setUserRoleFilter("all")}>All</button>
@@ -476,20 +439,36 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="admin-user-layout">
-              <div className="admin-user-list">
+            <div className="admin-user-summary-strip">
+              <article>
+                <small>Visible users</small>
+                <strong>{filteredUsers.length}</strong>
+              </article>
+              <article>
+                <small>Admins</small>
+                <strong>{adminCount}</strong>
+              </article>
+              <article>
+                <small>User credits tracked</small>
+                <strong>{formatNumber(totalCreditsAllocated)}</strong>
+              </article>
+            </div>
+
+            <div className="admin-user-layout admin-user-layout-v2">
+              <div className="admin-user-list admin-user-list-v2">
                 {filteredUsers.length === 0 ? (
                   <div className="admin-users-empty">No users found yet, or the backend is not connected to the database.</div>
                 ) : filteredUsers.map((item) => (
-                  <button key={item.id} type="button" className={`admin-user-list-item ${selectedUser?.id === item.id ? "active" : ""}`} onClick={() => selectUser(item)}>
+                  <button key={item.id} type="button" className={`admin-user-list-item admin-user-list-item-v2 ${selectedUser?.id === item.id ? "active" : ""}`} onClick={() => selectUser(item)}>
                     <div className="admin-user-list-main">
                       <div className="admin-user-avatar">{(item.name || item.email).slice(0, 1).toUpperCase()}</div>
                       <div className="admin-user-summary admin-user-summary-list">
                         <strong>{item.name}</strong>
                         <span>{item.email}</span>
+                        <code>{item.id}</code>
                       </div>
                     </div>
-                    <div className="admin-user-list-side">
+                    <div className="admin-user-list-side admin-user-list-side-v2">
                       <span className={`admin-role ${item.role}`}>{item.role}</span>
                       <b>{formatNumber(item.credits)}</b>
                     </div>
@@ -497,26 +476,36 @@ export default function AdminPage() {
                 ))}
               </div>
 
-              <div className="admin-user-detail">
+              <div className="admin-user-detail admin-user-detail-v2">
                 {selectedUser ? (
                   <>
-                    <div className="admin-user-hero">
+                    <div className="admin-user-hero admin-user-hero-v2">
                       <div className="admin-user-avatar large">{(selectedUser.name || selectedUser.email).slice(0, 1).toUpperCase()}</div>
-                      <div>
+                      <div className="admin-user-identity">
                         <h3>{selectedUser.name}</h3>
                         <p>{selectedUser.email}</p>
                         <code>{selectedUser.id}</code>
                       </div>
                       <span className={`admin-role ${selectedUser.role}`}>{selectedUser.role}</span>
                     </div>
+
                     <div className="admin-user-stat-grid admin-user-stat-grid-detail">
-                      <article><small>Credits</small><strong>{formatNumber(selectedUser.credits)}</strong></article>
-                      <article><small>Joined</small><strong>{formatDate(selectedUser.createdAt)}</strong></article>
+                      <article>
+                        <small>Credits</small>
+                        <strong>{formatNumber(selectedUser.credits)}</strong>
+                      </article>
+                      <article>
+                        <small>Joined</small>
+                        <strong>{formatDate(selectedUser.createdAt)}</strong>
+                      </article>
                     </div>
+
                     <form className="admin-user-credit-form" onSubmit={updateUserCredits}>
                       <input type="hidden" value={userId} readOnly />
-                      <label>User ID<input value={userId} onChange={(e) => setUserId(e.target.value)} /></label>
-                      <label>Credits<input type="number" value={credits} onChange={(e) => setCredits(Number(e.target.value))} /></label>
+                      <div className="admin-subgrid admin-subgrid-two">
+                        <label>User ID<input value={userId} onChange={(e) => setUserId(e.target.value)} /></label>
+                        <label>Credits<input type="number" value={credits} onChange={(e) => setCredits(Number(e.target.value))} /></label>
+                      </div>
                       <div className="admin-quick-credit-actions">
                         <button type="button" className="chip-btn ghost" onClick={() => setCredits(selectedUser.credits + settings.defaultUserCredits)}>+ Default Pack</button>
                         <button type="button" className="chip-btn ghost" onClick={() => setCredits(settings.defaultUserCredits)}>Reset to Default</button>
@@ -529,20 +518,76 @@ export default function AdminPage() {
               </div>
             </div>
           </section>
-        </div>
-        <div className="admin-stack">
-          <section className="admin-card">
-            <div className="admin-section-head">
+
+          <form className="admin-card admin-credit-console" onSubmit={saveSettings}>
+            <div className="admin-panel-head">
               <div>
-                <p className="admin-kicker">Templates</p>
+                <p className="admin-kicker">Credit policy</p>
+                <h2>Credit Matrix</h2>
+                <p className="admin-hint">Manage image tiers, Grok per-second pricing, fallback video policy, and package distribution from one structured block.</p>
+              </div>
+              <div className="admin-mini-stats">
+                <span>{activePackageCount} active packages</span>
+                <span>Default user: {settings.defaultUserCredits}</span>
+              </div>
+            </div>
+
+            <div className="admin-credit-groups">
+              <div className="admin-form-block">
+                <h3>Image generation</h3>
+                <div className="admin-subgrid">
+                  <label>Image 1K<input type="number" value={settings.imageCredits["1k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "1k": Number(e.target.value) } })} /></label>
+                  <label>Image 2K<input type="number" value={settings.imageCredits["2k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "2k": Number(e.target.value) } })} /></label>
+                  <label>Image 4K<input type="number" value={settings.imageCredits["4k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "4k": Number(e.target.value) } })} /></label>
+                </div>
+              </div>
+
+              <div className="admin-form-block">
+                <h3>Video generation</h3>
+                <div className="admin-subgrid">
+                  <label>Video 480p<input type="number" value={settings.videoCredits["480p"]} onChange={(e) => setSettings({ ...settings, videoCredits: { ...settings.videoCredits, "480p": Number(e.target.value) } })} /></label>
+                  <label>Video 720p<input type="number" value={settings.videoCredits["720p"]} onChange={(e) => setSettings({ ...settings, videoCredits: { ...settings.videoCredits, "720p": Number(e.target.value) } })} /></label>
+                  <label>Image Edit Extra<input type="number" value={settings.imageEditExtraCost} onChange={(e) => setSettings({ ...settings, imageEditExtraCost: Number(e.target.value) })} /></label>
+                </div>
+              </div>
+
+              <div className="admin-form-block">
+                <h3>Grok runtime pricing</h3>
+                <div className="admin-subgrid admin-subgrid-two">
+                  <label>Grok 480p (credit/sec)<input type="number" step="0.1" value={settings.grokVideoCreditsPerSecond["480p"]} onChange={(e) => setSettings({ ...settings, grokVideoCreditsPerSecond: { ...settings.grokVideoCreditsPerSecond, "480p": Number(e.target.value) } })} /></label>
+                  <label>Grok 720p (credit/sec)<input type="number" step="0.1" value={settings.grokVideoCreditsPerSecond["720p"]} onChange={(e) => setSettings({ ...settings, grokVideoCreditsPerSecond: { ...settings.grokVideoCreditsPerSecond, "720p": Number(e.target.value) } })} /></label>
+                </div>
+              </div>
+            </div>
+
+            <div className="admin-subgrid admin-subgrid-two">
+              <label>Default User Credits<input type="number" value={settings.defaultUserCredits} onChange={(e) => setSettings({ ...settings, defaultUserCredits: Number(e.target.value) })} /></label>
+              <div className="admin-note-box">
+                <strong>Policy note</strong>
+                <span>Video 480p / 720p remain the fallback pool for future Veo-style models. Grok pricing is per-second only.</span>
+              </div>
+            </div>
+
+            <label>Credit Packages (JSON)
+              <textarea rows={10} value={packageJson} onChange={(e) => setPackageJson(e.target.value)} placeholder='[{"id":"starter","name":"Starter","credits":500,"priceVnd":99000,"badge":"Pho bien","active":true}]' />
+            </label>
+            <button className="generate-cta">Save Credit Settings</button>
+          </form>
+        </div>
+
+        <div className="admin-secondary-stack">
+          <section className="admin-card admin-ops-console">
+            <div className="admin-panel-head">
+              <div>
+                <p className="admin-kicker">Template ops</p>
                 <h2>Prompt Importer</h2>
+                <p className="admin-hint">Control the MeiGen sync cadence, trigger maintenance tasks, and inspect template ingestion health from one operations panel.</p>
               </div>
               <div className="admin-mini-stats">
                 <span>{templateSnapshot?.importSettings.enabled ? "Auto on" : "Auto off"}</span>
                 <span>{templateSnapshot?.importSettings.importCount ?? 0} / run</span>
               </div>
             </div>
-            <p className="admin-hint">Control automatic imports, trigger recovery tasks, and keep the MeiGen feed healthy without leaving admin.</p>
 
             <div className="admin-subgrid admin-subgrid-two">
               <label>Import Count / Run
@@ -571,34 +616,36 @@ export default function AdminPage() {
               </label>
             </div>
 
-            <div className="admin-form-block">
-              <h3>Recovery actions</h3>
-              <div className="admin-quick-credit-actions admin-template-actions">
-                <button type="button" className="chip-btn ghost" onClick={saveImportSettings} disabled={templateLoading}>Save Import Settings</button>
-                <button type="button" className="chip-btn ghost" onClick={runImportNow} disabled={templateLoading}>Import Now</button>
-                <button type="button" className="chip-btn ghost" onClick={rehostThumbnails} disabled={templateLoading}>Rehost Thumbnails</button>
-                <button type="button" className="chip-btn ghost" onClick={cleanBrokenThumbnails} disabled={templateLoading}>Clean Broken URLs</button>
-                <button type="button" className="chip-btn ghost" onClick={repairMeigenTemplates} disabled={templateLoading}>Repair MeiGen Templates</button>
-                <button type="button" className="chip-btn ghost danger" onClick={clearMeigenTemplates} disabled={templateLoading}>Clear MeiGen Templates</button>
-              </div>
+            <div className="admin-template-action-grid">
+              <button type="button" className="chip-btn ghost" onClick={saveImportSettings} disabled={templateLoading}>Save settings</button>
+              <button type="button" className="chip-btn ghost" onClick={runImportNow} disabled={templateLoading}>Import now</button>
+              <button type="button" className="chip-btn ghost" onClick={rehostThumbnails} disabled={templateLoading}>Rehost thumbs</button>
+              <button type="button" className="chip-btn ghost" onClick={cleanBrokenThumbnails} disabled={templateLoading}>Clean broken</button>
+              <button type="button" className="chip-btn ghost" onClick={repairMeigenTemplates} disabled={templateLoading}>Repair data</button>
+              <button type="button" className="chip-btn ghost danger" onClick={clearMeigenTemplates} disabled={templateLoading}>Clear MeiGen</button>
             </div>
           </section>
 
-          <form className="admin-card" onSubmit={saveManualTemplate}>
-            <div className="admin-section-head">
+          <form className="admin-card admin-manual-console" onSubmit={saveManualTemplate}>
+            <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Manual content</p>
                 <h2>Manual Prompt</h2>
+                <p className="admin-hint">Seed curated prompts directly into the gallery with full control over category, media type, thumbnail, and tags.</p>
               </div>
               <div className="admin-mini-stats">
-                <span>{manualImportCount} seed items</span>
+                <span>{publishedTemplateCount} published</span>
+                <span>{featuredTemplateCount} featured</span>
               </div>
             </div>
-            <p className="admin-hint">Create a hand-curated template with its own tags, thumbnail, and generator metadata.</p>
 
             <div className="admin-subgrid admin-subgrid-two">
               <label>Title<input value={manualTemplate.title} onChange={(e) => setManualTemplate({ ...manualTemplate, title: e.target.value })} /></label>
-              <label>Category<input value={manualTemplate.category} onChange={(e) => setManualTemplate({ ...manualTemplate, category: e.target.value as TemplateCategory })} /></label>
+              <label>Category
+                <select value={manualTemplate.category} onChange={(e) => setManualTemplate({ ...manualTemplate, category: e.target.value as TemplateCategory })}>
+                  {TEMPLATE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+                </select>
+              </label>
               <label>Model<input value={manualTemplate.model} onChange={(e) => setManualTemplate({ ...manualTemplate, model: e.target.value })} /></label>
               <label>Media Type<select value={manualTemplate.mediaType} onChange={(e) => setManualTemplate({ ...manualTemplate, mediaType: e.target.value as "image" | "video" })}><option value="image">Image</option><option value="video">Video</option></select></label>
               <label>Aspect Ratio<input value={manualTemplate.aspectRatio} onChange={(e) => setManualTemplate({ ...manualTemplate, aspectRatio: e.target.value })} /></label>
@@ -615,81 +662,80 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className="admin-card">
-        <div className="admin-section-head">
-          <div>
-            <p className="admin-kicker">Monitoring</p>
-            <h2>Recent Import Runs</h2>
+      <section className="admin-lower-grid">
+        <section className="admin-card">
+          <div className="admin-panel-head">
+            <div>
+              <p className="admin-kicker">Monitoring</p>
+              <h2>Recent Import Runs</h2>
+            </div>
+            <div className="admin-mini-stats">
+              <span>{templateSnapshot?.runs.length || 0} tracked</span>
+            </div>
           </div>
-          <div className="admin-mini-stats">
-            <span>{templateSnapshot?.runs.length || 0} tracked</span>
-          </div>
-        </div>
-        <div className="admin-users-table-wrap">
-          <table className="admin-users-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Mode</th>
-                <th>Status</th>
-                <th>Requested</th>
-                <th>Imported</th>
-                <th>Message</th>
-              </tr>
-            </thead>
-            <tbody>
-              {templateSnapshot?.runs.length ? templateSnapshot.runs.slice(0, 8).map((run: ImportRun) => (
-                <tr key={run.id}>
-                  <td>{formatDate(run.createdAt)}</td>
-                  <td>{run.mode}</td>
-                  <td><span className={`admin-role ${run.status === "success" ? "user" : "admin"}`}>{run.status}</span></td>
-                  <td>{run.requestedCount}</td>
-                  <td>{run.importedCount}</td>
-                  <td>{run.message}</td>
-                </tr>
-              )) : (
+          <div className="admin-users-table-wrap">
+            <table className="admin-users-table">
+              <thead>
                 <tr>
-                  <td colSpan={6} className="admin-users-empty">No import runs tracked yet.</td>
+                  <th>Time</th>
+                  <th>Mode</th>
+                  <th>Status</th>
+                  <th>Requested</th>
+                  <th>Imported</th>
+                  <th>Message</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {templateSnapshot?.runs.length ? templateSnapshot.runs.slice(0, 8).map((run: ImportRun) => (
+                  <tr key={run.id}>
+                    <td>{formatDate(run.createdAt)}</td>
+                    <td>{run.mode}</td>
+                    <td><span className={`admin-role ${run.status === "success" ? "user" : "admin"}`}>{run.status}</span></td>
+                    <td>{run.requestedCount}</td>
+                    <td>{run.importedCount}</td>
+                    <td>{run.message}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={6} className="admin-users-empty">No import runs tracked yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-      <section className="admin-card">
-        <div className="admin-section-head">
-          <div>
-            <p className="admin-kicker">Library</p>
-            <h2>Template Snapshot</h2>
+        <section className="admin-card">
+          <div className="admin-panel-head">
+            <div>
+              <p className="admin-kicker">Library</p>
+              <h2>Template Snapshot</h2>
+            </div>
+            <div className="admin-mini-stats">
+              <span>{templateSnapshot?.templates.length || 0} total templates</span>
+              <span>{featuredTemplateCount} featured</span>
+            </div>
           </div>
-          <div className="admin-mini-stats">
-            <span>{templateSnapshot?.templates.length || 0} total templates</span>
-            <span>{featuredTemplateCount} featured</span>
+          <div className="admin-template-grid">
+            {templateSnapshot?.templates.slice(0, 8).map((template: TemplateItem) => (
+              <article key={template.id} className="admin-template-card">
+                <div className="admin-template-thumb" style={{ backgroundImage: template.thumbnailUrl ? `url(${template.thumbnailUrl})` : undefined }} />
+                <div className="admin-template-copy">
+                  <div className="admin-template-topline">
+                    <strong>{template.title}</strong>
+                    <span>{template.model}</span>
+                  </div>
+                  <p>{template.prompt}</p>
+                  <div className="admin-template-tags">
+                    {(template.tags || []).slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
-        </div>
-        <div className="admin-template-grid">
-          {templateSnapshot?.templates.slice(0, 12).map((template: TemplateItem) => (
-            <article key={template.id} className="admin-template-card">
-              <div className="admin-template-thumb" style={{ backgroundImage: template.thumbnailUrl ? `url(${template.thumbnailUrl})` : undefined }} />
-              <div className="admin-template-copy">
-                <div className="admin-template-topline">
-                  <strong>{template.title}</strong>
-                  <span>{template.model}</span>
-                </div>
-                <p>{template.prompt}</p>
-                <div className="admin-template-tags">
-                  {(template.tags || []).slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
+        </section>
       </section>
     </main>
   );
 }
-
-
-
 
