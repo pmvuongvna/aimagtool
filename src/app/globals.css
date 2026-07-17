@@ -3687,3 +3687,128 @@ a {
     padding: 0;
   }
 }
+.admin-tab-hidden {
+  display: none !important;
+}
+
+.admin-workspace-grid-solo {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.admin-lower-grid-solo {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+button.admin-sidebar-link {
+  width: 100%;
+  appearance: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-sidebar-link.active {
+  border-color: rgba(164, 130, 255, 0.42);
+  background: linear-gradient(180deg, rgba(48, 39, 103, 0.92), rgba(22, 24, 67, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(201, 186, 255, 0.1);
+  color: #ffffff;
+}
+
+.admin-user-console-v3 {
+  gap: 18px;
+}
+
+.admin-user-analytics-grid {
+  display: none;
+}
+
+.admin-user-summary-strip-v3,
+.admin-user-summary-strip-v4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-bulk-console {
+  padding: 18px 20px;
+  border: 1px solid rgba(126, 144, 255, 0.14);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(15, 22, 54, 0.92), rgba(10, 17, 44, 0.98));
+}
+
+.admin-bulk-actions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-user-layout-v3 {
+  grid-template-columns: minmax(360px, 0.95fr) minmax(0, 1.05fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-user-list-panel,
+.admin-user-detail-v3 {
+  min-height: 100%;
+}
+
+.admin-user-row-v4,
+.admin-user-row {
+  align-items: stretch;
+}
+
+.admin-user-list-item-v3 {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-user-list-side-v3 {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.admin-user-detail-v3 {
+  padding: 22px;
+}
+
+.admin-user-hero-v3 {
+  align-items: flex-start;
+}
+
+.admin-user-stat-grid-v3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-detail-actions,
+.admin-quick-credit-actions-v3,
+.admin-template-action-grid {
+  flex-wrap: wrap;
+}
+
+.admin-users-table-wrap {
+  overflow-x: auto;
+}
+
+@media (max-width: 1180px) {
+  .admin-user-layout-v3,
+  .admin-user-summary-strip-v3,
+  .admin-user-summary-strip-v4,
+  .admin-bulk-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .admin-user-layout-v3,
+  .admin-user-summary-strip-v3,
+  .admin-user-summary-strip-v4,
+  .admin-bulk-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-list-item-v3 {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-list-side-v3 {
+    align-items: flex-start;
+    text-align: left;
+  }
+}

@@ -63,6 +63,7 @@ type TemplateItem = {
 type TemplateSnapshot = { importSettings: ImportSettings; runs: ImportRun[]; templates: TemplateItem[] };
 type UserSort = "newest" | "oldest" | "credits-desc" | "credits-asc" | "name-asc";
 type UserBulkAction = "set-zero" | "reset-default" | "add-default" | "set-package" | "promote-admin" | "demote-user";
+type AdminSectionKey = "users" | "credits" | "imports" | "manual" | "monitoring" | "library";
 
 const DEFAULT_MANUAL_TEMPLATE = {
   title: "",
@@ -92,13 +93,13 @@ const formatDate = (value: string) => new Date(value).toLocaleString("vi-VN");
 const formatDateShort = (value: string) => new Date(value).toLocaleDateString("vi-VN");
 const truncateText = (value: string, size = 80) => (value.length > size ? `${value.slice(0, size)}...` : value);
 
-const ADMIN_SECTIONS = [
-  { id: "admin-users", label: "Users" },
-  { id: "admin-credits", label: "Credits" },
-  { id: "admin-imports", label: "Imports" },
-  { id: "admin-manual", label: "Manual" },
-  { id: "admin-monitoring", label: "Monitoring" },
-  { id: "admin-library", label: "Library" },
+const ADMIN_SECTIONS: Array<{ id: AdminSectionKey; label: string; eyebrow: string; title: string; description: string }> = [
+  { id: "users", label: "Users", eyebrow: "Users", title: "User Management", description: "Search accounts, sort balances, and update user access from one focused workspace." },
+  { id: "credits", label: "Credits", eyebrow: "Credits", title: "Credit Policy", description: "Manage image tiers, video pricing, Grok runtime rates, and package presets without unrelated panels." },
+  { id: "imports", label: "Imports", eyebrow: "Imports", title: "Prompt Importer", description: "Control MeiGen sync cadence, launch imports, and run maintenance tasks from a dedicated operations panel." },
+  { id: "manual", label: "Manual", eyebrow: "Manual", title: "Manual Prompt Studio", description: "Publish curated prompts with explicit model, media, category, thumbnail, and tag controls." },
+  { id: "monitoring", label: "Monitoring", eyebrow: "Monitoring", title: "Run Monitoring", description: "Inspect import history, success rate, and error messages in one clean monitoring view." },
+  { id: "library", label: "Library", eyebrow: "Library", title: "Template Library", description: "Audit the published template surface and latest gallery records without mixing in import controls." },
 ] as const;
 
 export default function AdminPage() {
@@ -117,6 +118,7 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<"all" | "user" | "admin">("all");
   const [userSort, setUserSort] = useState<UserSort>("newest");
+  const [activeSection, setActiveSection] = useState<AdminSectionKey>("users");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -247,6 +249,8 @@ export default function AdminPage() {
     ];
   }, [users.length, userCount, adminCount]);
   const selectedPackage = useMemo(() => settings?.creditPackages.find((item) => item.id === bulkPackageId) || null, [settings, bulkPackageId]);
+  const activeSectionMeta = useMemo(() => ADMIN_SECTIONS.find((item) => item.id === activeSection) || ADMIN_SECTIONS[0], [activeSection]);
+  const workspaceMode = activeSection === "users" || activeSection === "credits" ? "primary" : activeSection === "imports" || activeSection === "manual" ? "secondary" : "lower";
 
   useEffect(() => {
     if (selectedUser && selectedUser.id !== selectedUserId) setSelectedUserId(selectedUser.id);
@@ -528,9 +532,9 @@ export default function AdminPage() {
 
           <nav className="admin-sidebar-nav" aria-label="Admin navigation">
             {ADMIN_SECTIONS.map((item) => (
-              <a key={item.id} href={"#" + item.id} className="admin-sidebar-link">
+              <button key={item.id} type="button" className={`admin-sidebar-link ${activeSection === item.id ? "active" : ""}`} onClick={() => setActiveSection(item.id)}>
                 <span>{item.label}</span>
-              </a>
+              </button>
             ))}
           </nav>
 
@@ -563,9 +567,9 @@ export default function AdminPage() {
         <div className="admin-command-card admin-command-card-v4">
           <div className="admin-command-top admin-command-top-v4">
             <div className="admin-command-copy">
-              <p className="admin-kicker">Escanor control plane</p>
-              <h1>Admin Dashboard</h1>
-              <p className="admin-status">Run users, credit policy, imports, and content operations from one polished control surface.</p>
+              <p className="admin-kicker">{activeSectionMeta.eyebrow}</p>
+              <h1>{activeSectionMeta.title}</h1>
+              <p className="admin-status">{activeSectionMeta.description}</p>
             </div>
             <div className="admin-header-actions admin-header-actions-v4">
               <Link href="/user" className="chip-btn dark">Open Studio</Link>
@@ -606,18 +610,11 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <nav className="admin-section-nav" aria-label="Admin sections">
-          {ADMIN_SECTIONS.map((item) => (
-            <a key={item.id} href={"#" + item.id} className="admin-section-link">
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </nav>
-      </header>
+        </header>
 
-      <section className="admin-workspace-grid admin-workspace-grid-v4">
-        <div className="admin-primary-stack">
-          <section id="admin-users" className="admin-card admin-user-console-card admin-user-console-v3">
+      <section className={`admin-workspace-grid admin-workspace-grid-v4 ${workspaceMode !== "lower" ? "admin-workspace-grid-solo" : "admin-tab-hidden"}`}>
+        <div className={activeSection === "users" || activeSection === "credits" ? "admin-primary-stack" : "admin-primary-stack admin-tab-hidden"}>
+          <section id="admin-users" className={`admin-card admin-user-console-card admin-user-console-v3 ${activeSection === "users" ? "" : "admin-tab-hidden"}`}>
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Users</p>
@@ -862,7 +859,7 @@ export default function AdminPage() {
             </div>
           </section>
 
-          <form id="admin-credits" className="admin-card admin-credit-console" onSubmit={saveSettings}>
+          <form id="admin-credits" className={`admin-card admin-credit-console ${activeSection === "credits" ? "" : "admin-tab-hidden"}`} onSubmit={saveSettings}>
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Credit policy</p>
@@ -918,8 +915,8 @@ export default function AdminPage() {
           </form>
         </div>
 
-        <div className="admin-secondary-stack">
-          <section className="admin-card admin-ops-rail">
+        <div className={activeSection === "imports" || activeSection === "manual" ? "admin-secondary-stack" : "admin-secondary-stack admin-tab-hidden"}>
+          <section className={`admin-card admin-ops-rail ${activeSection === "imports" ? "" : "admin-tab-hidden"}`}>
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Operations</p>
@@ -952,7 +949,7 @@ export default function AdminPage() {
               </article>
             </div>
           </section>
-          <section id="admin-imports" className="admin-card admin-ops-console">
+          <section id="admin-imports" className={`admin-card admin-ops-console ${activeSection === "imports" ? "" : "admin-tab-hidden"}`}>
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Template ops</p>
@@ -1002,7 +999,7 @@ export default function AdminPage() {
             </div>
           </section>
 
-          <form id="admin-manual" className="admin-card admin-manual-console" onSubmit={saveManualTemplate}>
+          <form id="admin-manual" className={`admin-card admin-manual-console ${activeSection === "manual" ? "" : "admin-tab-hidden"}`} onSubmit={saveManualTemplate}>
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Manual content</p>
@@ -1038,8 +1035,8 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className="admin-lower-grid">
-        <section id="admin-monitoring" className="admin-card">
+      <section className={activeSection === "monitoring" || activeSection === "library" ? "admin-lower-grid admin-lower-grid-solo" : "admin-lower-grid admin-tab-hidden"}>
+        <section id="admin-monitoring" className={`admin-card ${activeSection === "monitoring" ? "" : "admin-tab-hidden"}`}>
           <div className="admin-panel-head">
             <div>
               <p className="admin-kicker">Monitoring</p>
@@ -1081,7 +1078,7 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section id="admin-library" className="admin-card">
+        <section id="admin-library" className={`admin-card ${activeSection === "library" ? "" : "admin-tab-hidden"}`}>
           <div className="admin-panel-head">
             <div>
               <p className="admin-kicker">Library</p>
