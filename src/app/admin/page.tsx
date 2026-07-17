@@ -61,6 +61,8 @@ type TemplateItem = {
 };
 
 type TemplateSnapshot = { importSettings: ImportSettings; runs: ImportRun[]; templates: TemplateItem[] };
+type UserSort = "newest" | "oldest" | "credits-desc" | "credits-asc" | "name-asc";
+type UserBulkAction = "set-zero" | "reset-default" | "add-default" | "set-package" | "promote-admin" | "demote-user";
 
 const DEFAULT_MANUAL_TEMPLATE = {
   title: "",
@@ -76,8 +78,19 @@ const DEFAULT_MANUAL_TEMPLATE = {
   featured: false,
 };
 
+const USER_PAGE_SIZE = 8;
+const USER_SORT_OPTIONS: Array<{ value: UserSort; label: string }> = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "credits-desc", label: "Highest credits" },
+  { value: "credits-asc", label: "Lowest credits" },
+  { value: "name-asc", label: "Name A-Z" },
+];
+
 const formatNumber = (value: number) => value.toLocaleString("vi-VN");
 const formatDate = (value: string) => new Date(value).toLocaleString("vi-VN");
+const formatDateShort = (value: string) => new Date(value).toLocaleDateString("vi-VN");
+const truncateText = (value: string, size = 80) => (value.length > size ? `${value.slice(0, size)}...` : value);
 
 export default function AdminPage() {
   const router = useRouter();
@@ -91,9 +104,14 @@ export default function AdminPage() {
   const [manualTemplate, setManualTemplate] = useState(DEFAULT_MANUAL_TEMPLATE);
   const [manualImportCount, setManualImportCount] = useState(12);
   const [templateLoading, setTemplateLoading] = useState(false);
+  const [userActionLoading, setUserActionLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<"all" | "user" | "admin">("all");
+  const [userSort, setUserSort] = useState<UserSort>("newest");
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [bulkPackageId, setBulkPackageId] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -109,9 +127,12 @@ export default function AdminPage() {
       }
 
       const loadedUsers = settingsPayload.users || [];
-      setSettings(settingsPayload.settings);
+      const loadedSettings = settingsPayload.settings;
+      setSettings(loadedSettings);
       setUsers(loadedUsers);
-      setPackageJson(JSON.stringify(settingsPayload.settings.creditPackages || [], null, 2));
+      setPackageJson(JSON.stringify(loadedSettings.creditPackages || [], null, 2));
+      const starterPackage = loadedSettings.creditPackages.find((item) => item.active) || loadedSettings.creditPackages[0];
+      setBulkPackageId(starterPackage?.id || "");
       if (loadedUsers[0]) {
         setSelectedUserId(loadedUsers[0].id);
         setUserId(loadedUsers[0].id);
@@ -128,6 +149,21 @@ export default function AdminPage() {
     }
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!bulkPackageId && settings?.creditPackages.length) {
+      const starterPackage = settings.creditPackages.find((item) => item.active) || settings.creditPackages[0];
+      setBulkPackageId(starterPackage?.id || "");
+    }
+  }, [settings, bulkPackageId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [userSearch, userRoleFilter, userSort]);
+
+  useEffect(() => {
+    setSelectedUserIds((prev) => prev.filter((id) => users.some((item) => item.id === id)));
+  }, [users]);
 
   const imageCostTotal = useMemo(() => settings ? settings.imageCredits["1k"] + settings.imageCredits["2k"] + settings.imageCredits["4k"] : 0, [settings]);
   const videoCostTotal = useMemo(() => settings ? settings.videoCredits["480p"] + settings.videoCredits["720p"] : 0, [settings]);
@@ -151,20 +187,62 @@ export default function AdminPage() {
     return matchesRole && (!keyword || haystack.includes(keyword));
   }), [users, userRoleFilter, userSearch]);
 
-  const selectedUser = useMemo(() => users.find((item) => item.id === selectedUserId) || filteredUsers[0] || users[0] || null, [users, filteredUsers, selectedUserId]);
+  const sortedUsers = useMemo(() => {
+    const nextUsers = [...filteredUsers];
+    nextUsers.sort((left, right) => {
+      if (userSort === "oldest") return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+      if (userSort === "credits-desc") return right.credits - left.credits;
+      if (userSort === "credits-asc") return left.credits - right.credits;
+      if (userSort === "name-asc") return left.name.localeCompare(right.name, "vi");
+      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+    });
+    return nextUsers;
+  }, [filteredUsers, userSort]);
+
+  const pageCount = useMemo(() => Math.max(1, Math.ceil(sortedUsers.length / USER_PAGE_SIZE)), [sortedUsers.length]);
+  const visiblePage = Math.min(currentPage, pageCount);
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (visiblePage - 1) * USER_PAGE_SIZE;
+    return sortedUsers.slice(startIndex, startIndex + USER_PAGE_SIZE);
+  }, [sortedUsers, visiblePage]);
+
+  const selectedUser = useMemo(
+    () => users.find((item) => item.id === selectedUserId) || paginatedUsers[0] || sortedUsers[0] || users[0] || null,
+    [users, paginatedUsers, sortedUsers, selectedUserId],
+  );
+
+  const selectedUsers = useMemo(() => users.filter((item) => selectedUserIds.includes(item.id)), [users, selectedUserIds]);
+  const selectedCreditsTotal = useMemo(() => selectedUsers.reduce((sum, item) => sum + item.credits, 0), [selectedUsers]);
+  const topBalanceUsers = useMemo(() => [...users].sort((left, right) => right.credits - left.credits).slice(0, 5), [users]);
+  const newestUsers = useMemo(() => [...users].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()).slice(0, 5), [users]);
+  const maxBalance = topBalanceUsers[0]?.credits || 1;
+  const roleBreakdown = useMemo(() => {
+    const total = Math.max(users.length, 1);
+    return [
+      { label: "Users", count: userCount, width: `${(userCount / total) * 100}%`, tone: "user" },
+      { label: "Admins", count: adminCount, width: `${(adminCount / total) * 100}%`, tone: "admin" },
+    ];
+  }, [users.length, userCount, adminCount]);
+  const selectedPackage = useMemo(() => settings?.creditPackages.find((item) => item.id === bulkPackageId) || null, [settings, bulkPackageId]);
 
   useEffect(() => {
     if (selectedUser && selectedUser.id !== selectedUserId) setSelectedUserId(selectedUser.id);
   }, [selectedUser, selectedUserId]);
 
-  function syncUsers(nextUsers: AdminUser[]) {
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
+
+  function syncUsers(nextUsers: AdminUser[], nextStatus?: string) {
     setUsers(nextUsers);
+    setSelectedUserIds((prev) => prev.filter((id) => nextUsers.some((item) => item.id === id)));
     const nextSelected = nextUsers.find((item) => item.id === selectedUserId) || nextUsers[0] || null;
     if (nextSelected) {
       setSelectedUserId(nextSelected.id);
       setUserId(nextSelected.id);
       setCredits(nextSelected.credits);
     }
+    if (nextStatus) setStatus(nextStatus);
   }
 
   function selectUser(user: AdminUser) {
@@ -173,6 +251,24 @@ export default function AdminPage() {
     setCredits(user.credits);
     setStatus(`Selected ${user.email}`);
   }
+
+  function toggleUserSelection(targetUserId: string) {
+    setSelectedUserIds((prev) => prev.includes(targetUserId) ? prev.filter((id) => id !== targetUserId) : [...prev, targetUserId]);
+  }
+
+  function toggleVisibleSelection() {
+    const visibleIds = paginatedUsers.map((item) => item.id);
+    const allSelected = visibleIds.every((id) => selectedUserIds.includes(id));
+    setSelectedUserIds((prev) => {
+      if (allSelected) return prev.filter((id) => !visibleIds.includes(id));
+      return Array.from(new Set([...prev, ...visibleIds]));
+    });
+  }
+
+  function clearUserSelection() {
+    setSelectedUserIds([]);
+  }
+
   async function saveSettings(e: FormEvent) {
     e.preventDefault();
     if (!settings) return;
@@ -191,12 +287,13 @@ export default function AdminPage() {
       body: JSON.stringify({ settings: { ...settings, creditPackages } }),
     });
     const payload = (await res.json().catch(() => ({}))) as { users?: AdminUser[] };
-    if (res.ok) syncUsers(payload.users || []);
-    setStatus(res.ok ? "Settings saved" : "Save failed");
+    if (res.ok) syncUsers(payload.users || [], "Settings saved");
+    else setStatus("Save failed");
   }
 
   async function updateUserCredits(e: FormEvent) {
     e.preventDefault();
+    setUserActionLoading(true);
     setStatus("Updating credits...");
     const res = await apiFetch(apiPath("/api/admin/settings"), {
       method: "PUT",
@@ -204,12 +301,33 @@ export default function AdminPage() {
       body: JSON.stringify({ userCredit: { userId, credits } }),
     });
     const payload = (await res.json().catch(() => ({}))) as { users?: AdminUser[] };
-    if (res.ok) syncUsers(payload.users || []);
-    setStatus(res.ok ? "User credits updated" : "Update failed");
+    if (res.ok) syncUsers(payload.users || [], "User credits updated");
+    else setStatus("Update failed");
+    setUserActionLoading(false);
   }
 
-  async function saveImportSettings(e: FormEvent) {
-    e.preventDefault();
+  async function applyBulkAction(action: UserBulkAction, targetUserIds = selectedUserIds, packageId = bulkPackageId) {
+    if (!targetUserIds.length) {
+      setStatus("Pick at least one user first.");
+      return;
+    }
+
+    setUserActionLoading(true);
+    setStatus("Applying bulk action...");
+    const res = await apiFetch(apiPath("/api/admin/settings"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bulkAction: { action, userIds: targetUserIds, packageId } }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { users?: AdminUser[]; bulkResult?: { message?: string }; error?: string };
+
+    if (res.ok) syncUsers(payload.users || [], payload.bulkResult?.message || "Bulk action complete");
+    else setStatus(payload.error || "Bulk action failed");
+    setUserActionLoading(false);
+  }
+
+  async function saveImportSettings(event?: FormEvent) {
+    event?.preventDefault();
     if (!templateSnapshot) return;
     setTemplateLoading(true);
     setStatus("Saving import settings...");
@@ -222,9 +340,11 @@ export default function AdminPage() {
     if (res.ok && payload.snapshot) {
       setTemplateSnapshot(payload.snapshot);
       setManualImportCount(payload.snapshot.importSettings.importCount);
+      setStatus("Import settings saved");
+    } else {
+      setStatus("Save import settings failed");
     }
     setTemplateLoading(false);
-    setStatus(res.ok ? "Import settings saved" : "Save import settings failed");
   }
 
   async function runImportNow() {
@@ -417,69 +537,186 @@ export default function AdminPage() {
 
       <section className="admin-workspace-grid">
         <div className="admin-primary-stack">
-          <section className="admin-card admin-user-console-card">
+          <section className="admin-card admin-user-console-card admin-user-console-v3">
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Users</p>
                 <h2>User Management</h2>
-                <p className="admin-hint">Search accounts, review role mix, inspect balances, and push credit updates without leaving the console.</p>
+                <p className="admin-hint">Search accounts, sort balances, review role mix, and run multi-user actions without leaving the dashboard.</p>
               </div>
               <div className="admin-mini-stats">
-                <span>{filteredUsers.length} visible</span>
+                <span>{sortedUsers.length} matched</span>
                 <span>{users.length} total</span>
               </div>
             </div>
 
-            <div className="admin-user-toolbar admin-user-toolbar-v2">
-              <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search by name, email, or user ID" />
-              <div className="admin-filter-pills">
-                <button type="button" className={`admin-filter-pill ${userRoleFilter === "all" ? "active" : ""}`} onClick={() => setUserRoleFilter("all")}>All</button>
-                <button type="button" className={`admin-filter-pill ${userRoleFilter === "user" ? "active" : ""}`} onClick={() => setUserRoleFilter("user")}>Users</button>
-                <button type="button" className={`admin-filter-pill ${userRoleFilter === "admin" ? "active" : ""}`} onClick={() => setUserRoleFilter("admin")}>Admins</button>
+            <div className="admin-user-toolbar admin-user-toolbar-v3">
+              <div className="admin-user-toolbar-search">
+                <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search by name, email, or user ID" />
+                <div className="admin-filter-pills">
+                  <button type="button" className={`admin-filter-pill ${userRoleFilter === "all" ? "active" : ""}`} onClick={() => setUserRoleFilter("all")}>All</button>
+                  <button type="button" className={`admin-filter-pill ${userRoleFilter === "user" ? "active" : ""}`} onClick={() => setUserRoleFilter("user")}>Users</button>
+                  <button type="button" className={`admin-filter-pill ${userRoleFilter === "admin" ? "active" : ""}`} onClick={() => setUserRoleFilter("admin")}>Admins</button>
+                </div>
+              </div>
+
+              <div className="admin-user-toolbar-actions">
+                <label className="admin-inline-select">
+                  <span>Sort</span>
+                  <select value={userSort} onChange={(e) => setUserSort(e.target.value as UserSort)}>
+                    {USER_SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <div className="admin-mini-stats admin-mini-stats-compact">
+                  <span>Page {visiblePage}/{pageCount}</span>
+                  <span>{selectedUserIds.length} selected</span>
+                </div>
               </div>
             </div>
 
-            <div className="admin-user-summary-strip">
+            <div className="admin-user-summary-strip admin-user-summary-strip-v3">
               <article>
                 <small>Visible users</small>
-                <strong>{filteredUsers.length}</strong>
+                <strong>{sortedUsers.length}</strong>
               </article>
               <article>
-                <small>Admins</small>
-                <strong>{adminCount}</strong>
+                <small>Selected accounts</small>
+                <strong>{selectedUserIds.length}</strong>
               </article>
               <article>
-                <small>User credits tracked</small>
+                <small>Selected credits</small>
+                <strong>{formatNumber(selectedCreditsTotal)}</strong>
+              </article>
+              <article>
+                <small>Total tracked</small>
                 <strong>{formatNumber(totalCreditsAllocated)}</strong>
               </article>
             </div>
 
-            <div className="admin-user-layout admin-user-layout-v2">
-              <div className="admin-user-list admin-user-list-v2">
-                {filteredUsers.length === 0 ? (
-                  <div className="admin-users-empty">No users found yet, or the backend is not connected to the database.</div>
-                ) : filteredUsers.map((item) => (
-                  <button key={item.id} type="button" className={`admin-user-list-item admin-user-list-item-v2 ${selectedUser?.id === item.id ? "active" : ""}`} onClick={() => selectUser(item)}>
-                    <div className="admin-user-list-main">
-                      <div className="admin-user-avatar">{(item.name || item.email).slice(0, 1).toUpperCase()}</div>
-                      <div className="admin-user-summary admin-user-summary-list">
-                        <strong>{item.name}</strong>
-                        <span>{item.email}</span>
-                        <code>{item.id}</code>
+            <div className="admin-user-analytics-grid">
+              <article className="admin-insight-card">
+                <div className="admin-insight-head">
+                  <strong>Role distribution</strong>
+                  <span>{users.length} accounts</span>
+                </div>
+                <div className="admin-role-bars">
+                  {roleBreakdown.map((item) => (
+                    <div key={item.label} className="admin-role-bar-row">
+                      <div className="admin-role-bar-copy">
+                        <span>{item.label}</span>
+                        <b>{item.count}</b>
+                      </div>
+                      <div className="admin-role-bar-track">
+                        <span className={`admin-role-bar-fill ${item.tone}`} style={{ width: item.width }} />
                       </div>
                     </div>
-                    <div className="admin-user-list-side admin-user-list-side-v2">
-                      <span className={`admin-role ${item.role}`}>{item.role}</span>
-                      <b>{formatNumber(item.credits)}</b>
+                  ))}
+                </div>
+              </article>
+
+              <article className="admin-insight-card">
+                <div className="admin-insight-head">
+                  <strong>Top balances</strong>
+                  <span>Highest credit holders</span>
+                </div>
+                <div className="admin-balance-list">
+                  {topBalanceUsers.map((item) => (
+                    <div key={item.id} className="admin-balance-row">
+                      <div>
+                        <b>{item.name}</b>
+                        <span>{item.email}</span>
+                      </div>
+                      <div className="admin-balance-bar-wrap">
+                        <strong>{formatNumber(item.credits)}</strong>
+                        <div className="admin-role-bar-track compact">
+                          <span className="admin-role-bar-fill user" style={{ width: `${Math.max((item.credits / maxBalance) * 100, 10)}%` }} />
+                        </div>
+                      </div>
                     </div>
-                  </button>
-                ))}
+                  ))}
+                </div>
+              </article>
+            </div>
+
+            <div className="admin-bulk-console">
+              <div className="admin-bulk-copy">
+                <strong>Bulk actions</strong>
+                <span>Apply role or credit updates to the selected accounts in one pass.</span>
+              </div>
+              <div className="admin-bulk-actions">
+                <button type="button" className="chip-btn ghost" onClick={toggleVisibleSelection} disabled={userActionLoading || paginatedUsers.length === 0}>
+                  {paginatedUsers.every((item) => selectedUserIds.includes(item.id)) ? "Unselect page" : "Select page"}
+                </button>
+                <button type="button" className="chip-btn ghost" onClick={clearUserSelection} disabled={userActionLoading || selectedUserIds.length === 0}>Clear</button>
+                <button type="button" className="chip-btn ghost" onClick={() => void applyBulkAction("add-default")} disabled={userActionLoading || selectedUserIds.length === 0}>+ Default</button>
+                <button type="button" className="chip-btn ghost" onClick={() => void applyBulkAction("reset-default")} disabled={userActionLoading || selectedUserIds.length === 0}>Reset default</button>
+                <button type="button" className="chip-btn ghost" onClick={() => void applyBulkAction("set-zero")} disabled={userActionLoading || selectedUserIds.length === 0}>Set 0</button>
+                <label className="admin-inline-select package">
+                  <span>Package</span>
+                  <select value={bulkPackageId} onChange={(e) => setBulkPackageId(e.target.value)}>
+                    {(settings.creditPackages || []).map((item) => (
+                      <option key={item.id} value={item.id}>{item.name} • {formatNumber(item.credits)}</option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" className="chip-btn dark" onClick={() => void applyBulkAction("set-package")} disabled={userActionLoading || selectedUserIds.length === 0 || !selectedPackage}>Apply package</button>
+                <button type="button" className="chip-btn ghost" onClick={() => void applyBulkAction("promote-admin")} disabled={userActionLoading || selectedUserIds.length === 0}>Promote</button>
+                <button type="button" className="chip-btn ghost" onClick={() => void applyBulkAction("demote-user")} disabled={userActionLoading || selectedUserIds.length === 0}>Demote</button>
+              </div>
+            </div>
+
+            <div className="admin-user-layout admin-user-layout-v3">
+              <div className="admin-user-list-panel">
+                <div className="admin-user-list-head">
+                  <div>
+                    <strong>User list</strong>
+                    <span>{paginatedUsers.length ? `${(visiblePage - 1) * USER_PAGE_SIZE + 1}-${Math.min(visiblePage * USER_PAGE_SIZE, sortedUsers.length)} of ${sortedUsers.length}` : "No matches"}</span>
+                  </div>
+                  <span className="admin-status-chip muted">{userSort.replace("-", " ")}</span>
+                </div>
+
+                <div className="admin-user-list admin-user-list-v3">
+                  {paginatedUsers.length === 0 ? (
+                    <div className="admin-users-empty">No users found yet, or the backend is not connected to the database.</div>
+                  ) : paginatedUsers.map((item) => {
+                    const isChecked = selectedUserIds.includes(item.id);
+                    const isActive = selectedUser?.id === item.id;
+                    return (
+                      <article key={item.id} className={`admin-user-row ${isActive ? "active" : ""}`}>
+                        <button type="button" className={`admin-user-check ${isChecked ? "active" : ""}`} onClick={() => toggleUserSelection(item.id)} aria-label={`Select ${item.email}`}>
+                          {isChecked ? "?" : ""}
+                        </button>
+                        <button type="button" className={`admin-user-list-item admin-user-list-item-v3 ${isActive ? "active" : ""}`} onClick={() => selectUser(item)}>
+                          <div className="admin-user-list-main">
+                            <div className="admin-user-avatar">{(item.name || item.email).slice(0, 1).toUpperCase()}</div>
+                            <div className="admin-user-summary admin-user-summary-list">
+                              <strong>{item.name}</strong>
+                              <span>{item.email}</span>
+                              <code>{truncateText(item.id, 26)}</code>
+                            </div>
+                          </div>
+                          <div className="admin-user-list-side admin-user-list-side-v3">
+                            <span className={`admin-role ${item.role}`}>{item.role}</span>
+                            <b>{formatNumber(item.credits)}</b>
+                            <small>{formatDateShort(item.createdAt)}</small>
+                          </div>
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <div className="admin-pagination">
+                  <button type="button" className="chip-btn ghost" onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))} disabled={visiblePage <= 1}>Previous</button>
+                  <span>Page {visiblePage} of {pageCount}</span>
+                  <button type="button" className="chip-btn ghost" onClick={() => setCurrentPage((page) => Math.min(page + 1, pageCount))} disabled={visiblePage >= pageCount}>Next</button>
+                </div>
               </div>
 
-              <div className="admin-user-detail admin-user-detail-v2">
+              <div className="admin-user-detail admin-user-detail-v3">
                 {selectedUser ? (
                   <>
-                    <div className="admin-user-hero admin-user-hero-v2">
+                    <div className="admin-user-hero admin-user-hero-v3">
                       <div className="admin-user-avatar large">{(selectedUser.name || selectedUser.email).slice(0, 1).toUpperCase()}</div>
                       <div className="admin-user-identity">
                         <h3>{selectedUser.name}</h3>
@@ -489,7 +726,7 @@ export default function AdminPage() {
                       <span className={`admin-role ${selectedUser.role}`}>{selectedUser.role}</span>
                     </div>
 
-                    <div className="admin-user-stat-grid admin-user-stat-grid-detail">
+                    <div className="admin-user-stat-grid admin-user-stat-grid-detail admin-user-stat-grid-v3">
                       <article>
                         <small>Credits</small>
                         <strong>{formatNumber(selectedUser.credits)}</strong>
@@ -498,21 +735,47 @@ export default function AdminPage() {
                         <small>Joined</small>
                         <strong>{formatDate(selectedUser.createdAt)}</strong>
                       </article>
+                      <article>
+                        <small>Selected in batch</small>
+                        <strong>{selectedUserIds.includes(selectedUser.id) ? "Yes" : "No"}</strong>
+                      </article>
                     </div>
 
-                    <form className="admin-user-credit-form" onSubmit={updateUserCredits}>
-                      <input type="hidden" value={userId} readOnly />
-                      <div className="admin-subgrid admin-subgrid-two">
+                    <form className="admin-user-credit-form admin-user-credit-form-v3" onSubmit={updateUserCredits}>
+                      <div className="admin-subgrid admin-subgrid-two admin-user-form-grid">
                         <label>User ID<input value={userId} onChange={(e) => setUserId(e.target.value)} /></label>
                         <label>Credits<input type="number" value={credits} onChange={(e) => setCredits(Number(e.target.value))} /></label>
                       </div>
-                      <div className="admin-quick-credit-actions">
-                        <button type="button" className="chip-btn ghost" onClick={() => setCredits(selectedUser.credits + settings.defaultUserCredits)}>+ Default Pack</button>
-                        <button type="button" className="chip-btn ghost" onClick={() => setCredits(settings.defaultUserCredits)}>Reset to Default</button>
+                      <div className="admin-quick-credit-actions admin-quick-credit-actions-v3">
+                        <button type="button" className="chip-btn ghost" onClick={() => setCredits(selectedUser.credits + settings.defaultUserCredits)}>+ Default pack</button>
+                        <button type="button" className="chip-btn ghost" onClick={() => setCredits(settings.defaultUserCredits)}>Reset default</button>
                         <button type="button" className="chip-btn ghost" onClick={() => setCredits(0)}>Set 0</button>
                       </div>
-                      <button className="generate-cta">Update User Credits</button>
+                      <div className="admin-detail-actions">
+                        <button className="generate-cta" disabled={userActionLoading}>Update User Credits</button>
+                        <button type="button" className="chip-btn dark" onClick={() => void applyBulkAction(selectedUser.role === "admin" ? "demote-user" : "promote-admin", [selectedUser.id])} disabled={userActionLoading}>
+                          {selectedUser.role === "admin" ? "Demote to user" : "Promote to admin"}
+                        </button>
+                      </div>
                     </form>
+
+                    <div className="admin-insight-card compact">
+                      <div className="admin-insight-head">
+                        <strong>Newest accounts</strong>
+                        <span>Quick audit view</span>
+                      </div>
+                      <div className="admin-recent-list">
+                        {newestUsers.map((item) => (
+                          <button key={item.id} type="button" className="admin-recent-row" onClick={() => selectUser(item)}>
+                            <div>
+                              <b>{item.name}</b>
+                              <span>{item.email}</span>
+                            </div>
+                            <small>{formatDateShort(item.createdAt)}</small>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </>
                 ) : <div className="admin-users-empty">Select a user to inspect credits and update the account balance.</div>}
               </div>
@@ -617,7 +880,7 @@ export default function AdminPage() {
             </div>
 
             <div className="admin-template-action-grid">
-              <button type="button" className="chip-btn ghost" onClick={saveImportSettings} disabled={templateLoading}>Save settings</button>
+              <button type="button" className="chip-btn ghost" onClick={() => void saveImportSettings()} disabled={templateLoading}>Save settings</button>
               <button type="button" className="chip-btn ghost" onClick={runImportNow} disabled={templateLoading}>Import now</button>
               <button type="button" className="chip-btn ghost" onClick={rehostThumbnails} disabled={templateLoading}>Rehost thumbs</button>
               <button type="button" className="chip-btn ghost" onClick={cleanBrokenThumbnails} disabled={templateLoading}>Clean broken</button>
