@@ -3812,3 +3812,226 @@ button.admin-sidebar-link {
     text-align: left;
   }
 }
+.admin-overview-grid {
+  display: none;
+}
+
+.admin-shell-content-v5 {
+  gap: 20px;
+}
+
+.admin-command-card-v4 {
+  padding: 28px;
+}
+
+.admin-status-row-v4 {
+  border-top: 1px solid rgba(122, 140, 255, 0.14);
+  padding-top: 16px;
+}
+
+.admin-user-console-card {
+  padding: 26px;
+}
+
+.admin-user-toolbar-v3 {
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  gap: 14px;
+  align-items: end;
+}
+
+.admin-user-toolbar-v3 .admin-user-toolbar-search,
+.admin-user-toolbar-v3 .admin-user-toolbar-actions {
+  background: rgba(8, 14, 38, 0.48);
+  border: 1px solid rgba(123, 140, 255, 0.14);
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.admin-user-summary-strip-v3 {
+  gap: 14px;
+}
+
+.admin-user-summary-strip-v3 article {
+  min-height: 108px;
+  justify-content: center;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(13, 20, 48, 0.92), rgba(9, 15, 35, 0.98));
+}
+
+.admin-bulk-console {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.admin-bulk-copy {
+  padding-right: 8px;
+}
+
+.admin-bulk-copy strong {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.admin-bulk-copy span {
+  color: #9eb1e6;
+  line-height: 1.6;
+}
+
+.admin-bulk-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.admin-bulk-actions .admin-inline-select.package {
+  min-width: 0;
+}
+
+.admin-user-layout-v3 {
+  grid-template-columns: minmax(370px, 0.86fr) minmax(0, 1.14fr);
+  gap: 20px;
+}
+
+.admin-user-list-panel,
+.admin-user-detail-v3 {
+  border: 1px solid rgba(123, 140, 255, 0.14);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(11, 17, 41, 0.96), rgba(8, 13, 32, 0.98));
+}
+
+.admin-user-list-panel {
+  padding: 18px;
+}
+
+.admin-user-list-head {
+  margin-bottom: 14px;
+}
+
+.admin-user-list-v3 {
+  gap: 10px;
+}
+
+.admin-user-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.admin-user-check {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  align-self: start;
+}
+
+.admin-user-list-item-v3 {
+  padding: 16px 18px;
+  border-radius: 18px;
+}
+
+.admin-user-summary-list strong {
+  font-size: 16px;
+}
+
+.admin-user-summary-list span,
+.admin-user-summary-list code {
+  font-size: 12px;
+}
+
+.admin-user-list-side-v3 b {
+  font-size: 20px;
+}
+
+.admin-user-detail-v3 {
+  padding: 20px;
+  gap: 18px;
+}
+
+.admin-user-hero-v3 {
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(123, 140, 255, 0.12);
+}
+
+.admin-user-identity h3 {
+  font-size: 28px;
+}
+
+.admin-user-identity p,
+.admin-user-identity code {
+  word-break: break-word;
+}
+
+.admin-user-stat-grid-v3 article {
+  min-height: 112px;
+  border-radius: 18px;
+}
+
+.admin-user-stat-grid-v3 strong {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.admin-user-credit-form-v3 {
+  border: 1px solid rgba(123, 140, 255, 0.12);
+  border-radius: 20px;
+  padding: 18px;
+  background: rgba(7, 12, 28, 0.5);
+}
+
+.admin-quick-credit-actions-v3 {
+  gap: 10px;
+}
+
+.admin-detail-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-detail-actions .generate-cta,
+.admin-detail-actions .chip-btn {
+  min-height: 48px;
+}
+
+.admin-insight-card.compact {
+  border-radius: 20px;
+  background: rgba(8, 14, 35, 0.58);
+}
+
+.admin-recent-list {
+  gap: 10px;
+}
+
+.admin-recent-row {
+  border-radius: 16px;
+}
+
+@media (max-width: 1280px) {
+  .admin-bulk-console,
+  .admin-user-toolbar-v3,
+  .admin-user-layout-v3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .admin-command-card-v4,
+  .admin-user-console-card,
+  .admin-user-list-panel,
+  .admin-user-detail-v3,
+  .admin-bulk-console {
+    padding: 18px;
+  }
+
+  .admin-detail-actions {
+    flex-direction: column;
+  }
+
+  .admin-detail-actions .generate-cta,
+  .admin-detail-actions .chip-btn {
+    width: 100%;
+  }
+}

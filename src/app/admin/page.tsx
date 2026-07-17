@@ -619,7 +619,7 @@ export default function AdminPage() {
               <div>
                 <p className="admin-kicker">Users</p>
                 <h2>User Management</h2>
-                <p className="admin-hint">Search accounts, sort balances, review role mix, and run multi-user actions without leaving the dashboard.</p>
+                <p className="admin-hint">Search accounts, filter by role, review balances, and handle user credit operations in one focused workspace.</p>
               </div>
               <div className="admin-mini-stats">
                 <span>{sortedUsers.length} matched</span>
@@ -646,7 +646,7 @@ export default function AdminPage() {
                 </label>
                 <div className="admin-mini-stats admin-mini-stats-compact">
                   <span>Page {visiblePage}/{pageCount}</span>
-                  <span>{selectedUserIds.length} selected</span>
+                  <span>{selectedCreditsTotal ? `${formatNumber(selectedCreditsTotal)} credits` : "No batch selected"}</span>
                 </div>
               </div>
             </div>
@@ -661,12 +661,12 @@ export default function AdminPage() {
                 <strong>{selectedUserIds.length}</strong>
               </article>
               <article>
-                <small>Selected credits</small>
-                <strong>{formatNumber(selectedCreditsTotal)}</strong>
+                <small>Admins</small>
+                <strong>{adminCount}</strong>
               </article>
               <article>
-                <small>Total tracked</small>
-                <strong>{formatNumber(totalCreditsAllocated)}</strong>
+                <small>Users</small>
+                <strong>{userCount}</strong>
               </article>
             </div>
 
@@ -746,10 +746,10 @@ export default function AdminPage() {
               <div className="admin-user-list-panel">
                 <div className="admin-user-list-head">
                   <div>
-                    <strong>User list</strong>
+                    <strong>Account list</strong>
                     <span>{paginatedUsers.length ? `${(visiblePage - 1) * USER_PAGE_SIZE + 1}-${Math.min(visiblePage * USER_PAGE_SIZE, sortedUsers.length)} of ${sortedUsers.length}` : "No matches"}</span>
                   </div>
-                  <span className="admin-status-chip muted">{userSort.replace("-", " ")}</span>
+                  <span className="admin-status-chip muted">{selectedUserIds.length ? `${selectedUserIds.length} in batch` : "Single select mode"}</span>
                 </div>
 
                 <div className="admin-user-list admin-user-list-v3">
@@ -838,8 +838,8 @@ export default function AdminPage() {
 
                     <div className="admin-insight-card compact">
                       <div className="admin-insight-head">
-                        <strong>Newest accounts</strong>
-                        <span>Quick audit view</span>
+                        <strong>Recent signups</strong>
+                        <span>Quick switch list</span>
                       </div>
                       <div className="admin-recent-list">
                         {newestUsers.map((item) => (
