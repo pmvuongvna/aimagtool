@@ -92,6 +92,14 @@ const formatDate = (value: string) => new Date(value).toLocaleString("vi-VN");
 const formatDateShort = (value: string) => new Date(value).toLocaleDateString("vi-VN");
 const truncateText = (value: string, size = 80) => (value.length > size ? `${value.slice(0, size)}...` : value);
 
+const ADMIN_SECTIONS = [
+  { id: "admin-users", label: "Users" },
+  { id: "admin-credits", label: "Credits" },
+  { id: "admin-imports", label: "Imports" },
+  { id: "admin-manual", label: "Manual" },
+  { id: "admin-library", label: "Library" },
+] as const;
+
 export default function AdminPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<AdminPayload["settings"] | null>(null);
@@ -179,6 +187,20 @@ export default function AdminPage() {
     return users.filter((item) => new Date(item.createdAt).getTime() >= threshold).length;
   }, [users]);
   const latestImportRun = useMemo(() => templateSnapshot?.runs?.[0] || null, [templateSnapshot]);
+  const importRuns = templateSnapshot?.runs || [];
+  const successfulImports = useMemo(() => importRuns.filter((run) => run.status === "success").length, [importRuns]);
+  const importSuccessRate = useMemo(
+    () => importRuns.length ? Math.round((successfulImports / importRuns.length) * 100) : 0,
+    [importRuns, successfulImports],
+  );
+  const manualTemplateCount = useMemo(
+    () => (templateSnapshot?.templates || []).filter((item) => item.source === "manual").length,
+    [templateSnapshot],
+  );
+  const meigenTemplateCount = useMemo(
+    () => (templateSnapshot?.templates || []).filter((item) => item.source === "meigen").length,
+    [templateSnapshot],
+  );
 
   const filteredUsers = useMemo(() => users.filter((item) => {
     const matchesRole = userRoleFilter === "all" || item.role === userRoleFilter;
@@ -487,57 +509,65 @@ export default function AdminPage() {
 
   return (
     <main className="admin-v2 admin-v3-shell">
-      <header className="admin-shell-header">
-        <div className="admin-command-card">
-          <div className="admin-command-top">
-            <div>
+      <header className="admin-shell-header admin-shell-header-v4">
+        <div className="admin-command-card admin-command-card-v4">
+          <div className="admin-command-top admin-command-top-v4">
+            <div className="admin-command-copy">
               <p className="admin-kicker">Escanor control plane</p>
               <h1>Admin Dashboard</h1>
-              <p className="admin-status">Monitor users, tune credit policy, and manage template ingestion from one workspace.</p>
+              <p className="admin-status">Run users, credit policy, imports, and content operations from one polished control surface.</p>
             </div>
-            <div className="admin-header-actions">
+            <div className="admin-header-actions admin-header-actions-v4">
               <Link href="/user" className="chip-btn dark">Open Studio</Link>
               <Link href="/" className="chip-btn ghost">Landing</Link>
               <button type="button" className="chip-btn dark" onClick={handleLogout}>Logout</button>
             </div>
           </div>
 
-          <div className="admin-status-row">
+          <div className="admin-status-row admin-status-row-v4">
             <span className="admin-status-chip">{status}</span>
             <span className="admin-status-chip">{userCount} users</span>
             <span className="admin-status-chip">{adminCount} admins</span>
             <span className="admin-status-chip">{templateSnapshot?.templates.length || 0} templates</span>
             <span className="admin-status-chip">{activePackageCount} active packages</span>
           </div>
+
+          <div className="admin-overview-grid">
+            <article className="admin-overview-card featured">
+              <span>Total allocated credits</span>
+              <strong>{formatNumber(totalCreditsAllocated)}</strong>
+              <small>Live balance distributed across every tracked account.</small>
+            </article>
+            <article className="admin-overview-card">
+              <span>Import success rate</span>
+              <strong>{importSuccessRate}%</strong>
+              <small>{successfulImports}/{importRuns.length || 0} recent runs completed successfully.</small>
+            </article>
+            <article className="admin-overview-card">
+              <span>Template split</span>
+              <strong>{meigenTemplateCount} / {manualTemplateCount}</strong>
+              <small>MeiGen sourced versus manually curated templates.</small>
+            </article>
+            <article className="admin-overview-card">
+              <span>Average credits / user</span>
+              <strong>{formatNumber(averageCredits)}</strong>
+              <small>{recentUsersCount} new accounts joined in the last 7 days.</small>
+            </article>
+          </div>
         </div>
 
-        <section className="admin-health-grid">
-          <article className="admin-health-card admin-health-card-primary">
-            <span>Allocated credits</span>
-            <strong>{formatNumber(totalCreditsAllocated)}</strong>
-            <small>Distributed across all user accounts.</small>
-          </article>
-          <article className="admin-health-card">
-            <span>New users (7d)</span>
-            <strong>{recentUsersCount}</strong>
-            <small>Recent growth in the last 7 days.</small>
-          </article>
-          <article className="admin-health-card">
-            <span>Avg credits / user</span>
-            <strong>{formatNumber(averageCredits)}</strong>
-            <small>Quick read on account balance health.</small>
-          </article>
-          <article className="admin-health-card">
-            <span>Latest import</span>
-            <strong>{latestImportRun?.status || "idle"}</strong>
-            <small>{latestImportRun ? formatDate(latestImportRun.createdAt) : "No import run yet"}</small>
-          </article>
-        </section>
+        <nav className="admin-section-nav" aria-label="Admin sections">
+          {ADMIN_SECTIONS.map((item) => (
+            <a key={item.id} href={"#" + item.id} className="admin-section-link">
+              <span>{item.label}</span>
+            </a>
+          ))}
+        </nav>
       </header>
 
-      <section className="admin-workspace-grid">
+      <section className="admin-workspace-grid admin-workspace-grid-v4">
         <div className="admin-primary-stack">
-          <section className="admin-card admin-user-console-card admin-user-console-v3">
+          <section id="admin-users" className="admin-card admin-user-console-card admin-user-console-v3">
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Users</p>
@@ -655,7 +685,7 @@ export default function AdminPage() {
                   <span>Package</span>
                   <select value={bulkPackageId} onChange={(e) => setBulkPackageId(e.target.value)}>
                     {(settings.creditPackages || []).map((item) => (
-                      <option key={item.id} value={item.id}>{item.name} • {formatNumber(item.credits)}</option>
+                      <option key={item.id} value={item.id}>{item.name} - {formatNumber(item.credits)}</option>
                     ))}
                   </select>
                 </label>
@@ -684,7 +714,7 @@ export default function AdminPage() {
                     return (
                       <article key={item.id} className={`admin-user-row ${isActive ? "active" : ""}`}>
                         <button type="button" className={`admin-user-check ${isChecked ? "active" : ""}`} onClick={() => toggleUserSelection(item.id)} aria-label={`Select ${item.email}`}>
-                          {isChecked ? "?" : ""}
+                          {isChecked ? "x" : ""}
                         </button>
                         <button type="button" className={`admin-user-list-item admin-user-list-item-v3 ${isActive ? "active" : ""}`} onClick={() => selectUser(item)}>
                           <div className="admin-user-list-main">
@@ -782,7 +812,7 @@ export default function AdminPage() {
             </div>
           </section>
 
-          <form className="admin-card admin-credit-console" onSubmit={saveSettings}>
+          <form id="admin-credits" className="admin-card admin-credit-console" onSubmit={saveSettings}>
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Credit policy</p>
@@ -839,7 +869,40 @@ export default function AdminPage() {
         </div>
 
         <div className="admin-secondary-stack">
-          <section className="admin-card admin-ops-console">
+          <section className="admin-card admin-ops-rail">
+            <div className="admin-panel-head">
+              <div>
+                <p className="admin-kicker">Operations</p>
+                <h2>System Snapshot</h2>
+                <p className="admin-hint">A quick read on templates, imports, packages, and user growth before you make changes.</p>
+              </div>
+              <span className="admin-status-chip muted">Live</span>
+            </div>
+
+            <div className="admin-ops-rail-grid">
+              <article>
+                <small>Published templates</small>
+                <strong>{publishedTemplateCount}</strong>
+                <span>{featuredTemplateCount} featured</span>
+              </article>
+              <article>
+                <small>Manual prompts</small>
+                <strong>{manualTemplateCount}</strong>
+                <span>{meigenTemplateCount} MeiGen templates</span>
+              </article>
+              <article>
+                <small>Active packages</small>
+                <strong>{activePackageCount}</strong>
+                <span>Image pool {formatNumber(imageCostTotal)}</span>
+              </article>
+              <article>
+                <small>Video pool</small>
+                <strong>{formatNumber(videoCostTotal)}</strong>
+                <span>Latest run {latestImportRun?.status || 'idle'}</span>
+              </article>
+            </div>
+          </section>
+          <section id="admin-imports" className="admin-card admin-ops-console">
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Template ops</p>
@@ -889,7 +952,7 @@ export default function AdminPage() {
             </div>
           </section>
 
-          <form className="admin-card admin-manual-console" onSubmit={saveManualTemplate}>
+          <form id="admin-manual" className="admin-card admin-manual-console" onSubmit={saveManualTemplate}>
             <div className="admin-panel-head">
               <div>
                 <p className="admin-kicker">Manual content</p>
@@ -926,7 +989,7 @@ export default function AdminPage() {
       </section>
 
       <section className="admin-lower-grid">
-        <section className="admin-card">
+        <section id="admin-monitoring" className="admin-card">
           <div className="admin-panel-head">
             <div>
               <p className="admin-kicker">Monitoring</p>
@@ -968,7 +1031,7 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section className="admin-card">
+        <section id="admin-library" className="admin-card">
           <div className="admin-panel-head">
             <div>
               <p className="admin-kicker">Library</p>
