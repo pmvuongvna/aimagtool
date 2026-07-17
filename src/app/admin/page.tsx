@@ -484,7 +484,7 @@ export default function AdminPage() {
                   <button key={item.id} type="button" className={`admin-user-list-item ${selectedUser?.id === item.id ? "active" : ""}`} onClick={() => selectUser(item)}>
                     <div className="admin-user-list-main">
                       <div className="admin-user-avatar">{(item.name || item.email).slice(0, 1).toUpperCase()}</div>
-                      <div className="admin-user-summary">
+                      <div className="admin-user-summary admin-user-summary-list">
                         <strong>{item.name}</strong>
                         <span>{item.email}</span>
                       </div>
@@ -509,7 +509,7 @@ export default function AdminPage() {
                       </div>
                       <span className={`admin-role ${selectedUser.role}`}>{selectedUser.role}</span>
                     </div>
-                    <div className="admin-user-stat-grid">
+                    <div className="admin-user-stat-grid admin-user-stat-grid-detail">
                       <article><small>Credits</small><strong>{formatNumber(selectedUser.credits)}</strong></article>
                       <article><small>Joined</small><strong>{formatDate(selectedUser.createdAt)}</strong></article>
                     </div>
@@ -689,6 +689,7 @@ export default function AdminPage() {
     </main>
   );
 }
+
 
 
 

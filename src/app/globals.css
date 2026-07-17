@@ -2447,3 +2447,132 @@ a {
     grid-template-columns: 1fr;
   }
 }
+.admin-user-layout {
+  align-items: start;
+}
+
+.admin-user-list {
+  align-self: start;
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+.admin-user-list-item {
+  align-items: flex-start;
+  min-height: 96px;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+.admin-user-list-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(156, 125, 255, 0.34);
+  box-shadow: 0 16px 32px rgba(4, 10, 32, 0.22);
+}
+
+.admin-user-summary-list {
+  align-content: start;
+}
+
+.admin-user-summary-list strong,
+.admin-user-summary-list span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-list-side {
+  flex: 0 0 auto;
+}
+
+.admin-user-detail {
+  min-width: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 100% 0, rgba(131, 97, 255, 0.14), transparent 38%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.admin-user-hero {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.admin-user-identity {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-user-identity h3,
+.admin-user-identity p,
+.admin-user-identity code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-identity p,
+.admin-user-identity code {
+  white-space: nowrap;
+}
+
+.admin-user-stat-grid-detail {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.admin-user-stat-grid-detail article {
+  min-width: 0;
+}
+
+.admin-user-stat-grid-detail strong {
+  font-size: clamp(20px, 2vw, 30px);
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.admin-user-credit-form {
+  border-top: 1px solid rgba(141, 169, 255, 0.18);
+  padding-top: 16px;
+}
+
+.admin-user-credit-form input {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-quick-credit-actions .chip-btn {
+  height: 40px;
+  padding-inline: 14px;
+}
+
+.admin-user-credit-form .generate-cta {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 1120px) {
+  .admin-user-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-user-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-list-item {
+    flex-direction: column;
+  }
+
+  .admin-user-list-side {
+    width: 100%;
+    justify-items: start;
+  }
+
+  .admin-user-stat-grid-detail {
+    grid-template-columns: 1fr;
+  }
+}
