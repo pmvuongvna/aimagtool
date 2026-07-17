@@ -97,6 +97,7 @@ const ADMIN_SECTIONS = [
   { id: "admin-credits", label: "Credits" },
   { id: "admin-imports", label: "Imports" },
   { id: "admin-manual", label: "Manual" },
+  { id: "admin-monitoring", label: "Monitoring" },
   { id: "admin-library", label: "Library" },
 ] as const;
 
@@ -509,6 +510,55 @@ export default function AdminPage() {
 
   return (
     <main className="admin-v2 admin-v3-shell">
+      <div className="admin-shell-grid-v5">
+        <aside className="admin-sidebar-v5">
+          <div className="admin-sidebar-brand">
+            <span className="admin-sidebar-dot" />
+            <div>
+              <strong>Escanor Admin</strong>
+              <span>Control center</span>
+            </div>
+          </div>
+
+          <div className="admin-sidebar-card hero">
+            <small>Live workspace</small>
+            <strong>{formatNumber(totalCreditsAllocated)}</strong>
+            <span>Total credits managed across the platform.</span>
+          </div>
+
+          <nav className="admin-sidebar-nav" aria-label="Admin navigation">
+            {ADMIN_SECTIONS.map((item) => (
+              <a key={item.id} href={"#" + item.id} className="admin-sidebar-link">
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </nav>
+
+          <div className="admin-sidebar-stack">
+            <div className="admin-sidebar-card compact">
+              <small>Accounts</small>
+              <strong>{users.length}</strong>
+              <span>{adminCount} admins / {userCount} users</span>
+            </div>
+            <div className="admin-sidebar-card compact">
+              <small>Templates</small>
+              <strong>{templateSnapshot?.templates.length || 0}</strong>
+              <span>{publishedTemplateCount} published</span>
+            </div>
+            <div className="admin-sidebar-card compact">
+              <small>Import health</small>
+              <strong>{importSuccessRate}%</strong>
+              <span>{successfulImports} successful runs</span>
+            </div>
+            <div className="admin-sidebar-card compact">
+              <small>Default credits</small>
+              <strong>{formatNumber(settings.defaultUserCredits)}</strong>
+              <span>{activePackageCount} active packages</span>
+            </div>
+          </div>
+        </aside>
+
+        <div className="admin-shell-content-v5">
       <header className="admin-shell-header admin-shell-header-v4">
         <div className="admin-command-card admin-command-card-v4">
           <div className="admin-command-top admin-command-top-v4">
@@ -1061,6 +1111,8 @@ export default function AdminPage() {
           </div>
         </section>
       </section>
+        </div>
+      </div>
     </main>
   );
 }
