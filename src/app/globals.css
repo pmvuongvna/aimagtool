@@ -2001,3 +2001,449 @@ a {
     grid-template-columns: 1fr;
   }
 }
+.admin-loading-card {
+  border: 1px solid rgba(141, 169, 255, 0.22);
+  border-radius: 18px;
+  padding: 24px;
+  background: linear-gradient(180deg, rgba(13, 22, 56, 0.96), rgba(11, 19, 48, 0.96));
+}
+
+.admin-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-status-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(141, 169, 255, 0.2);
+  color: #d7e3ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-overview-card {
+  border: 1px solid var(--admin-line);
+  border-radius: 16px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(14, 22, 54, 0.96), rgba(11, 19, 46, 0.96));
+  display: grid;
+  gap: 10px;
+}
+
+.admin-overview-highlight {
+  background:
+    radial-gradient(circle at 100% 0, rgba(160, 84, 255, 0.22), transparent 42%),
+    linear-gradient(180deg, rgba(16, 24, 60, 0.98), rgba(11, 19, 46, 0.98));
+}
+
+.admin-overview-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #a8baed;
+  font-size: 12px;
+}
+
+.admin-overview-top span,
+.admin-overview-top b {
+  color: #a8baed;
+}
+
+.admin-overview-card h3 {
+  margin: 0;
+  font-size: 34px;
+  color: #fff;
+}
+
+.admin-overview-card p {
+  margin: 0;
+  color: #9fb3e8;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.admin-layout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.admin-section-head h2 {
+  margin: 0;
+}
+
+.admin-mini-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-mini-stats span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(141, 169, 255, 0.18);
+  color: #cbd8ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-form-block {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-form-block h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #f4f7ff;
+}
+
+.admin-subgrid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-note-box {
+  border: 1px solid rgba(141, 169, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-note-box strong {
+  color: #fff;
+  font-size: 13px;
+}
+
+.admin-note-box span {
+  color: #9fb3e8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-user-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.admin-user-toolbar input {
+  border-radius: 12px;
+  border: 1px solid rgba(116, 146, 221, 0.4);
+  background: #0b1333;
+  color: #edf3ff;
+  padding: 12px 14px;
+}
+
+.admin-filter-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-filter-pill {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(141, 169, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c7d5ff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-filter-pill.active {
+  border-color: rgba(148, 115, 255, 0.5);
+  background: rgba(126, 87, 255, 0.16);
+  color: #ffffff;
+}
+
+.admin-user-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.admin-user-list {
+  display: grid;
+  gap: 10px;
+  max-height: 620px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.admin-user-list-item {
+  width: 100%;
+  border: 1px solid rgba(141, 169, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.admin-user-list-item.active {
+  border-color: rgba(147, 108, 255, 0.58);
+  background: rgba(126, 87, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(126, 87, 255, 0.12);
+}
+
+.admin-user-list-main {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-user-summary {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-user-summary strong {
+  color: #fff;
+  font-size: 14px;
+}
+
+.admin-user-summary span {
+  color: #aebfe8;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-list-side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.admin-user-list-side b {
+  color: #fff;
+  font-size: 15px;
+}
+
+.admin-user-detail {
+  border: 1px solid rgba(141, 169, 255, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.admin-user-hero {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.admin-user-hero h3 {
+  margin: 0 0 4px;
+  color: #fff;
+  font-size: 22px;
+}
+
+.admin-user-hero p,
+.admin-user-hero code {
+  margin: 0;
+  color: #abc0ef;
+}
+
+.admin-user-hero code {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.admin-user-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(108, 60, 255, 0.28), rgba(97, 139, 255, 0.22));
+  color: #fff;
+  font-weight: 800;
+}
+
+.admin-user-avatar.large {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  font-size: 20px;
+}
+
+.admin-user-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-user-stat-grid article {
+  border: 1px solid rgba(141, 169, 255, 0.18);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+  gap: 6px;
+}
+
+.admin-user-stat-grid small {
+  color: #9fb3e8;
+}
+
+.admin-user-stat-grid strong {
+  color: #fff;
+  font-size: 22px;
+}
+
+.admin-user-credit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-quick-credit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-template-actions .chip-btn,
+.admin-quick-credit-actions .chip-btn {
+  min-width: auto;
+}
+
+.admin-quick-credit-actions .chip-btn.danger {
+  border-color: rgba(255, 113, 113, 0.35);
+  color: #ffb3b3;
+}
+
+.admin-template-card {
+  border: 1px solid rgba(141, 169, 255, 0.18);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-template-thumb {
+  height: 132px;
+  background: linear-gradient(135deg, rgba(108, 60, 255, 0.25), rgba(97, 139, 255, 0.18));
+  background-size: cover;
+  background-position: center;
+}
+
+.admin-template-copy {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-template-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-template-topline strong {
+  color: #fff;
+}
+
+.admin-template-topline span,
+.admin-template-copy p {
+  color: #aebfe8;
+}
+
+.admin-template-copy p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.admin-template-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-template-tags span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(126, 87, 255, 0.14);
+  border: 1px solid rgba(126, 87, 255, 0.24);
+  color: #d6c9ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 1120px) {
+  .admin-overview-grid,
+  .admin-layout-grid,
+  .admin-user-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-user-toolbar,
+  .admin-section-head,
+  .admin-user-hero,
+  .admin-subgrid-two {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .admin-mini-stats,
+  .admin-header-actions,
+  .admin-quick-credit-actions,
+  .admin-filter-pills {
+    justify-content: flex-start;
+  }
+
+  .admin-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-stat-grid {
+    grid-template-columns: 1fr;
+  }
+}
