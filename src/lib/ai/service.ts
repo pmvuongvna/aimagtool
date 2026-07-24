@@ -1,5 +1,5 @@
-import { createTask } from "@/lib/kie";
-import type { AIServiceId, CreateTaskInput } from "./types";
+﻿import { createTask } from "@/lib/kie";
+import type { AIServiceId, CharacterOrientation, CreateTaskInput, KlingMotionMode } from "./types";
 
 type ServiceConfig = {
   model: string;
@@ -15,10 +15,10 @@ function requirePrompt(prompt: string) {
   return normalized;
 }
 
-function requireHttpUrl(inputUrl?: string) {
+function requireHttpUrl(inputUrl?: string, fieldName = "inputUrl") {
   const normalized = inputUrl?.trim();
   if (!normalized || !/^https?:\/\//.test(normalized)) {
-    throw new Error("inputUrl must be a valid http(s) URL.");
+    throw new Error(`${fieldName} must be a valid http(s) URL.`);
   }
   return normalized;
 }
@@ -32,6 +32,14 @@ function mapImageResolution(resolution?: CreateTaskInput["imageResolution"]) {
   if (resolution === "1k") return "1K";
   if (resolution === "2k") return "2K";
   return "4K";
+}
+
+function normalizeKlingMode(mode?: KlingMotionMode) {
+  return mode === "1080p" ? "1080p" : "720p";
+}
+
+function normalizeCharacterOrientation(value?: CharacterOrientation) {
+  return value === "video" ? "video" : "image";
 }
 
 const SERVICES: Record<AIServiceId, ServiceConfig> = {
@@ -97,6 +105,17 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
       duration: normalizeDuration(payload.duration),
       resolution: payload.videoResolution || "480p",
       nsfw_checker: payload.nsfwChecker ?? true,
+    }),
+  },
+  "kling-motion-control": {
+    model: "kling-2.6/motion-control",
+    requiresReferenceImage: true,
+    buildInput: (payload) => ({
+      prompt: requirePrompt(payload.prompt),
+      input_urls: [requireHttpUrl(payload.inputUrl, "inputUrl")],
+      video_urls: [requireHttpUrl(payload.referenceVideoUrl, "referenceVideoUrl")],
+      character_orientation: normalizeCharacterOrientation(payload.characterOrientation),
+      mode: normalizeKlingMode(payload.klingMotionMode),
     }),
   },
 };

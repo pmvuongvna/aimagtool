@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,7 @@ type AdminPayload = {
     imageCredits: { "1k": number; "2k": number; "4k": number };
     videoCredits: { "480p": number; "720p": number };
     grokVideoCreditsPerSecond: { "480p": number; "720p": number };
+    klingMotionCredits: { "720p": number; "1080p": number };
     imageEditExtraCost: number;
     defaultUserCredits: number;
   };
@@ -864,7 +865,7 @@ export default function AdminPage() {
               <div>
                 <p className="admin-kicker">Credit policy</p>
                 <h2>Credit Matrix</h2>
-                <p className="admin-hint">Manage image tiers, Grok per-second pricing, fallback video policy, and package distribution from one structured block.</p>
+                <p className="admin-hint">Manage image tiers, Grok per-second pricing, Kling motion pricing, fallback video policy, and package distribution from one structured block.</p>
               </div>
               <div className="admin-mini-stats">
                 <span>{activePackageCount} active packages</span>
@@ -898,13 +899,21 @@ export default function AdminPage() {
                   <label>Grok 720p (credit/sec)<input type="number" step="0.1" value={settings.grokVideoCreditsPerSecond["720p"]} onChange={(e) => setSettings({ ...settings, grokVideoCreditsPerSecond: { ...settings.grokVideoCreditsPerSecond, "720p": Number(e.target.value) } })} /></label>
                 </div>
               </div>
+
+              <div className="admin-form-block">
+                <h3>Kling motion control</h3>
+                <div className="admin-subgrid admin-subgrid-two">
+                  <label>Kling 720p<input type="number" value={settings.klingMotionCredits["720p"]} onChange={(e) => setSettings({ ...settings, klingMotionCredits: { ...settings.klingMotionCredits, "720p": Number(e.target.value) } })} /></label>
+                  <label>Kling 1080p<input type="number" value={settings.klingMotionCredits["1080p"]} onChange={(e) => setSettings({ ...settings, klingMotionCredits: { ...settings.klingMotionCredits, "1080p": Number(e.target.value) } })} /></label>
+                </div>
+              </div>
             </div>
 
             <div className="admin-subgrid admin-subgrid-two">
               <label>Default User Credits<input type="number" value={settings.defaultUserCredits} onChange={(e) => setSettings({ ...settings, defaultUserCredits: Number(e.target.value) })} /></label>
               <div className="admin-note-box">
                 <strong>Policy note</strong>
-                <span>Video 480p / 720p remain the fallback pool for future Veo-style models. Grok pricing is per-second only.</span>
+                <span>Video 480p / 720p remain the fallback pool for future Veo-style models. Grok uses per-second pricing, while Kling motion control uses fixed 720p / 1080p task pricing.</span>
               </div>
             </div>
 
@@ -1113,4 +1122,7 @@ export default function AdminPage() {
     </main>
   );
 }
+
+
+
 

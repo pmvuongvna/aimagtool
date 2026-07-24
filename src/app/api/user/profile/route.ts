@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
     image1k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "1k" } as CreateTaskInput),
     image2k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "2k" } as CreateTaskInput),
     image4k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "4k" } as CreateTaskInput),
-    video480p: await calculateTaskCost({ serviceId: "grok-text-video", prompt: "x", videoResolution: "480p", duration: 1 } as CreateTaskInput),
-    video720p: await calculateTaskCost({ serviceId: "grok-text-video", prompt: "x", videoResolution: "720p", duration: 1 } as CreateTaskInput),
+    grok480p: await calculateTaskCost({ serviceId: "grok-text-video", prompt: "x", videoResolution: "480p", duration: 1 } as CreateTaskInput),
+    grok720p: await calculateTaskCost({ serviceId: "grok-text-video", prompt: "x", videoResolution: "720p", duration: 1 } as CreateTaskInput),
+    kling720p: await calculateTaskCost({ serviceId: "kling-motion-control", prompt: "x", klingMotionMode: "720p", inputUrl: "https://example.com/a.jpg", referenceVideoUrl: "https://example.com/b.mp4" } as CreateTaskInput),
+    kling1080p: await calculateTaskCost({ serviceId: "kling-motion-control", prompt: "x", klingMotionMode: "1080p", inputUrl: "https://example.com/a.jpg", referenceVideoUrl: "https://example.com/b.mp4" } as CreateTaskInput),
   };
 
   return NextResponse.json({
@@ -28,4 +30,3 @@ export async function GET(request: NextRequest) {
     previewCosts,
   });
 }
-

@@ -1,4 +1,4 @@
-﻿const KIE_BASE_URL = "https://api.kie.ai/api/v1";
+const KIE_BASE_URL = "https://api.kie.ai/api/v1";
 const KIE_UPLOAD_URL = "https://upload.kie.ai/api/v1";
 const KIE_UPLOAD_QUICKSTART_URL = "https://kieai.redpandaai.co/api";
 
@@ -58,7 +58,7 @@ export async function getTaskDetails(taskId: string) {
   });
 }
 
-export async function uploadFileToKie(file: File) {
+export async function uploadFileToKie(file: File, kind: "image" | "video" = "image") {
   const apiKey = getApiKey();
   const endpoints = [
     `${KIE_UPLOAD_QUICKSTART_URL}/file-stream-upload`,
@@ -71,7 +71,7 @@ export async function uploadFileToKie(file: File) {
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("uploadPath", "images");
+      form.append("uploadPath", kind === "video" ? "videos" : "images");
       if (file.name) form.append("fileName", file.name);
 
       const res = await fetch(endpoint, {

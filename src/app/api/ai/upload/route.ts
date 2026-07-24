@@ -35,8 +35,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "file is required." }, { status: 400 });
     }
     const file = fileLike;
+    const kind = String(form.get("kind") || "image").toLowerCase() === "video" ? "video" : "image";
 
-    const payload = (await uploadFileToKie(file)) as Record<string, unknown>;
+    const payload = (await uploadFileToKie(file, kind)) as Record<string, unknown>;
     const url = extractUploadUrl(payload);
     if (!url) {
       return NextResponse.json({ error: "Upload succeeded but no file URL found in response." }, { status: 500 });

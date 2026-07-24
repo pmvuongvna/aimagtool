@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { getCreditSettings, setUserCredits, updateCreditSettings } from "@/lib/credit";
 import { getUserFromRequest } from "@/lib/auth";
 import { getAdminToken } from "@/lib/env";
@@ -27,6 +27,7 @@ type CreditSettingsPayload = {
   imageCredits?: { "1k"?: number; "2k"?: number; "4k"?: number };
   videoCredits?: { "480p"?: number; "720p"?: number };
   grokVideoCreditsPerSecond?: { "480p"?: number; "720p"?: number };
+  klingMotionCredits?: { "720p"?: number; "1080p"?: number };
   imageEditExtraCost?: number;
   defaultUserCredits?: number;
 };
@@ -195,4 +196,6 @@ export async function PUT(request: NextRequest) {
     users: await getAdminUsers(),
   });
 }
+
+
 
