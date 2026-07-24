@@ -22,9 +22,13 @@ function truncate(value: string, max = 120) {
   return `${clean.slice(0, max - 1)}...`;
 }
 
+function isKlingTemplate(item: PromptTemplate) {
+  return item.model.toLowerCase().includes("kling");
+}
+
 function getTemplateCardMeta(item: PromptTemplate) {
   if (item.source === "meigen") return item.model;
-  return [item.aspectRatio, item.model].filter(Boolean).join(" · ");
+  return [item.aspectRatio, item.model].filter(Boolean).join(" Â· ");
 }
 
 export default function TemplatesClient() {
@@ -119,13 +123,14 @@ export default function TemplatesClient() {
           </Link>
 
           <nav className={shellStyles.navMenu}>
-            <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>⌂</span><span className={shellStyles.navText}>Dashboard</span></Link>
-            <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>▧</span><span className={shellStyles.navText}>Image</span></Link>
-            <Link className={shellStyles.navItem} href="/user/video"><span className={shellStyles.navIcon}>▶</span><span className={shellStyles.navText}>Video</span></Link>
-            <Link className={`${shellStyles.navItem} ${shellStyles.activeNav}`} href="/user/templates"><span className={shellStyles.navIcon}>▦</span><span className={shellStyles.navText}>Templates</span></Link>
-            <Link className={shellStyles.navItem} href="/user/history"><span className={shellStyles.navIcon}>↺</span><span className={shellStyles.navText}>History</span></Link>
-            <Link className={shellStyles.navItem} href="/user#styles"><span className={shellStyles.navIcon}>♡</span><span className={shellStyles.navText}>Styles</span></Link>
-            <Link className={shellStyles.navItem} href="/admin"><span className={shellStyles.navIcon}>⚙</span><span className={shellStyles.navText}>Settings</span></Link>
+            <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>D</span><span className={shellStyles.navText}>Dashboard</span></Link>
+            <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>I</span><span className={shellStyles.navText}>Image</span></Link>
+            <Link className={shellStyles.navItem} href="/user/video"><span className={shellStyles.navIcon}>V</span><span className={shellStyles.navText}>Video</span></Link>
+            <Link className={shellStyles.navItem} href="/user/kling"><span className={shellStyles.navIcon}>K</span><span className={shellStyles.navText}>Kling Motion</span></Link>
+            <Link className={`${shellStyles.navItem} ${shellStyles.activeNav}`} href="/user/templates"><span className={shellStyles.navIcon}>T</span><span className={shellStyles.navText}>Templates</span></Link>
+            <Link className={shellStyles.navItem} href="/user/history"><span className={shellStyles.navIcon}>H</span><span className={shellStyles.navText}>History</span></Link>
+            <Link className={shellStyles.navItem} href="/user#styles"><span className={shellStyles.navIcon}>S</span><span className={shellStyles.navText}>Styles</span></Link>
+            <Link className={shellStyles.navItem} href="/admin"><span className={shellStyles.navIcon}>A</span><span className={shellStyles.navText}>Settings</span></Link>
           </nav>
 
           <div className={shellStyles.sidebarSpacer} />
@@ -133,7 +138,7 @@ export default function TemplatesClient() {
           <div className={shellStyles.upgradeCard}>
             <h3>Upgrade Pro</h3>
             <p>Unlock more prompt packs, more models, and a gallery that keeps updating from curated sources.</p>
-            <button type="button">Upgrade now →</button>
+            <button type="button">Upgrade now â†’</button>
           </div>
 
           <div className={shellStyles.planBox}>
@@ -145,13 +150,13 @@ export default function TemplatesClient() {
         <main className={shellStyles.main}>
           <header className={shellStyles.topbar}>
             <div className={shellStyles.search}>
-              <span>🔍</span>
+              <span>ðŸ”</span>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search templates, tags, models..." />
               <div className={shellStyles.shortcut}>Gallery</div>
             </div>
 
             <div className={shellStyles.topActions}>
-              <div className={shellStyles.creditsPill}>⚡ {formatCredits(credits)} Credits</div>
+              <div className={shellStyles.creditsPill}>âš¡ {formatCredits(credits)} Credits</div>
               <div className={shellStyles.userCard}>
                 <div className={shellStyles.avatar} />
                 <div>
@@ -230,7 +235,7 @@ export default function TemplatesClient() {
       {selectedTemplate ? (
         <div className={styles.modalBackdrop} onClick={() => setSelectedTemplate(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <button type="button" className={styles.modalClose} onClick={() => setSelectedTemplate(null)}>✕</button>
+            <button type="button" className={styles.modalClose} onClick={() => setSelectedTemplate(null)}>âœ•</button>
             <div className={styles.modalMedia}>
               <img src={selectedTemplate.thumbnailUrl} alt={selectedTemplate.title} />
             </div>
@@ -246,7 +251,7 @@ export default function TemplatesClient() {
               </div>
               {selectedTemplate.source === "meigen" ? (
                 <p className={styles.modalMetaText}>
-                  Source: MeiGen{selectedTemplate.aspectRatio ? ` · Format ${selectedTemplate.aspectRatio}` : ""}
+                  Source: MeiGen{selectedTemplate.aspectRatio ? ` Â· Format ${selectedTemplate.aspectRatio}` : ""}
                 </p>
               ) : null}
               <p className={styles.modalPrompt}>{selectedTemplate.prompt}</p>
@@ -258,7 +263,7 @@ export default function TemplatesClient() {
               <div className={styles.modalActions}>
                 <button type="button" className={styles.copyBtn} onClick={copyPrompt}>{copied ? "Copied" : "Copy prompt"}</button>
                 <Link
-                  href={selectedTemplate.mediaType === "image" ? `/user?prompt=${encodeURIComponent(selectedTemplate.prompt)}` : `/user/video?prompt=${encodeURIComponent(selectedTemplate.prompt)}`}
+                  href={selectedTemplate.mediaType === "image" ? `/user?prompt=${encodeURIComponent(selectedTemplate.prompt)}` : isKlingTemplate(selectedTemplate) ? `/user/kling?prompt=${encodeURIComponent(selectedTemplate.prompt)}` : `/user/video?prompt=${encodeURIComponent(selectedTemplate.prompt)}`}
                   className={styles.useBtn}
                 >
                   Open generator
@@ -271,3 +276,4 @@ export default function TemplatesClient() {
     </div>
   );
 }
+

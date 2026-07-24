@@ -1,4 +1,4 @@
-﻿
+
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory } from 
 import styles from "../generate.module.css";
 
 type VideoModel = "grok-imagine" | "kling-motion-control";
+type VideoVariant = "grok" | "kling";
 type VideoWorkflow = "text" | "image";
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
 type ProfileResponse = { userId: string; credits: number; previewCosts: { grok480p: number; grok720p: number; kling720p: number; kling1080p: number } };
@@ -17,7 +18,8 @@ type CreditPackage = { id: string; name: string; credits: number; priceVnd: numb
 type VideoDashboardCache = { userId: string; userName: string; credits: number; costPreview: ProfileResponse["previewCosts"] | null; history: HistoryItem[]; packages: CreditPackage[]; templates: PromptTemplate[] };
 type ControlDropdown = "model" | "aspect" | "quality" | "workflow" | null;
 type CardItem = { id: string; title: string; meta: string; thumbUrl: string; videoUrl: string; createdAt: string };
-const CACHE_KEY = "aistudio_video_dashboard_cache_v2";
+const CACHE_KEY = "aistudio_video_dashboard_cache_v3";
+function isKlingTemplate(item: PromptTemplate) { return item.model.toLowerCase().includes("kling"); }
 const videoAspectOptions = ["auto", "2:3", "16:9", "9:16", "4:3", "3:4", "1:1"];
 const durationOptions = [5, 10, 15, 20, 25, 30];
 const videoResolutionOptions: VideoResolution[] = ["480p", "720p"];
@@ -33,16 +35,18 @@ function firstNonEmptyString(values: unknown[]) { for (const item of values) { i
 function extractTaskError(payload: Record<string, unknown>, data: Record<string, unknown>) { const result = data.result as Record<string, unknown> | undefined; const resultJson = data.resultJson as Record<string, unknown> | undefined; return firstNonEmptyString([payload.error, payload.msg, data.fail_reason, data.failReason, data.error, data.error_message, data.errorMessage, result?.error, result?.message, resultJson?.error, resultJson?.message]); }
 function isVideoUrl(url: string) { return /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(url); }
 function truncate(value: string, max = 38) { const clean = value.trim(); return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`; }
-export default function VideoClient({ initialPrompt }: { initialPrompt: string }) {
+export default function VideoClient({ initialPrompt, variant = "grok" }: { initialPrompt: string; variant?: VideoVariant }) {
   const router = useRouter();
   const controlsRef = useRef<HTMLDivElement | null>(null);
+  const isKlingPage = variant === "kling";
+  const pageTitle = isKlingPage ? "Kling Motion" : "AI Video";
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("User");
   const [credits, setCredits] = useState(0);
   const [costPreview, setCostPreview] = useState<ProfileResponse["previewCosts"] | null>(null);
   const [search, setSearch] = useState("");
-  const [prompt, setPrompt] = useState(initialPrompt.trim() || "A cinematic tracking shot with premium lighting, refined motion, and crisp storytelling.");
-  const [videoModel, setVideoModel] = useState<VideoModel>("grok-imagine");
+  const [prompt, setPrompt] = useState(initialPrompt.trim() || (variant === "kling" ? "Elegant fashion portrait, natural human motion, refined body movement, cinematic realism." : "A cinematic tracking shot with premium lighting, refined motion, and crisp storytelling."));
+  const [videoModel, setVideoModel] = useState<VideoModel>(variant === "kling" ? "kling-motion-control" : "grok-imagine");
   const [videoModeType, setVideoModeType] = useState<VideoWorkflow>("text");
   const [referenceUrl, setReferenceUrl] = useState("");
   const [referenceVideoUrl, setReferenceVideoUrl] = useState("");
@@ -55,12 +59,12 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   const [klingMotionMode, setKlingMotionMode] = useState<KlingMotionMode>("720p");
   const [characterOrientation, setCharacterOrientation] = useState<CharacterOrientation>("image");
   const [activeTab, setActiveTab] = useState<"result" | "history">("result");
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(variant === "kling");
   const [openControl, setOpenControl] = useState<ControlDropdown>(null);
   const [templateLibrary, setTemplateLibrary] = useState<PromptTemplate[]>([]);
   const [templateCategory, setTemplateCategory] = useState<TemplateCategory>("All");
   const [taskId, setTaskId] = useState("");
-  const [statusText, setStatusText] = useState("Sẵn sàng tạo video.");
+  const [statusText, setStatusText] = useState(isKlingPage ? "Sẵn sàng tạo Kling motion." : "Sẵn sàng tạo video.");
   const [loading, setLoading] = useState(false);
   const [resultUrl, setResultUrl] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -69,8 +73,8 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   const saveCache = useCallback((next: Partial<VideoDashboardCache>) => { if (typeof window === "undefined") return; try { const raw = window.sessionStorage.getItem(CACHE_KEY); const base: VideoDashboardCache = raw ? (JSON.parse(raw) as VideoDashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [], templates: [] }; window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next })); } catch {} }, []);
   const currentCost = useMemo(() => { if (!costPreview) return null; if (videoModel === "kling-motion-control") return klingMotionMode === "1080p" ? costPreview.kling1080p : costPreview.kling720p; const rate = resolution === "720p" ? costPreview.grok720p : costPreview.grok480p; return Math.round(rate * duration * 10) / 10; }, [costPreview, videoModel, klingMotionMode, resolution, duration]);
   const canGenerate = useMemo(() => { const hasPrompt = prompt.trim().length >= 3; if (!hasPrompt || uploadingImage || uploadingVideo) return false; if (videoModel === "kling-motion-control") return /^https?:\/\//.test(referenceUrl) && /^https?:\/\//.test(referenceVideoUrl); if (videoModeType === "image") return /^https?:\/\//.test(referenceUrl); return true; }, [prompt, uploadingImage, uploadingVideo, videoModel, referenceUrl, referenceVideoUrl, videoModeType]);
-  useEffect(() => { router.prefetch("/user"); }, [router]);
-  useEffect(() => { if (videoModel === "kling-motion-control" || videoModeType === "image") setShowAdvancedSettings(true); }, [videoModel, videoModeType]);
+  useEffect(() => { router.prefetch("/user"); router.prefetch("/user/video"); router.prefetch("/user/kling"); }, [router]);
+  useEffect(() => { if (variant === "kling") { setVideoModel("kling-motion-control"); setShowAdvancedSettings(true); return; } if (videoModel === "kling-motion-control" || videoModeType === "image") setShowAdvancedSettings(true); }, [variant, videoModel, videoModeType]);
   useEffect(() => { function handlePointerDown(event: MouseEvent) { if (!controlsRef.current) return; if (!controlsRef.current.contains(event.target as Node)) setOpenControl(null); } document.addEventListener("mousedown", handlePointerDown); return () => document.removeEventListener("mousedown", handlePointerDown); }, []);
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -84,7 +88,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
           if (cached.costPreview) setCostPreview(cached.costPreview);
           if (Array.isArray(cached.history)) setHistory(cached.history.filter((x) => x.mediaType === "video"));
           if (Array.isArray(cached.packages)) setPackages(cached.packages);
-          if (Array.isArray(cached.templates)) setTemplateLibrary(cached.templates);
+          if (Array.isArray(cached.templates)) setTemplateLibrary(cached.templates.filter((item) => variant === "kling" ? isKlingTemplate(item) : !isKlingTemplate(item)));
         }
       } catch {}
     }
@@ -118,13 +122,14 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
       }
       if (templateRes.ok) {
         const payload = (await templateRes.json()) as { items?: PromptTemplate[] };
-        const nextTemplates = payload.items || [];
+        const allTemplates = payload.items || [];
+        const nextTemplates = allTemplates.filter((item) => variant === "kling" ? isKlingTemplate(item) : !isKlingTemplate(item));
         setTemplateLibrary(nextTemplates);
-        saveCache({ templates: nextTemplates });
+        saveCache({ templates: allTemplates });
       }
     }
     void bootstrap();
-  }, [saveCache]);
+  }, [saveCache, variant]);
   const checkTask = useCallback(async (targetTaskId: string) => {
     const res = await apiFetch(apiPath(`/api/ai/task/${targetTaskId}`));
     const payload = (await res.json()) as Record<string, unknown>;
@@ -207,7 +212,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
   const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
   const progressWidth = Math.max(8, Math.min(100, Math.round((credits / Math.max(credits + (currentCost || 0), 1000)) * 100)));
   const filteredTemplates = useMemo(() => { if (templateCategory === "All") return templateLibrary; return templateLibrary.filter((item) => item.category === templateCategory || item.tags.includes(templateCategory)); }, [templateCategory, templateLibrary]);
-  const applyTemplate = useCallback((item: PromptTemplate) => { setPrompt(item.prompt); if (videoAspectOptions.includes(item.aspectRatio)) setAspectRatio(item.aspectRatio); setVideoModel(item.mediaType === "video" && item.model.toLowerCase().includes("kling") ? "kling-motion-control" : "grok-imagine"); setVideoModeType("text"); setActiveTab("result"); document.getElementById("generator")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);
+  const applyTemplate = useCallback((item: PromptTemplate) => { setPrompt(item.prompt); if (variant !== "kling" && videoAspectOptions.includes(item.aspectRatio)) setAspectRatio(item.aspectRatio); if (variant !== "kling") setVideoModel(item.mediaType === "video" && item.model.toLowerCase().includes("kling") ? "kling-motion-control" : "grok-imagine"); setVideoModeType("text"); setActiveTab("result"); document.getElementById("generator")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [variant]);
   const activePackage = packages[0];
   const modelLabel = videoModel === "kling-motion-control" ? "Kling 2.6" : "Grok Imagine";
   const qualityLabel = videoModel === "kling-motion-control" ? klingMotionMode : resolution;
@@ -221,7 +226,8 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
           <nav className={styles.navMenu}>
             <Link className={styles.navItem} href="/user"><span className={styles.navIcon}>⌂</span><span className={styles.navText}>Dashboard</span></Link>
             <Link className={styles.navItem} href="/user"><span className={styles.navIcon}>▧</span><span className={styles.navText}>Tạo ảnh</span></Link>
-            <a className={`${styles.navItem} ${styles.activeNav}`} href="#generator"><span className={styles.navIcon}>▶</span><span className={styles.navText}>Tạo video</span></a>
+            <Link className={`${styles.navItem} ${!isKlingPage ? styles.activeNav : ""}`} href="/user/video"><span className={styles.navIcon}>▶</span><span className={styles.navText}>Tạo video</span></Link>
+            <Link className={`${styles.navItem} ${isKlingPage ? styles.activeNav : ""}`} href="/user/kling"><span className={styles.navIcon}>◉</span><span className={styles.navText}>Kling Motion</span></Link>
             <Link className={styles.navItem} href="/user/templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></Link>
             <Link className={styles.navItem} href="/user/history"><span className={styles.navIcon}>↺</span><span className={styles.navText}>Lịch sử</span></Link>
             <a className={styles.navItem} href="#styles"><span className={styles.navIcon}>♡</span><span className={styles.navText}>Phong cách</span></a>
@@ -244,7 +250,8 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
           <section className={styles.generator} id="generator">
             <div className={styles.generatorTabs}>
               <Link href="/user" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>✨ AI Image</Link>
-              <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}>🎬 AI Video</button>
+              {!isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}>🎬 AI Video</button> : <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>🎬 AI Video</Link>}
+              {isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}>🎞 Kling Motion</button> : <Link href="/user/kling" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>🎞 Kling Motion</Link>}
             </div>
             <form onSubmit={onGenerate}>
               <div className={styles.promptBox}>
@@ -253,14 +260,14 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
               </div>
               <div className={styles.controlsCompact} ref={controlsRef}>
                 <div className={styles.optionCluster}>
-                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "model" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "model" ? null : "model")}><div className={styles.controlSelectIcon}>▤</div><div><small>Model</small><strong>{modelLabel}</strong></div></button>{openControl === "model" ? <div className={styles.settingMenu}><button type="button" className={`${styles.settingMenuItem} ${videoModel === "grok-imagine" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModel("grok-imagine"); setOpenControl(null); }}>Grok Imagine</button><button type="button" className={`${styles.settingMenuItem} ${videoModel === "kling-motion-control" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModel("kling-motion-control"); setShowAdvancedSettings(true); setOpenControl(null); }}>Kling 2.6 Motion Control</button></div> : null}</div>
+                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "model" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "model" ? null : "model")}><div className={styles.controlSelectIcon}>▤</div><div><small>Model</small><strong>{modelLabel}</strong></div></button>{openControl === "model" ? <div className={styles.settingMenu}><button type="button" className={`${styles.settingMenuItem} ${videoModel === "grok-imagine" ? styles.settingMenuItemActive : ""}`} onClick={() => { if (variant === "kling") { router.push("/user/video"); return; } setVideoModel("grok-imagine"); setOpenControl(null); }}>Grok Imagine</button><button type="button" className={`${styles.settingMenuItem} ${videoModel === "kling-motion-control" ? styles.settingMenuItemActive : ""}`} onClick={() => { if (variant !== "kling") { router.push("/user/kling"); return; } setVideoModel("kling-motion-control"); setShowAdvancedSettings(true); setOpenControl(null); }}>Kling 2.6 Motion Control</button></div> : null}</div>
                   <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "aspect" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}><div className={styles.controlSelectIcon}>▭</div><div><small>{videoModel === "kling-motion-control" ? "Character" : "Tỷ lệ video"}</small><strong>{secondaryLabel}</strong></div></button>{openControl === "aspect" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? characterOrientationOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${characterOrientation === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setCharacterOrientation(value); setOpenControl(null); }}>{value}</button>) : videoAspectOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
                   <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "quality" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "quality" ? null : "quality")}><div className={styles.controlSelectIcon}>⏱</div><div><small>{videoModel === "kling-motion-control" ? "Output mode" : "Độ phân giải"}</small><strong>{qualityLabel}</strong></div></button>{openControl === "quality" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? klingModeOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${klingMotionMode === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setKlingMotionMode(value); setOpenControl(null); }}>{value}</button>) : videoResolutionOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${resolution === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setResolution(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
                   <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "workflow" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "workflow" ? null : "workflow")}><div className={styles.controlSelectIcon}>🖼</div><div><small>{videoModel === "kling-motion-control" ? "Workflow" : "Chế độ tạo"}</small><strong>{workflowLabel}</strong></div></button>{openControl === "workflow" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? <button type="button" className={`${styles.settingMenuItem} ${styles.settingMenuItemActive}`} onClick={() => setOpenControl(null)}>Motion Control</button> : <><button type="button" className={`${styles.settingMenuItem} ${videoModeType === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("text"); setOpenControl(null); }}>Text to Video</button><button type="button" className={`${styles.settingMenuItem} ${videoModeType === "image" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>Image to Video</button></>}</div> : null}</div>
                 </div>
                 <div className={styles.actionCluster}>
                   <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>{showAdvancedSettings ? "Hide advanced" : "Advanced settings"}</button>
-                  <button type="button" className={styles.resetBtn} onClick={() => { setPrompt(""); setReferenceUrl(""); setReferenceVideoUrl(""); setMode("normal"); setAspectRatio("2:3"); setDuration(6); setResolution("480p"); setVideoModeType("text"); setVideoModel("grok-imagine"); setKlingMotionMode("720p"); setCharacterOrientation("image"); }}>Reset</button>
+                  <button type="button" className={styles.resetBtn} onClick={() => { setPrompt(""); setReferenceUrl(""); setReferenceVideoUrl(""); setMode("normal"); setAspectRatio("2:3"); setDuration(6); setResolution("480p"); setVideoModeType("text"); setVideoModel(variant === "kling" ? "kling-motion-control" : "grok-imagine"); setKlingMotionMode("720p"); setCharacterOrientation("image"); }}>Reset</button>
                   <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Generating..." : `Generate • ${formatCredits(currentCost ?? 0)}`}</button>
                 </div>
               </div>
@@ -269,7 +276,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
                   <div className={styles.fieldBlockHeader}><h4>Advanced settings</h4><span className={styles.fieldHint}>Workflow, motion setup, reference assets, và trạng thái render</span></div>
                   <div className={styles.advancedPanelGrid}>
                     <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Model AI</h4><span className={styles.fieldHint}>Pipeline đang dùng</span></div><select value={videoModel} onChange={(e) => setVideoModel(e.target.value as VideoModel)}><option value="grok-imagine">Grok Imagine</option><option value="kling-motion-control">Kling 2.6 Motion Control</option></select></div>
-                    {videoModel === "grok-imagine" ? (
+                    {variant !== "kling" ? (
                       <>
                         <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Video mode</h4><span className={styles.fieldHint}>Tính cách chuyển động</span></div><select value={mode} onChange={(e) => setMode(e.target.value as VideoMode)}>{videoModeOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
                         <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Thời lượng</h4><span className={styles.fieldHint}>Tối đa 30 giây</span></div><select value={String(duration)} onChange={(e) => setDuration(Number(e.target.value))}>{durationOptions.map((value) => <option key={value} value={value}>{value}s</option>)}</select></div>
@@ -305,7 +312,7 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
           </section>
           <section className={styles.quickPromptSection} id="styles">
             <div className={styles.quickPromptPanel}>
-              <div className={styles.quickPromptHeader}><div><h3>Mẫu video nhanh</h3><p>Chọn prompt mẫu và áp vào form video ngay.</p></div><button type="button" className={styles.quickPromptCta} onClick={() => router.push("/user/templates")}>Xem tất cả</button></div>
+              <div className={styles.quickPromptHeader}><div><h3>{isKlingPage ? "Mẫu Kling Motion" : "Mẫu video nhanh"}</h3><p>{isKlingPage ? "Chọn preset Kling Motion rồi đổ thẳng vào workflow motion control." : "Chọn prompt mẫu và áp vào form video ngay."}</p></div><button type="button" className={styles.quickPromptCta} onClick={() => router.push("/user/templates")}>Xem tất cả</button></div>
               <div className={styles.quickPromptBody}>
                 <aside className={styles.quickPromptSidebar}><span>TAGS</span><div className={styles.quickPromptTags}>{TEMPLATE_CATEGORIES.map((category) => <button key={category} type="button" className={`${styles.quickPromptTag} ${templateCategory === category ? styles.quickPromptTagActive : ""}`} onClick={() => setTemplateCategory(category)}>{category}</button>)}</div></aside>
                 <div className={styles.quickPromptGrid}>{filteredTemplates.slice(0, 6).map((item) => <article key={item.id} className={styles.quickPromptCard}><div className={styles.quickPromptThumb} style={{ backgroundImage: `url(${item.thumbnailUrl})` }} /><div className={styles.quickPromptCopy}><strong>{item.title}</strong><span>{item.aspectRatio} · {item.model}</span><p>{item.prompt}</p><button type="button" className={styles.quickPromptUseBtn} onClick={() => applyTemplate(item)}>Dùng prompt</button></div></article>)}</div>
@@ -318,3 +325,4 @@ export default function VideoClient({ initialPrompt }: { initialPrompt: string }
     </div>
   );
 }
+

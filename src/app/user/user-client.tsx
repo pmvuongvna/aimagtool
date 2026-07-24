@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -133,6 +133,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   useEffect(() => {
     router.prefetch("/user/video");
+    router.prefetch("/user/kling");
   }, [router]);
 
   useEffect(() => {
@@ -438,6 +439,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
             <div className={styles.generatorTabs}>
               <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}>✨ AI Image</button>
               <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>🎬 AI Video</Link>
+              <Link href="/user/kling" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>🎞 Kling Motion</Link>
             </div>
 
             <form onSubmit={onGenerate}>
@@ -688,6 +690,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     </div>
   );
 }
+
 
 
 

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -133,6 +133,7 @@ export default function HistoryClient() {
             <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>⌂</span><span className={shellStyles.navText}>Dashboard</span></Link>
             <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>▧</span><span className={shellStyles.navText}>Tạo ảnh</span></Link>
             <Link className={shellStyles.navItem} href="/user/video"><span className={shellStyles.navIcon}>▶</span><span className={shellStyles.navText}>Tạo video</span></Link>
+            <Link className={shellStyles.navItem} href="/user/kling"><span className={shellStyles.navIcon}>◉</span><span className={shellStyles.navText}>Kling Motion</span></Link>
             <Link className={shellStyles.navItem} href="/user/templates"><span className={shellStyles.navIcon}>▦</span><span className={shellStyles.navText}>Mẫu có sẵn</span></Link>
             <Link className={`${shellStyles.navItem} ${shellStyles.activeNav}`} href="/user/history"><span className={shellStyles.navIcon}>↺</span><span className={shellStyles.navText}>Lịch sử</span></Link>
             <Link className={shellStyles.navItem} href="/admin"><span className={shellStyles.navIcon}>⚙</span><span className={shellStyles.navText}>Cài đặt</span></Link>
@@ -244,3 +245,4 @@ export default function HistoryClient() {
     </div>
   );
 }
+
