@@ -28,7 +28,7 @@ function isKlingTemplate(item: PromptTemplate) {
 
 function getTemplateCardMeta(item: PromptTemplate) {
   if (item.source === "meigen") return item.model;
-  return [item.aspectRatio, item.model].filter(Boolean).join(" Â· ");
+  return [item.aspectRatio, item.model].filter(Boolean).join(" - ");
 }
 
 export default function TemplatesClient() {
@@ -138,7 +138,7 @@ export default function TemplatesClient() {
           <div className={shellStyles.upgradeCard}>
             <h3>Upgrade Pro</h3>
             <p>Unlock more prompt packs, more models, and a gallery that keeps updating from curated sources.</p>
-            <button type="button">Upgrade now â†’</button>
+            <button type="button">Upgrade now {"->"}</button>
           </div>
 
           <div className={shellStyles.planBox}>
@@ -150,13 +150,13 @@ export default function TemplatesClient() {
         <main className={shellStyles.main}>
           <header className={shellStyles.topbar}>
             <div className={shellStyles.search}>
-              <span>ðŸ”</span>
+              <span>Search</span>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search templates, tags, models..." />
               <div className={shellStyles.shortcut}>Gallery</div>
             </div>
 
             <div className={shellStyles.topActions}>
-              <div className={shellStyles.creditsPill}>âš¡ {formatCredits(credits)} Credits</div>
+              <div className={shellStyles.creditsPill}>Credits {formatCredits(credits)}</div>
               <div className={shellStyles.userCard}>
                 <div className={shellStyles.avatar} />
                 <div>
@@ -251,7 +251,7 @@ export default function TemplatesClient() {
               </div>
               {selectedTemplate.source === "meigen" ? (
                 <p className={styles.modalMetaText}>
-                  Source: MeiGen{selectedTemplate.aspectRatio ? ` Â· Format ${selectedTemplate.aspectRatio}` : ""}
+                  Source: MeiGen{selectedTemplate.aspectRatio ? ` - Format ${selectedTemplate.aspectRatio}` : ""}
                 </p>
               ) : null}
               <p className={styles.modalPrompt}>{selectedTemplate.prompt}</p>

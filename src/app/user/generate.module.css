@@ -1490,3 +1490,28 @@
     align-items: flex-start;
   }
 }
+
+.klingGenerator {
+  border-color: rgba(87, 214, 201, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(83, 224, 208, 0.14), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(108, 60, 255, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(8, 18, 42, 0.98) 0%, rgba(7, 15, 34, 0.99) 100%);
+}
+
+.klingGeneratorTabs {
+  border-color: rgba(87, 214, 201, 0.18);
+  background: rgba(87, 214, 201, 0.05);
+}
+
+.klingGenerator .generatorTabActive {
+  background: rgba(87, 214, 201, 0.16);
+  color: #d8fffb;
+  border-color: rgba(87, 214, 201, 0.38);
+}
+
+.klingPromptBox {
+  border-color: rgba(87, 214, 201, 0.18);
+  background:
+    linear-gradient(180deg, rgba(8, 15, 31, 0.96), rgba(6, 13, 28, 0.92));
+}
