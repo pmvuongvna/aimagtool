@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -541,24 +541,9 @@ export default function AdminPage() {
 
           <div className="admin-sidebar-stack">
             <div className="admin-sidebar-card compact">
-              <small>Accounts</small>
-              <strong>{users.length}</strong>
-              <span>{adminCount} admins / {userCount} users</span>
-            </div>
-            <div className="admin-sidebar-card compact">
-              <small>Templates</small>
+              <small>Platform summary</small>
               <strong>{templateSnapshot?.templates.length || 0}</strong>
-              <span>{publishedTemplateCount} published</span>
-            </div>
-            <div className="admin-sidebar-card compact">
-              <small>Import health</small>
-              <strong>{importSuccessRate}%</strong>
-              <span>{successfulImports} successful runs</span>
-            </div>
-            <div className="admin-sidebar-card compact">
-              <small>Default credits</small>
-              <strong>{formatNumber(settings.defaultUserCredits)}</strong>
-              <span>{activePackageCount} active packages</span>
+              <span>{users.length} accounts - {importSuccessRate}% import health - {activePackageCount} packages</span>
             </div>
           </div>
         </aside>
@@ -581,8 +566,7 @@ export default function AdminPage() {
 
           <div className="admin-status-row admin-status-row-v4">
             <span className="admin-status-chip">{status}</span>
-            <span className="admin-status-chip">{userCount} users</span>
-            <span className="admin-status-chip">{adminCount} admins</span>
+            <span className="admin-status-chip">{users.length} accounts</span>
             <span className="admin-status-chip">{templateSnapshot?.templates.length || 0} templates</span>
             <span className="admin-status-chip">{activePackageCount} active packages</span>
           </div>
@@ -970,6 +954,24 @@ export default function AdminPage() {
                 <span>{templateSnapshot?.importSettings.importCount ?? 0} / run</span>
               </div>
             </div>
+            <div className="admin-user-summary-strip admin-user-summary-strip-v4">
+              <article>
+                <small>Published templates</small>
+                <strong>{publishedTemplateCount}</strong>
+              </article>
+              <article>
+                <small>MeiGen templates</small>
+                <strong>{meigenTemplateCount}</strong>
+              </article>
+              <article>
+                <small>Manual prompts</small>
+                <strong>{manualTemplateCount}</strong>
+              </article>
+              <article>
+                <small>Latest run</small>
+                <strong>{latestImportRun?.status || "idle"}</strong>
+              </article>
+            </div>
 
             <div className="admin-subgrid admin-subgrid-two">
               <label>Import Count / Run
@@ -1019,6 +1021,24 @@ export default function AdminPage() {
                 <span>{publishedTemplateCount} published</span>
                 <span>{featuredTemplateCount} featured</span>
               </div>
+            </div>
+            <div className="admin-user-summary-strip admin-user-summary-strip-v4">
+              <article>
+                <small>Total templates</small>
+                <strong>{templateSnapshot?.templates.length || 0}</strong>
+              </article>
+              <article>
+                <small>Manual prompts</small>
+                <strong>{manualTemplateCount}</strong>
+              </article>
+              <article>
+                <small>Featured</small>
+                <strong>{featuredTemplateCount}</strong>
+              </article>
+              <article>
+                <small>Source mix</small>
+                <strong>{meigenTemplateCount}/{manualTemplateCount}</strong>
+              </article>
             </div>
 
             <div className="admin-subgrid admin-subgrid-two">
@@ -1122,6 +1142,8 @@ export default function AdminPage() {
     </main>
   );
 }
+
+
 
 
 

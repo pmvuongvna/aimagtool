@@ -4035,3 +4035,127 @@ button.admin-sidebar-link {
     width: 100%;
   }
 }
+
+/* Admin v5 cleanup */
+.admin-ops-rail {
+  display: none !important;
+}
+
+.admin-sidebar-stack {
+  grid-template-columns: 1fr;
+}
+
+.admin-sidebar-card.compact {
+  min-height: 0;
+}
+
+.admin-user-toolbar-v3 {
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+}
+
+.admin-user-summary-strip-v3,
+.admin-user-summary-strip-v4 {
+  gap: 12px;
+}
+
+.admin-user-summary-strip-v3 article,
+.admin-user-summary-strip-v4 article {
+  min-height: 92px;
+  padding: 18px;
+}
+
+.admin-user-layout-v3 {
+  grid-template-columns: minmax(400px, 0.92fr) minmax(0, 1.08fr);
+  align-items: stretch;
+}
+
+.admin-user-list-panel,
+.admin-user-detail-v3 {
+  height: 100%;
+}
+
+.admin-user-list-item-v3 {
+  align-items: center;
+}
+
+.admin-user-list-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-user-summary-list {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-user-summary-list strong,
+.admin-user-summary-list span,
+.admin-user-summary-list code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-list-side-v3 {
+  min-width: 132px;
+}
+
+.admin-user-credit-form-v3 {
+  gap: 16px;
+}
+
+.admin-detail-actions {
+  flex-wrap: wrap;
+}
+
+.admin-detail-actions .generate-cta {
+  flex: 1 1 220px;
+}
+
+.admin-detail-actions .chip-btn {
+  flex: 1 1 180px;
+}
+
+.admin-template-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-template-action-grid .chip-btn {
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .admin-user-toolbar-v3,
+  .admin-user-layout-v3,
+  .admin-template-action-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .admin-user-summary-strip-v3,
+  .admin-user-summary-strip-v4 {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-list-item-v3 {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-user-list-side-v3 {
+    width: 100%;
+    min-width: 0;
+    justify-items: start;
+    text-align: left;
+  }
+}
