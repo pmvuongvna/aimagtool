@@ -1,7 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server";
-import { getCreditSettings, setUserCredits, updateCreditSettings } from "@/lib/credit";
+import { NextRequest, NextResponse } from "next/server";
+import { getCreditSettings, getUserCredits, setUserCredits, updateCreditSettings } from "@/lib/credit";
 import { getUserFromRequest } from "@/lib/auth";
-import { getAdminToken } from "@/lib/env";
+import { getAdminCredentials, getAdminToken } from "@/lib/env";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 
 type AdminUserItem = {
@@ -54,6 +54,7 @@ async function isAdmin(request: NextRequest) {
 async function getAdminUsers(): Promise<AdminUserItem[]> {
   if (!hasDatabase()) return [];
   await ensureSchema();
+  const adminCreds = getAdminCredentials();
   const pool = getPool();
   const result = await pool.query(
     `
@@ -71,7 +72,7 @@ async function getAdminUsers(): Promise<AdminUserItem[]> {
     `,
   );
 
-  return result.rows.map((row) => ({
+  const dbUsers = result.rows.map((row) => ({
     id: String(row.id),
     name: String(row.name),
     email: String(row.email),
@@ -79,6 +80,19 @@ async function getAdminUsers(): Promise<AdminUserItem[]> {
     createdAt: new Date(String(row.created_at)).toISOString(),
     credits: Number(row.credits ?? 0),
   }));
+
+  const adminDbUser = dbUsers.find((user) => user.email.toLowerCase() === adminCreds.email);
+  const nonEnvAdminUsers = dbUsers.filter((user) => user.email.toLowerCase() !== adminCreds.email);
+  const envAdmin: AdminUserItem = {
+    id: "admin-user",
+    name: adminDbUser?.name || "Admin",
+    email: adminCreds.email,
+    role: "admin",
+    createdAt: adminDbUser?.createdAt || new Date(0).toISOString(),
+    credits: await getUserCredits("admin-user"),
+  };
+
+  return [envAdmin, ...nonEnvAdminUsers];
 }
 
 async function setRoleForUsers(userIds: string[], role: "user" | "admin") {
