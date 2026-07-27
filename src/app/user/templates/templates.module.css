@@ -404,3 +404,165 @@
     flex: 1;
   }
 }
+
+/* Mobile polish for the dedicated template gallery. */
+@media (max-width: 920px) {
+  .pageIntro {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .pageIntro h1 {
+    font-size: 26px;
+    color: #f5f7ff;
+  }
+
+  .subtitle {
+    color: #aab6e0;
+    line-height: 1.65;
+  }
+
+  .modeTabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(122, 143, 210, 0.18);
+  }
+
+  .modeTab {
+    color: #aeb8df;
+  }
+
+  .modeTabActive {
+    background: rgba(139, 107, 255, 0.18);
+    color: #efeaff;
+    border-color: rgba(139, 107, 255, 0.34);
+  }
+
+  .galleryShell {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .sidebar {
+    position: static;
+    padding: 12px;
+    border-radius: 18px;
+    background: rgba(13, 20, 48, 0.96);
+    border-color: rgba(122, 143, 210, 0.16);
+  }
+
+  .sidebarTitle {
+    color: #99a7d6;
+  }
+
+  .tagList {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    overflow-x: auto;
+    gap: 8px;
+    scrollbar-width: none;
+  }
+
+  .tagList::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tagBtn {
+    width: auto;
+    min-width: max-content;
+    color: #aeb8df;
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(122, 143, 210, 0.12);
+  }
+
+  .tagBtnActive {
+    background: rgba(139, 107, 255, 0.18);
+    color: #efeaff;
+    border-color: rgba(139, 107, 255, 0.34);
+  }
+
+  .masonry {
+    column-count: 2;
+    column-gap: 12px;
+  }
+
+  .card {
+    margin-bottom: 12px;
+    border-radius: 18px;
+    background: rgba(13, 20, 48, 0.96);
+    box-shadow: none;
+  }
+
+  .cardOverlay {
+    padding: 14px;
+  }
+
+  .cardOverlay strong {
+    font-size: 15px;
+  }
+
+  .cardOverlay p {
+    display: none;
+  }
+
+  .modalBackdrop {
+    padding: 12px;
+    align-items: flex-end;
+  }
+
+  .modal {
+    width: 100%;
+    height: auto;
+    max-height: 92vh;
+    flex-direction: column;
+    border-radius: 24px 24px 18px 18px;
+    background: #0d1430;
+  }
+
+  .modalMedia {
+    min-height: 300px;
+    max-height: 48vh;
+    background: #070c20;
+  }
+
+  .modalBody {
+    min-width: 0;
+    padding: 20px;
+    color: #f5f7ff;
+  }
+
+  .modalBody h2 {
+    font-size: 23px;
+    color: #f5f7ff;
+  }
+
+  .modalPrompt,
+  .modalMetaText {
+    color: #c2cae8;
+  }
+
+  .modalActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  .pageIntro h1 {
+    font-size: 24px;
+  }
+
+  .masonry {
+    column-count: 1;
+  }
+
+  .modalActions {
+    grid-template-columns: 1fr;
+  }
+}

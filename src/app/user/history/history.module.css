@@ -183,3 +183,83 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Mobile polish for 7-day history gallery. */
+@media (max-width: 920px) {
+  .intro {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .intro h1 {
+    font-size: 26px;
+  }
+
+  .filterTabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .filterTab {
+    width: 100%;
+    padding: 0 10px;
+  }
+
+  .statsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .historyGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .historyCard {
+    border-radius: 18px;
+    box-shadow: none;
+  }
+
+  .historyThumb {
+    aspect-ratio: 1 / 1;
+  }
+
+  .historyBody {
+    padding: 11px;
+  }
+
+  .historyBody strong {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .historyMeta {
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 520px) {
+  .intro h1 {
+    font-size: 24px;
+  }
+
+  .filterTabs,
+  .statsRow,
+  .historyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .filterTab {
+    height: 40px;
+  }
+
+  .historyThumb {
+    aspect-ratio: 16 / 10;
+  }
+}

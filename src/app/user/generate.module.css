@@ -1515,3 +1515,461 @@
   background:
     linear-gradient(180deg, rgba(8, 15, 31, 0.96), rgba(6, 13, 28, 0.92));
 }
+
+/* Mobile responsive polish: keep desktop intact, make user workspace feel native on phones. */
+@media (max-width: 920px) {
+  .page {
+    background:
+      radial-gradient(circle at 18% 0%, rgba(139, 107, 255, 0.22), transparent 30%),
+      linear-gradient(180deg, #08112b 0%, #050916 100%);
+  }
+
+  .appShell {
+    display: block;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 45;
+    height: auto;
+    padding: 12px 14px;
+    gap: 12px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(122, 143, 210, 0.18);
+    background: rgba(7, 12, 30, 0.94);
+    backdrop-filter: blur(18px);
+  }
+
+  .logoLink {
+    font-size: 20px;
+    justify-content: space-between;
+  }
+
+  .logoMark {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .navMenu {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .navMenu::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navItem {
+    height: 40px;
+    min-width: max-content;
+    padding: 0 12px;
+    border-radius: 12px;
+    justify-content: flex-start;
+    gap: 8px;
+    color: #aeb8df;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(122, 143, 210, 0.1);
+  }
+
+  .navText,
+  .logoText {
+    display: inline;
+  }
+
+  .sidebarSpacer,
+  .upgradeCard,
+  .planBox {
+    display: none;
+  }
+
+  .main {
+    padding: 16px 12px 28px;
+    overflow: visible;
+  }
+
+  .topbar {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .search {
+    order: 2;
+    height: 46px;
+    min-width: 100%;
+    border-radius: 14px;
+    box-shadow: none;
+  }
+
+  .shortcut,
+  .userCard span,
+  .iconBtn {
+    display: none;
+  }
+
+  .topActions {
+    order: 1;
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+    margin-left: 0;
+  }
+
+  .creditsPill {
+    height: 42px;
+    padding: 0 12px;
+    border-radius: 13px;
+    font-size: 13px;
+  }
+
+  .userCard {
+    min-width: 0;
+    max-width: 48%;
+    padding: 5px 9px 5px 5px;
+    border-radius: 14px;
+  }
+
+  .userCard strong {
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+  }
+
+  .generator,
+  .panel,
+  .statCard,
+  .advancedPanel,
+  .loadingBox,
+  .emptyState {
+    border-radius: 20px;
+  }
+
+  .generator {
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+
+  .generatorTabs {
+    width: 100%;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    overflow-x: auto;
+    margin-bottom: 14px;
+  }
+
+  .generatorTab,
+  .generatorTabLink {
+    width: 100%;
+  }
+
+  .promptBox {
+    min-height: 150px;
+    padding: 14px;
+    border-radius: 18px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .promptBox textarea {
+    min-height: 112px;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .promptSide {
+    width: 100%;
+    min-width: 0;
+    flex-direction: row-reverse;
+    align-items: center;
+  }
+
+  .magicBtn {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+
+  .controls,
+  .controlsCompact,
+  .optionCluster {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .settingButton,
+  .controlCard,
+  .actionCard,
+  .controlSelectCard {
+    min-height: 60px;
+    border-radius: 16px;
+    padding: 10px 13px;
+  }
+
+  .settingButton strong {
+    font-size: 16px;
+  }
+
+  .settingMenu {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: auto;
+    bottom: 14px;
+    max-height: 58vh;
+    overflow: auto;
+    border-radius: 20px;
+    z-index: 80;
+  }
+
+  .actionCluster,
+  .generatorActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .advancedToggle,
+  .resetBtn,
+  .generateBtn,
+  .secondaryBtn,
+  .downloadBtn,
+  .viewBtn,
+  .miniBtn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .statusBar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .advancedGrid,
+  .advancedPanelGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .advancedPanelWide {
+    grid-column: auto;
+  }
+
+  .modelOption {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .modelOption img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .statCard {
+    padding: 14px;
+    gap: 10px;
+    box-shadow: none;
+  }
+
+  .statIcon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    font-size: 18px;
+  }
+
+  .statCard h3 {
+    font-size: 22px;
+  }
+
+  .statUp,
+  .progressTrack {
+    display: none;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .panelHead {
+    align-items: flex-start;
+  }
+
+  .panelHead h2 {
+    font-size: 20px;
+  }
+
+  .segmentTabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .segmentTab {
+    width: 100%;
+  }
+
+  .creationGrid,
+  .creationGridCompact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .creationThumb {
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+  }
+
+  .creationMeta {
+    padding: 11px;
+  }
+
+  .creationMeta strong {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .creationMeta span {
+    font-size: 11px;
+  }
+
+  .templateLibrary {
+    grid-template-columns: 1fr;
+  }
+
+  .templateSidebar {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  .templateCategoryList {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .templateCategoryList::-webkit-scrollbar {
+    display: none;
+  }
+
+  .templateCategoryBtn {
+    width: auto;
+    min-width: max-content;
+    padding: 9px 12px;
+  }
+
+  .templates {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .templateImg {
+    height: 126px;
+  }
+
+  .templateBody {
+    padding: 11px;
+  }
+
+  .templatePrompt {
+    display: none;
+  }
+
+  .lightbox {
+    padding: 12px;
+  }
+
+  .lightboxMedia {
+    width: 100%;
+    max-height: 82vh;
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  .main {
+    padding: 12px 10px 24px;
+  }
+
+  .sidebar {
+    padding: 10px;
+  }
+
+  .logoText {
+    font-size: 18px;
+  }
+
+  .navItem {
+    height: 38px;
+    font-size: 13px;
+  }
+
+  .generator,
+  .panel {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .generatorTab {
+    height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .statsGrid,
+  .creationGrid,
+  .creationGridCompact,
+  .templates {
+    grid-template-columns: 1fr;
+  }
+
+  .statCard {
+    min-height: 82px;
+  }
+
+  .creationThumb {
+    aspect-ratio: 16 / 10;
+  }
+
+  .creationThumbContain {
+    aspect-ratio: 1 / 1;
+  }
+
+  .panelHead {
+    gap: 10px;
+  }
+
+  .panelHead h2 {
+    font-size: 18px;
+  }
+
+  .fieldBlock {
+    padding: 13px;
+    border-radius: 16px;
+  }
+
+  .choiceBtn {
+    flex: 1 1 calc(50% - 8px);
+  }
+}
