@@ -4159,3 +4159,357 @@ button.admin-sidebar-link {
     text-align: left;
   }
 }
+
+/* Admin users polish */
+.admin-user-console-card {
+  padding: 20px;
+  gap: 14px;
+}
+
+.admin-user-console-card .admin-panel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(123, 140, 255, 0.1);
+}
+
+.admin-user-console-card .admin-panel-head h2 {
+  font-size: clamp(24px, 1.7vw, 30px);
+}
+
+.admin-user-console-card .admin-hint {
+  max-width: 720px;
+}
+
+.admin-user-toolbar-v3 .admin-user-toolbar-search,
+.admin-user-toolbar-v3 .admin-user-toolbar-actions,
+.admin-bulk-console,
+.admin-user-list-panel,
+.admin-user-detail-v3,
+.admin-user-credit-form-v3,
+.admin-insight-card.compact {
+  border-color: rgba(133, 153, 255, 0.1);
+  background: rgba(7, 12, 30, 0.44);
+  box-shadow: none;
+}
+
+.admin-user-toolbar-v3 {
+  gap: 10px;
+}
+
+.admin-user-toolbar-v3 .admin-user-toolbar-search,
+.admin-user-toolbar-v3 .admin-user-toolbar-actions {
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.admin-user-summary-strip-v3 {
+  gap: 10px;
+}
+
+.admin-user-summary-strip-v3 article {
+  min-height: 76px;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.admin-user-summary-strip-v3 small,
+.admin-user-stat-grid-v3 small {
+  color: #91a4d9;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.admin-user-summary-strip-v3 strong {
+  font-size: 26px;
+}
+
+.admin-bulk-console {
+  grid-template-columns: minmax(180px, 0.3fr) minmax(0, 1fr);
+  gap: 14px;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.admin-bulk-copy strong {
+  font-size: 17px;
+}
+
+.admin-bulk-copy span {
+  font-size: 13px;
+}
+
+.admin-bulk-actions {
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+  gap: 8px;
+}
+
+.admin-bulk-actions .chip-btn,
+.admin-quick-credit-actions-v3 .chip-btn,
+.admin-detail-actions .chip-btn,
+.admin-pagination .chip-btn {
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+
+.admin-user-layout-v3 {
+  grid-template-columns: minmax(340px, 0.88fr) minmax(0, 1.12fr);
+  gap: 14px;
+}
+
+.admin-user-list-panel,
+.admin-user-detail-v3 {
+  border-radius: 18px;
+}
+
+.admin-user-list-panel {
+  padding: 14px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+}
+
+.admin-user-list-head {
+  margin-bottom: 0;
+}
+
+.admin-user-list-head strong,
+.admin-insight-head strong {
+  font-size: 16px;
+}
+
+.admin-status-chip.muted {
+  border-color: rgba(148, 163, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-user-list-v3 {
+  align-content: start;
+  gap: 8px;
+}
+
+.admin-user-row {
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.admin-user-check {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  align-self: center;
+  color: transparent;
+  position: relative;
+}
+
+.admin-user-check.active::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.admin-user-list-item-v3 {
+  min-height: 88px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(16, 26, 62, 0.54);
+}
+
+.admin-user-row.active .admin-user-list-item-v3,
+.admin-user-list-item-v3.active {
+  border-color: rgba(157, 124, 255, 0.54);
+  background:
+    linear-gradient(90deg, rgba(91, 66, 173, 0.34), rgba(21, 30, 73, 0.74)),
+    rgba(16, 26, 62, 0.78);
+  box-shadow: inset 3px 0 0 rgba(158, 124, 255, 0.75);
+}
+
+.admin-user-list-main {
+  gap: 12px;
+}
+
+.admin-user-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #313a8d, #242a68);
+  box-shadow: none;
+}
+
+.admin-user-avatar.large {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  font-size: 20px;
+}
+
+.admin-user-summary-list strong {
+  font-size: 15px;
+}
+
+.admin-user-summary-list span,
+.admin-user-summary-list code {
+  font-size: 12px;
+}
+
+.admin-user-list-side-v3 {
+  min-width: 104px;
+  gap: 5px;
+}
+
+.admin-user-list-side-v3 b {
+  font-size: 18px;
+}
+
+.admin-role {
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+.admin-user-detail-v3 {
+  padding: 20px;
+  gap: 14px;
+}
+
+.admin-user-hero-v3 {
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 14px;
+}
+
+.admin-user-identity h3 {
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.admin-user-identity p {
+  margin-top: 4px;
+  color: #aab9e8;
+}
+
+.admin-user-identity code {
+  color: #899bd0;
+  font-size: 13px;
+}
+
+.admin-user-stat-grid-v3 {
+  gap: 10px;
+}
+
+.admin-user-stat-grid-v3 article {
+  min-height: 86px;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.admin-user-stat-grid-v3 strong {
+  font-size: 22px;
+  line-height: 1.12;
+}
+
+.admin-user-credit-form-v3 {
+  border-radius: 16px;
+  padding: 14px;
+  gap: 12px;
+}
+
+.admin-user-form-grid {
+  gap: 10px;
+}
+
+.admin-user-form-grid input {
+  min-height: 40px;
+}
+
+.admin-quick-credit-actions-v3,
+.admin-detail-actions {
+  gap: 8px;
+}
+
+.admin-detail-actions .generate-cta {
+  min-height: 48px;
+  border-radius: 12px;
+  font-size: 15px;
+  box-shadow: 0 12px 26px rgba(115, 71, 255, 0.26);
+}
+
+.admin-insight-card.compact {
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.admin-recent-list {
+  gap: 8px;
+}
+
+.admin-recent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.admin-recent-row div {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.admin-recent-row b,
+.admin-recent-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-recent-row b {
+  max-width: 140px;
+}
+
+.admin-recent-row span {
+  max-width: 260px;
+}
+
+.admin-pagination {
+  padding-top: 6px;
+}
+
+@media (max-width: 1180px) {
+  .admin-bulk-console,
+  .admin-user-layout-v3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .admin-user-console-card .admin-panel-head,
+  .admin-recent-row,
+  .admin-recent-row div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-user-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .admin-user-list-item-v3 {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-recent-row div {
+  gap: 6px;
+}
