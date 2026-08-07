@@ -217,11 +217,12 @@ export async function calculateTaskCost(input: CreateTaskInput) {
     input.serviceId === "gpt-image-2-text" ||
     input.serviceId === "gpt-image-2-image" ||
     input.serviceId === "seedream-5-lite-text" ||
-    input.serviceId === "seedream-5-lite-image"
+    input.serviceId === "seedream-5-lite-image" ||
+    input.serviceId === "qwen3-pro-image"
   ) {
     const quality = input.imageResolution || "1k";
     const base = settings.imageCredits[quality];
-    return input.serviceId === "gpt-image-2-image" || input.serviceId === "seedream-5-lite-image" ? base + settings.imageEditExtraCost : base;
+    return input.serviceId === "gpt-image-2-image" || input.serviceId === "seedream-5-lite-image" || input.serviceId === "qwen3-pro-image" ? base + settings.imageEditExtraCost : base;
   }
   if (input.serviceId === "grok-text-video" || input.serviceId === "grok-image-video") {
     const quality = input.videoResolution || "480p";

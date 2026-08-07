@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { calculateTaskCost, getCreditSettings, getUserCredits } from "@/lib/credit";
 import type { CreateTaskInput } from "@/lib/ai/types";
 import { getUserFromRequest, sanitizeUser } from "@/lib/auth";
@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
     image1k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "1k" } as CreateTaskInput),
     image2k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "2k" } as CreateTaskInput),
     image4k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "4k" } as CreateTaskInput),
+    imageEdit1k: await calculateTaskCost({ serviceId: "qwen3-pro-image", prompt: "x", imageResolution: "1k", inputUrl: "https://example.com/a.jpg" } as CreateTaskInput),
+    imageEdit2k: await calculateTaskCost({ serviceId: "qwen3-pro-image", prompt: "x", imageResolution: "2k", inputUrl: "https://example.com/a.jpg" } as CreateTaskInput),
+    imageEdit4k: await calculateTaskCost({ serviceId: "qwen3-pro-image", prompt: "x", imageResolution: "4k", inputUrl: "https://example.com/a.jpg" } as CreateTaskInput),
     grok480p: await calculateTaskCost({ serviceId: "grok-text-video", prompt: "x", videoResolution: "480p", duration: 1 } as CreateTaskInput),
     grok720p: await calculateTaskCost({ serviceId: "grok-text-video", prompt: "x", videoResolution: "720p", duration: 1 } as CreateTaskInput),
     kling720p: await calculateTaskCost({ serviceId: "kling-motion-control", prompt: "x", klingMotionMode: "720p", inputUrl: "https://example.com/a.jpg", referenceVideoUrl: "https://example.com/b.mp4" } as CreateTaskInput),

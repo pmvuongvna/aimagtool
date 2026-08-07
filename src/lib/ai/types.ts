@@ -1,8 +1,9 @@
-﻿export type AIServiceId =
+export type AIServiceId =
   | "gpt-image-2-text"
   | "gpt-image-2-image"
   | "seedream-5-lite-text"
   | "seedream-5-lite-image"
+  | "qwen3-pro-image"
   | "grok-text-video"
   | "grok-image-video"
   | "kling-motion-control";

@@ -861,9 +861,9 @@ export default function AdminPage() {
               <div className="admin-form-block">
                 <h3>Image generation</h3>
                 <div className="admin-subgrid">
-                  <label>Image 1K / Seedream Basic 2K<input type="number" value={settings.imageCredits["1k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "1k": Number(e.target.value) } })} /></label>
-                  <label>Image 2K / Seedream High 3K<input type="number" value={settings.imageCredits["2k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "2k": Number(e.target.value) } })} /></label>
-                  <label>Image 4K / Seedream Ultra 4K<input type="number" value={settings.imageCredits["4k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "4k": Number(e.target.value) } })} /></label>
+                  <label>Image 1K / Seedream Basic 2K / Qwen 1K<input type="number" value={settings.imageCredits["1k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "1k": Number(e.target.value) } })} /></label>
+                  <label>Image 2K / Seedream High 3K / Qwen 2K<input type="number" value={settings.imageCredits["2k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "2k": Number(e.target.value) } })} /></label>
+                  <label>Image 4K / Seedream Ultra 4K / Qwen 4K<input type="number" value={settings.imageCredits["4k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "4k": Number(e.target.value) } })} /></label>
                 </div>
               </div>
 

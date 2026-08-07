@@ -88,6 +88,16 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
       quality: mapSeedreamQuality(payload.imageResolution),
     }),
   },
+  "qwen3-pro-image": {
+    model: "qwen3/pro-image-to-image",
+    requiresReferenceImage: true,
+    buildInput: (payload) => ({
+      prompt: requirePrompt(payload.prompt),
+      image_urls: [requireHttpUrl(payload.inputUrl)],
+      aspect_ratio: payload.aspectRatio || "1:1",
+      resolution: mapImageResolution(payload.imageResolution),
+    }),
+  },
   "grok-text-video": {
     model: "grok-imagine/text-to-video",
     requiresReferenceImage: false,

@@ -9,7 +9,7 @@ import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory } from 
 import styles from "./generate.module.css";
 
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
-type ProfileResponse = { userId: string; credits: number; previewCosts: { image1k: number; image2k: number; image4k: number } };
+type ProfileResponse = { userId: string; credits: number; previewCosts: { image1k: number; image2k: number; image4k: number; imageEdit1k: number; imageEdit2k: number; imageEdit4k: number } };
 type HistoryItem = { id: string; mediaType: "image" | "video"; urls: string[]; prompt: string; createdAt: string };
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string };
 type DashboardCache = {
@@ -87,7 +87,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   const [prompt, setPrompt] = useState(initialPrompt.trim() || "Cô gái đứng trên đỉnh núi, ánh hoàng hôn vàng cam, siêu thực, cinematic.");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [imageModel, setImageModel] = useState<"gpt" | "seedream">("gpt");
+  const [imageModel, setImageModel] = useState<"gpt" | "seedream" | "qwen3">("gpt");
   const [generationMode, setGenerationMode] = useState<"text" | "image">("text");
   const [referenceUrl, setReferenceUrl] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -121,9 +121,11 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, []);
 
   const currentCost = useMemo(() => {
-    const single = imageResolution === "4k" ? costPreview?.image4k : imageResolution === "2k" ? costPreview?.image2k : costPreview?.image1k;
+    const single = imageModel === "qwen3"
+      ? (imageResolution === "4k" ? costPreview?.imageEdit4k : imageResolution === "2k" ? costPreview?.imageEdit2k : costPreview?.imageEdit1k)
+      : (imageResolution === "4k" ? costPreview?.image4k : imageResolution === "2k" ? costPreview?.image2k : costPreview?.image1k);
     return single ? single * quantity : null;
-  }, [costPreview, imageResolution, quantity]);
+  }, [costPreview, imageModel, imageResolution, quantity]);
 
   const canGenerate = prompt.trim().length >= 3 && (generationMode === "text" || /^https?:\/\//.test(referenceUrl)) && !uploading;
 
@@ -270,7 +272,9 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
       serviceId: (
         imageModel === "gpt"
           ? (generationMode === "text" ? "gpt-image-2-text" : "gpt-image-2-image")
-          : (generationMode === "text" ? "seedream-5-lite-text" : "seedream-5-lite-image")
+          : imageModel === "seedream"
+            ? (generationMode === "text" ? "seedream-5-lite-text" : "seedream-5-lite-image")
+            : "qwen3-pro-image"
       ) as AIServiceId,
       prompt: `${prompt}${negativePrompt.trim() ? `\nNegative prompt: ${negativePrompt.trim()}` : ""}${activeStyle !== "Khong chon" ? `\nStyle: ${activeStyle}` : ""}`,
       aspectRatio,
@@ -341,7 +345,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const recentResultCards: CardItem[] = resultUrls.map((url, index) => ({
     id: `${url}-${index}`,
     title: truncate(prompt),
-    meta: `${imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"} · ${imageResolution.toUpperCase()} · ${aspectRatio}`,
+    meta: `${imageModel === "gpt" ? "GPT Image 2" : imageModel === "seedream" ? "Seedream 5 Lite" : "Qwen3 Pro"} · ${imageResolution.toUpperCase()} · ${aspectRatio}`,
     thumbUrl: url,
     urls: resultUrls,
     createdAt: new Date().toISOString(),
@@ -504,7 +508,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     <div className={styles.controlSelectIcon}>▤</div>
                     <div>
                       <small>Model</small>
-                      <strong>{imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"}</strong>
+                      <strong>{imageModel === "gpt" ? "GPT Image 2" : imageModel === "seedream" ? "Seedream 5 Lite" : "Qwen3 Pro"}</strong>
                     </div>
                   </button>
                   {openControl === "model" ? (
@@ -514,6 +518,9 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       </button>
                       <button type="button" className={`${styles.settingMenuItem} ${imageModel === "seedream" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("seedream"); setOpenControl(null); }}>
                         Seedream 5 Lite
+                      </button>
+                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "qwen3" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("qwen3"); setGenerationMode("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>
+                        Qwen3 Pro
                       </button>
                     </div>
                   ) : null}
@@ -533,7 +540,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                   </button>
                   {openControl === "mode" ? (
                     <div className={styles.settingMenu}>
-                      <button type="button" className={`${styles.settingMenuItem} ${generationMode === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { setGenerationMode("text"); setOpenControl(null); }}>
+                      <button type="button" className={`${styles.settingMenuItem} ${generationMode === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { if (imageModel !== "qwen3") setGenerationMode("text"); setOpenControl(null); }}>
                         Text to Image
                       </button>
                       <button type="button" className={`${styles.settingMenuItem} ${generationMode === "image" ? styles.settingMenuItemActive : ""}`} onClick={() => { setGenerationMode("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>
@@ -585,7 +592,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     </div>
 
                     <div className={styles.fieldBlock}>
-                      <div className={styles.fieldBlockHeader}><h4>Độ phân giải</h4><span className={styles.fieldHint}>{imageModel === "gpt" ? "1K / 2K / 4K" : "Basic 2K / High 3K / Ultra 4K"}</span></div>
+                      <div className={styles.fieldBlockHeader}><h4>Độ phân giải</h4><span className={styles.fieldHint}>{imageModel === "qwen3" ? "1K / 2K / 4K" : imageModel === "gpt" ? "1K / 2K / 4K" : "Basic 2K / High 3K / Ultra 4K"}</span></div>
                       <select value={imageResolution} onChange={(e) => setImageResolution(e.target.value as ImageResolution)}>
                         {resolutionOptions.map((value) => <option key={value} value={value}>{imageModel === "seedream" ? (value === "1k" ? "Basic (2K)" : value === "2k" ? "High (3K)" : "Ultra (4K)") : value.toUpperCase()}</option>)}
                       </select>
@@ -594,7 +601,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     <div className={styles.fieldBlock}>
                       <div className={styles.fieldBlockHeader}><h4>Workflow</h4><span className={styles.fieldHint}>{generationMode === "image" ? "Đang bật ảnh tham chiếu" : "Prompt thuần"}</span></div>
                       <select value={generationMode} onChange={(e) => setGenerationMode(e.target.value as "text" | "image")}>
-                        <option value="text">Text to Image</option>
+                        <option value="text" disabled={imageModel === "qwen3"}>Text to Image</option>
                         <option value="image">Image to Image</option>
                       </select>
                     </div>
@@ -619,7 +626,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt</span></div>
                       <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
                       <div style={{ marginTop: 10 }} className={styles.subtleNote}>
-                        {imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
+                        {imageModel === "qwen3" ? "Qwen3 Pro dùng ảnh tham chiếu, hỗ trợ 1K / 2K / 4K theo Kie.ai." : imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
                       </div>
                     </div>
                   </div>
@@ -635,7 +642,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
           <section className={styles.statsGrid}>
             <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statPurple}`}>🖼</div><div><small>Ảnh đã tạo</small><h3>{createdImageCount.toLocaleString("vi-VN")}</h3></div><div className={styles.statUp}>↑ 18%</div></article>
-            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statBlue}`}>✨</div><div><small>Model đang dùng</small><h3>{imageModel === "gpt" ? "GPT" : "Lite"}</h3></div><div className={styles.statUp}>↑ 9%</div></article>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statBlue}`}>✨</div><div><small>Model đang dùng</small><h3>{imageModel === "gpt" ? "GPT" : imageModel === "seedream" ? "Lite" : "Qwen3"}</h3></div><div className={styles.statUp}>↑ 9%</div></article>
             <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statOrange}`}>⚡</div><div><small>Credits còn lại</small><h3>{formatCredits(credits)}</h3><div className={styles.progressTrack}><span style={{ width: `${progressWidth}%` }} /></div></div></article>
             <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statGreen}`}>📁</div><div><small>Dự án đã lưu</small><h3>{projectCount.toLocaleString("vi-VN")}</h3></div><div className={styles.statUp}>↑ 6%</div></article>
           </section>
