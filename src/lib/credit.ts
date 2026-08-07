@@ -218,7 +218,8 @@ export async function calculateTaskCost(input: CreateTaskInput) {
     input.serviceId === "gpt-image-2-image" ||
     input.serviceId === "seedream-5-lite-text" ||
     input.serviceId === "seedream-5-lite-image" ||
-    input.serviceId === "qwen3-pro-image"
+    input.serviceId === "qwen3-pro-image" ||
+    input.serviceId === "qwen3-pro-text"
   ) {
     const quality = input.imageResolution || "1k";
     const base = settings.imageCredits[quality];

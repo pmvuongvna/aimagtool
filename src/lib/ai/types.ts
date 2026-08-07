@@ -4,6 +4,7 @@ export type AIServiceId =
   | "seedream-5-lite-text"
   | "seedream-5-lite-image"
   | "qwen3-pro-image"
+  | "qwen3-pro-text"
   | "grok-text-video"
   | "grok-image-video"
   | "kling-motion-control";

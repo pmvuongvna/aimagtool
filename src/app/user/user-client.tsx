@@ -121,11 +121,11 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, []);
 
   const currentCost = useMemo(() => {
-    const single = imageModel === "qwen3"
+    const single = imageModel === "qwen3" && generationMode === "image"
       ? (imageResolution === "4k" ? costPreview?.imageEdit4k : imageResolution === "2k" ? costPreview?.imageEdit2k : costPreview?.imageEdit1k)
       : (imageResolution === "4k" ? costPreview?.image4k : imageResolution === "2k" ? costPreview?.image2k : costPreview?.image1k);
     return single ? single * quantity : null;
-  }, [costPreview, imageModel, imageResolution, quantity]);
+  }, [costPreview, generationMode, imageModel, imageResolution, quantity]);
 
   const canGenerate = prompt.trim().length >= 3 && (generationMode === "text" || /^https?:\/\//.test(referenceUrl)) && !uploading;
 
@@ -274,7 +274,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           ? (generationMode === "text" ? "gpt-image-2-text" : "gpt-image-2-image")
           : imageModel === "seedream"
             ? (generationMode === "text" ? "seedream-5-lite-text" : "seedream-5-lite-image")
-            : "qwen3-pro-image"
+            : (generationMode === "text" ? "qwen3-pro-text" : "qwen3-pro-image")
       ) as AIServiceId,
       prompt: `${prompt}${negativePrompt.trim() ? `\nNegative prompt: ${negativePrompt.trim()}` : ""}${activeStyle !== "Khong chon" ? `\nStyle: ${activeStyle}` : ""}`,
       aspectRatio,
@@ -519,7 +519,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       <button type="button" className={`${styles.settingMenuItem} ${imageModel === "seedream" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("seedream"); setOpenControl(null); }}>
                         Seedream 5 Lite
                       </button>
-                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "qwen3" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("qwen3"); setGenerationMode("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>
+                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "qwen3" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("qwen3"); setShowAdvancedSettings(true); setOpenControl(null); }}>
                         Qwen3 Pro
                       </button>
                     </div>
@@ -540,7 +540,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                   </button>
                   {openControl === "mode" ? (
                     <div className={styles.settingMenu}>
-                      <button type="button" className={`${styles.settingMenuItem} ${generationMode === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { if (imageModel !== "qwen3") setGenerationMode("text"); setOpenControl(null); }}>
+                      <button type="button" className={`${styles.settingMenuItem} ${generationMode === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { setGenerationMode("text"); setOpenControl(null); }}>
                         Text to Image
                       </button>
                       <button type="button" className={`${styles.settingMenuItem} ${generationMode === "image" ? styles.settingMenuItemActive : ""}`} onClick={() => { setGenerationMode("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>
@@ -601,7 +601,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     <div className={styles.fieldBlock}>
                       <div className={styles.fieldBlockHeader}><h4>Workflow</h4><span className={styles.fieldHint}>{generationMode === "image" ? "Đang bật ảnh tham chiếu" : "Prompt thuần"}</span></div>
                       <select value={generationMode} onChange={(e) => setGenerationMode(e.target.value as "text" | "image")}>
-                        <option value="text" disabled={imageModel === "qwen3"}>Text to Image</option>
+                        <option value="text">Text to Image</option>
                         <option value="image">Image to Image</option>
                       </select>
                     </div>
@@ -626,7 +626,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt</span></div>
                       <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
                       <div style={{ marginTop: 10 }} className={styles.subtleNote}>
-                        {imageModel === "qwen3" ? "Qwen3 Pro dùng ảnh tham chiếu, hỗ trợ 1K / 2K / 4K theo Kie.ai." : imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
+                        {imageModel === "qwen3" ? "Qwen3 Pro hỗ trợ Text to Image và Image to Image theo Kie.ai; Image to Image cần ảnh tham chiếu." : imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
                       </div>
                     </div>
                   </div>

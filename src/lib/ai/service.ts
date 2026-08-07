@@ -40,6 +40,16 @@ function mapSeedreamQuality(resolution?: CreateTaskInput["imageResolution"]) {
   return "basic";
 }
 
+function mapQwenImageSize(resolution?: CreateTaskInput["imageResolution"], aspectRatio?: string) {
+  const isHd = resolution !== "1k";
+  const prefix = aspectRatio === "4:3" ? "landscape_4_3"
+    : aspectRatio === "3:4" ? "portrait_4_3"
+      : aspectRatio === "16:9" ? "landscape_16_9"
+        : aspectRatio === "9:16" ? "portrait_16_9"
+          : "square";
+  return isHd && prefix === "square" ? "square_hd" : prefix;
+}
+
 function normalizeKlingMode(mode?: KlingMotionMode) {
   return mode === "1080p" ? "1080p" : "720p";
 }
@@ -86,6 +96,17 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
       image_urls: [requireHttpUrl(payload.inputUrl)],
       aspect_ratio: payload.aspectRatio || "1:1",
       quality: mapSeedreamQuality(payload.imageResolution),
+    }),
+  },
+  "qwen3-pro-text": {
+    model: "qwen3/pro-text-to-image",
+    requiresReferenceImage: false,
+    buildInput: (payload) => ({
+      prompt: requirePrompt(payload.prompt),
+      image_size: mapQwenImageSize(payload.imageResolution, payload.aspectRatio),
+      negative_prompt: "",
+      enable_safety_checker: true,
+      nsfw_checker: false,
     }),
   },
   "qwen3-pro-image": {
