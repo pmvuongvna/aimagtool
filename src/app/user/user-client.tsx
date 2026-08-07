@@ -38,6 +38,11 @@ const aspectOptions = ["1:1", "16:9", "4:3", "3:4", "9:16"];
 const styleOptions = ["Cinematic", "Ảnh thực", "Anime", "3D Render", "Editorial"];
 const quantityOptions = [1, 2];
 const resolutionOptions: ImageResolution[] = ["1k", "2k", "4k"];
+const QWEN_PROMPT_MAX_LENGTH = 5000;
+
+function composeImagePrompt(prompt: string, negativePrompt: string, activeStyle: string) {
+  return `${prompt}${negativePrompt.trim() ? `\nNegative prompt: ${negativePrompt.trim()}` : ""}${activeStyle !== "Khong chon" ? `\nStyle: ${activeStyle}` : ""}`;
+}
 
 function formatCredits(value: number) {
   return Number.isInteger(value)
@@ -127,7 +132,9 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     return single ? single * quantity : null;
   }, [costPreview, generationMode, imageModel, imageResolution, quantity]);
 
-  const canGenerate = prompt.trim().length >= 3 && (generationMode === "text" || /^https?:\/\//.test(referenceUrl)) && !uploading;
+  const composedPrompt = composeImagePrompt(prompt, negativePrompt, activeStyle);
+  const promptTooLong = imageModel === "qwen3" && composedPrompt.length > QWEN_PROMPT_MAX_LENGTH;
+  const canGenerate = prompt.trim().length >= 3 && !promptTooLong && (generationMode === "text" || /^https?:\/\//.test(referenceUrl)) && !uploading;
 
   useEffect(() => {
     router.prefetch("/user/video");
@@ -276,7 +283,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
             ? (generationMode === "text" ? "seedream-5-lite-text" : "seedream-5-lite-image")
             : (generationMode === "text" ? "qwen3-pro-text" : "qwen3-pro-image")
       ) as AIServiceId,
-      prompt: `${prompt}${negativePrompt.trim() ? `\nNegative prompt: ${negativePrompt.trim()}` : ""}${activeStyle !== "Khong chon" ? `\nStyle: ${activeStyle}` : ""}`,
+      prompt: composedPrompt,
       aspectRatio,
       imageResolution,
       inputUrl: generationMode === "image" ? referenceUrl : undefined,
@@ -447,7 +454,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                 <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Mô tả nội dung anh muốn tạo... Ví dụ: poster sản phẩm, phong cách cinematic, ánh sáng cao cấp." />
                 <div className={styles.promptSide}>
                   <button type="button" className={styles.magicBtn}>✦</button>
-                  <span>{prompt.length} chars</span>
+                  <span>{imageModel === "qwen3" ? `${composedPrompt.length}/${QWEN_PROMPT_MAX_LENGTH} chars` : `${prompt.length} chars`}</span>
                 </div>
               </div>
 

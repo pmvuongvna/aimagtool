@@ -15,6 +15,14 @@ function requirePrompt(prompt: string) {
   return normalized;
 }
 
+function requirePromptWithinLimit(prompt: string, maxLength: number, modelName: string) {
+  const normalized = requirePrompt(prompt);
+  if (normalized.length > maxLength) {
+    throw new Error(`${modelName} prompt cannot exceed ${maxLength} characters.`);
+  }
+  return normalized;
+}
+
 function requireHttpUrl(inputUrl?: string, fieldName = "inputUrl") {
   const normalized = inputUrl?.trim();
   if (!normalized || !/^https?:\/\//.test(normalized)) {
@@ -102,7 +110,7 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
     model: "qwen3/pro-text-to-image",
     requiresReferenceImage: false,
     buildInput: (payload) => ({
-      prompt: requirePrompt(payload.prompt),
+      prompt: requirePromptWithinLimit(payload.prompt, 5000, "Qwen3 Pro"),
       image_size: mapQwenImageSize(payload.imageResolution, payload.aspectRatio),
       negative_prompt: "",
       enable_safety_checker: true,
@@ -113,7 +121,7 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
     model: "qwen3/pro-image-to-image",
     requiresReferenceImage: true,
     buildInput: (payload) => ({
-      prompt: requirePrompt(payload.prompt),
+      prompt: requirePromptWithinLimit(payload.prompt, 5000, "Qwen3 Pro"),
       image_urls: [requireHttpUrl(payload.inputUrl)],
       aspect_ratio: payload.aspectRatio || "1:1",
       resolution: mapImageResolution(payload.imageResolution),
