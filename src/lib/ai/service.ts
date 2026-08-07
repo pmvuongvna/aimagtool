@@ -1,4 +1,4 @@
-﻿import { createTask } from "@/lib/kie";
+import { createTask } from "@/lib/kie";
 import type { AIServiceId, CharacterOrientation, CreateTaskInput, KlingMotionMode } from "./types";
 
 type ServiceConfig = {
@@ -32,6 +32,12 @@ function mapImageResolution(resolution?: CreateTaskInput["imageResolution"]) {
   if (resolution === "1k") return "1K";
   if (resolution === "2k") return "2K";
   return "4K";
+}
+
+function mapSeedreamQuality(resolution?: CreateTaskInput["imageResolution"]) {
+  if (resolution === "4k") return "ultra";
+  if (resolution === "2k") return "high";
+  return "basic";
 }
 
 function normalizeKlingMode(mode?: KlingMotionMode) {
@@ -68,7 +74,7 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
     buildInput: (payload) => ({
       prompt: requirePrompt(payload.prompt),
       aspect_ratio: payload.aspectRatio || "1:1",
-      quality: "basic",
+      quality: mapSeedreamQuality(payload.imageResolution),
       nsfw_checker: false,
     }),
   },
@@ -79,7 +85,7 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
       prompt: requirePrompt(payload.prompt),
       image_urls: [requireHttpUrl(payload.inputUrl)],
       aspect_ratio: payload.aspectRatio || "1:1",
-      quality: "basic",
+      quality: mapSeedreamQuality(payload.imageResolution),
     }),
   },
   "grok-text-video": {

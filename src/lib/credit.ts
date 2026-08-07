@@ -1,4 +1,4 @@
-﻿import type { CreateTaskInput, ImageResolution, KlingMotionMode, VideoResolution } from "@/lib/ai/types";
+import type { CreateTaskInput, ImageResolution, KlingMotionMode, VideoResolution } from "@/lib/ai/types";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 
 export type CreditSettings = {
@@ -221,7 +221,7 @@ export async function calculateTaskCost(input: CreateTaskInput) {
   ) {
     const quality = input.imageResolution || "1k";
     const base = settings.imageCredits[quality];
-    return input.serviceId === "gpt-image-2-image" ? base + settings.imageEditExtraCost : base;
+    return input.serviceId === "gpt-image-2-image" || input.serviceId === "seedream-5-lite-image" ? base + settings.imageEditExtraCost : base;
   }
   if (input.serviceId === "grok-text-video" || input.serviceId === "grok-image-video") {
     const quality = input.videoResolution || "480p";

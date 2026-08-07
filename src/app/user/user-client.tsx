@@ -121,13 +121,9 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, []);
 
   const currentCost = useMemo(() => {
-    if (imageModel === "seedream") {
-      const single = costPreview?.image1k ?? null;
-      return single ? single * quantity : null;
-    }
     const single = imageResolution === "4k" ? costPreview?.image4k : imageResolution === "2k" ? costPreview?.image2k : costPreview?.image1k;
     return single ? single * quantity : null;
-  }, [costPreview, imageResolution, quantity, imageModel]);
+  }, [costPreview, imageResolution, quantity]);
 
   const canGenerate = prompt.trim().length >= 3 && (generationMode === "text" || /^https?:\/\//.test(referenceUrl)) && !uploading;
 
@@ -278,7 +274,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
       ) as AIServiceId,
       prompt: `${prompt}${negativePrompt.trim() ? `\nNegative prompt: ${negativePrompt.trim()}` : ""}${activeStyle !== "Khong chon" ? `\nStyle: ${activeStyle}` : ""}`,
       aspectRatio,
-      imageResolution: imageModel === "gpt" ? imageResolution : "1k",
+      imageResolution,
       inputUrl: generationMode === "image" ? referenceUrl : undefined,
     };
 
@@ -345,7 +341,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const recentResultCards: CardItem[] = resultUrls.map((url, index) => ({
     id: `${url}-${index}`,
     title: truncate(prompt),
-    meta: `${imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"} · ${aspectRatio}`,
+    meta: `${imageModel === "gpt" ? "GPT Image 2" : "Seedream 5 Lite"} · ${imageResolution.toUpperCase()} · ${aspectRatio}`,
     thumbUrl: url,
     urls: resultUrls,
     createdAt: new Date().toISOString(),
@@ -516,7 +512,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       <button type="button" className={`${styles.settingMenuItem} ${imageModel === "gpt" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("gpt"); if (imageResolution === "1k") setImageResolution("2k"); setOpenControl(null); }}>
                         GPT Image 2
                       </button>
-                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "seedream" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("seedream"); setImageResolution("1k"); setOpenControl(null); }}>
+                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "seedream" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("seedream"); setOpenControl(null); }}>
                         Seedream 5 Lite
                       </button>
                     </div>
@@ -564,7 +560,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     setGenerationMode("text");
                     setAspectRatio("16:9");
                     setQuantity(1);
-                    setImageResolution(imageModel === "gpt" ? "2k" : "1k");
+                    setImageResolution("2k");
                   }}
                 >
                   Reset
@@ -589,9 +585,9 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     </div>
 
                     <div className={styles.fieldBlock}>
-                      <div className={styles.fieldBlockHeader}><h4>Độ phân giải</h4><span className={styles.fieldHint}>{imageModel === "gpt" ? "1K / 2K / 4K" : "Seedream chỉ hỗ trợ 1K"}</span></div>
-                      <select value={imageResolution} onChange={(e) => setImageResolution(e.target.value as ImageResolution)} disabled={imageModel !== "gpt"}>
-                        {resolutionOptions.map((value) => <option key={value} value={value}>{value.toUpperCase()}</option>)}
+                      <div className={styles.fieldBlockHeader}><h4>Độ phân giải</h4><span className={styles.fieldHint}>{imageModel === "gpt" ? "1K / 2K / 4K" : "Basic 2K / High 3K / Ultra 4K"}</span></div>
+                      <select value={imageResolution} onChange={(e) => setImageResolution(e.target.value as ImageResolution)}>
+                        {resolutionOptions.map((value) => <option key={value} value={value}>{imageModel === "seedream" ? (value === "1k" ? "Basic (2K)" : value === "2k" ? "High (3K)" : "Ultra (4K)") : value.toUpperCase()}</option>)}
                       </select>
                     </div>
 
@@ -623,7 +619,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt</span></div>
                       <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
                       <div style={{ marginTop: 10 }} className={styles.subtleNote}>
-                        {imageModel === "seedream" ? "Seedream 5 Lite đang được khóa về 1K để đúng workflow của model." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
+                        {imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
                       </div>
                     </div>
                   </div>
