@@ -48,14 +48,11 @@ function mapSeedreamQuality(resolution?: CreateTaskInput["imageResolution"]) {
   return "basic";
 }
 
-function mapQwenImageSize(resolution?: CreateTaskInput["imageResolution"], aspectRatio?: string) {
-  const isHd = resolution !== "1k";
-  const prefix = aspectRatio === "4:3" ? "landscape_4_3"
-    : aspectRatio === "3:4" ? "portrait_4_3"
-      : aspectRatio === "16:9" ? "landscape_16_9"
-        : aspectRatio === "9:16" ? "portrait_16_9"
-          : "square";
-  return isHd && prefix === "square" ? "square_hd" : prefix;
+function mapQwenImageSize() {
+  // Kie currently rejects the aspect-ratio presets for qwen3/pro-text-to-image.
+  // Keep the request on the model's universally accepted enum value until Kie
+  // exposes the wider preset list for this model.
+  return "square";
 }
 
 function normalizeKlingMode(mode?: KlingMotionMode) {
@@ -111,7 +108,7 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
     requiresReferenceImage: false,
     buildInput: (payload) => ({
       prompt: requirePromptWithinLimit(payload.prompt, 5000, "Qwen3 Pro"),
-      image_size: mapQwenImageSize(payload.imageResolution, payload.aspectRatio),
+      image_size: mapQwenImageSize(),
       negative_prompt: "",
       enable_safety_checker: true,
       nsfw_checker: false,
