@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory, type TemplateMediaType } from "@/lib/template-catalog";
 import shellStyles from "../generate.module.css";
@@ -9,6 +9,7 @@ import styles from "./templates.module.css";
 
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string };
 type ProfileResponse = { userId: string; credits: number; user?: { id: string; name: string } | null };
+type TemplatesResponse = { items?: PromptTemplate[]; total?: number; page?: number; pageSize?: number; categoryCounts?: Record<string, number> };
 
 function formatCredits(value: number) {
   return Number.isInteger(value)
@@ -35,6 +36,10 @@ export default function TemplatesClient() {
   const [mediaType, setMediaType] = useState<TemplateMediaType>("image");
   const [templateCategory, setTemplateCategory] = useState<TemplateCategory>("All");
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalTemplates, setTotalTemplates] = useState(0);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const pageSize = 20;
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [credits, setCredits] = useState(0);
@@ -73,10 +78,15 @@ export default function TemplatesClient() {
 
     async function loadTemplates() {
       try {
-        const res = await apiFetch(apiPath(`/api/public/templates?mediaType=${mediaType}`));
-        const payload = (await res.json()) as { items?: PromptTemplate[] };
+        const params = new URLSearchParams({ mediaType, page: String(page), pageSize: String(pageSize) });
+        if (templateCategory !== "All") params.set("category", templateCategory);
+        if (search.trim()) params.set("q", search.trim());
+        const res = await apiFetch(apiPath(`/api/public/templates?${params.toString()}`));
+        const payload = (await res.json()) as TemplatesResponse;
         if (!cancelled) {
           setTemplates(payload.items || []);
+          setTotalTemplates(payload.total || 0);
+          setCategoryCounts(payload.categoryCounts || {});
         }
       } catch {
         if (!cancelled) setTemplates([]);
@@ -89,20 +99,14 @@ export default function TemplatesClient() {
     return () => {
       cancelled = true;
     };
-  }, [mediaType]);
+  }, [mediaType, page, pageSize, search, templateCategory]);
 
   useEffect(() => {
     setTemplateCategory("All");
+    setPage(1);
   }, [mediaType]);
 
-  const filteredTemplates = useMemo(() => {
-    return templates.filter((item) => {
-      const matchesCategory = templateCategory === "All" || item.category === templateCategory || item.tags.includes(templateCategory);
-      const haystack = `${item.title} ${item.prompt} ${item.model} ${item.tags.join(" ")}`.toLowerCase();
-      const matchesSearch = !search.trim() || haystack.includes(search.trim().toLowerCase());
-      return matchesCategory && matchesSearch;
-    });
-  }, [search, templateCategory, templates]);
+  const totalPages = Math.max(1, Math.ceil(totalTemplates / pageSize));
 
   async function copyPrompt() {
     if (!selectedTemplate) return;
@@ -151,7 +155,7 @@ export default function TemplatesClient() {
           <header className={shellStyles.topbar}>
             <div className={shellStyles.search}>
               <span>Search</span>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search templates, tags, models..." />
+              <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search templates, tags, models..." />
               <div className={shellStyles.shortcut}>Gallery</div>
             </div>
 
@@ -177,14 +181,14 @@ export default function TemplatesClient() {
               <button
                 type="button"
                 className={`${styles.modeTab} ${mediaType === "image" ? styles.modeTabActive : ""}`}
-                onClick={() => setMediaType("image")}
+                onClick={() => { setMediaType("image"); setPage(1); }}
               >
                 AI Image
               </button>
               <button
                 type="button"
                 className={`${styles.modeTab} ${mediaType === "video" ? styles.modeTabActive : ""}`}
-                onClick={() => setMediaType("video")}
+                onClick={() => { setMediaType("video"); setPage(1); }}
               >
                 AI Video
               </button>
@@ -200,9 +204,9 @@ export default function TemplatesClient() {
                     key={category}
                     type="button"
                     className={`${styles.tagBtn} ${templateCategory === category ? styles.tagBtnActive : ""}`}
-                    onClick={() => setTemplateCategory(category)}
+                    onClick={() => { setTemplateCategory(category); setPage(1); }}
                   >
-                    {category}
+                    {category} <span className={styles.tagCount}>{category === "All" ? (categoryCounts.All || 0) : (categoryCounts[category] || 0)}</span>
                   </button>
                 ))}
               </div>
@@ -211,11 +215,12 @@ export default function TemplatesClient() {
             <div className={styles.galleryContent}>
               {loading ? (
                 <div className={styles.emptyState}>Loading template gallery...</div>
-              ) : filteredTemplates.length === 0 ? (
+              ) : templates.length === 0 ? (
                 <div className={styles.emptyState}>No templates matched the current filters.</div>
               ) : (
+                <>
                 <div className={styles.masonry}>
-                  {filteredTemplates.map((item) => (
+                  {templates.map((item) => (
                     <button key={item.id} type="button" className={styles.card} onClick={() => setSelectedTemplate(item)}>
                       <img className={styles.cardImage} src={item.thumbnailUrl} alt={item.title} loading="lazy" />
                       <div className={styles.cardOverlay}>
@@ -226,6 +231,15 @@ export default function TemplatesClient() {
                     </button>
                   ))}
                 </div>
+                <div className={styles.galleryFooter}>
+                  <span>{totalTemplates.toLocaleString("en-US")} templates · Page {Math.min(page, totalPages)} of {totalPages}</span>
+                  <div className={styles.pagination}>
+                    <button type="button" className={styles.pageBtn} disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
+                    <span className={styles.pageInfo}>{page} / {totalPages}</span>
+                    <button type="button" className={styles.pageBtn} disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next</button>
+                  </div>
+                </div>
+                </>
               )}
             </div>
           </section>

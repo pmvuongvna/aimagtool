@@ -333,6 +333,61 @@
   box-shadow: 0 12px 24px rgba(108, 60, 255, 0.24);
 }
 
+.tagBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tagCount {
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(108, 60, 255, 0.1);
+  color: #6c3cff;
+  font-size: 11px;
+  text-align: center;
+}
+
+.galleryFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 22px;
+  color: #756d96;
+  font-size: 13px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pageBtn {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #ddd2ff;
+  border-radius: 10px;
+  background: #fff;
+  color: #6c3cff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.pageBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pageInfo {
+  min-width: 48px;
+  text-align: center;
+  font-weight: 700;
+  color: #4f5369;
+}
 @media (max-width: 1380px) {
   .masonry {
     column-count: 3;

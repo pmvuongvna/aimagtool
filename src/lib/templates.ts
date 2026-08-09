@@ -185,53 +185,120 @@ async function seedTemplatesIfEmpty() {
   }
 }
 
-export async function getPublicTemplates(options?: { mediaType?: TemplateMediaType; category?: string; query?: string }) {
+export type PublicTemplatePage = {
+  items: PublicPromptTemplate[];
+  total: number;
+  page: number;
+  pageSize: number;
+  categoryCounts: Record<string, number>;
+};
+
+export async function getPublicTemplates(options?: {
+  mediaType?: TemplateMediaType;
+  category?: string;
+  query?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PublicTemplatePage> {
   const mediaType = options?.mediaType;
   const category = options?.category && options.category !== "All" ? options.category : undefined;
   const query = options?.query?.trim().toLowerCase();
+  const pageSize = Math.min(50, Math.max(1, Math.floor(options?.pageSize || 20)));
+  const page = Math.max(1, Math.floor(options?.page || 1));
+  const offset = (page - 1) * pageSize;
+  const categoryCounts = Object.fromEntries(TEMPLATE_CATEGORIES.map((item) => [item, 0]));
 
   if (!hasDatabase()) {
-    return Array.from(memoryTemplatesMap.values()).filter((item) => {
-      if (mediaType && item.mediaType !== mediaType) return false;
-      if (category && item.category !== category && !item.tags.includes(category)) return false;
+    const baseItems = Array.from(memoryTemplatesMap.values()).filter((item) => {
+      if (!item.published || (mediaType && item.mediaType !== mediaType)) return false;
       if (query) {
         const haystack = `${item.title} ${item.prompt} ${item.tags.join(" ")} ${item.model}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
-      return item.published;
+      return true;
     });
+
+    categoryCounts.All = baseItems.length;
+    for (const item of baseItems) {
+      for (const itemCategory of TEMPLATE_CATEGORIES) {
+        if (itemCategory !== "All" && (item.category === itemCategory || item.tags.includes(itemCategory))) {
+          categoryCounts[itemCategory] += 1;
+        }
+      }
+    }
+
+    const filteredItems = category
+      ? baseItems.filter((item) => item.category === category || item.tags.includes(category))
+      : baseItems;
+    return {
+      items: filteredItems.slice(offset, offset + pageSize),
+      total: filteredItems.length,
+      page,
+      pageSize,
+      categoryCounts,
+    };
   }
 
   await ensureSchema();
   await seedTemplatesIfEmpty();
   const pool = getPool();
-
   const clauses = ["published = TRUE"];
   const values: unknown[] = [];
 
+  if (mediaType) {
+    values.push(mediaType);
+    clauses.push(`media_type = $${values.length}`);
+  }
   if (query) {
     values.push(`%${query}%`);
-    clauses.push(`(LOWER(title) LIKE $${values.length} OR LOWER(prompt) LIKE $${values.length} OR LOWER(model) LIKE $${values.length})`);
+    clauses.push(`(LOWER(title) LIKE $${values.length} OR LOWER(prompt) LIKE $${values.length} OR LOWER(model) LIKE $${values.length} OR LOWER(tags::text) LIKE $${values.length})`);
   }
 
+  const countValues = [...values];
+  const countExpressions = TEMPLATE_CATEGORIES.map((itemCategory) => {
+    if (itemCategory === "All") return "COUNT(*)::int AS all_count";
+    countValues.push(itemCategory);
+    const placeholder = `$${countValues.length}`;
+    return `COUNT(*) FILTER (WHERE category = ${placeholder} OR tags ? ${placeholder})::int AS "${itemCategory.replace(/"/g, '""')}"`;
+  });
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total, ${countExpressions.join(", ")}
+     FROM prompt_templates
+     WHERE ${clauses.join(" AND ")}`,
+    countValues,
+  );
+  const countRow = (countResult.rows[0] || {}) as Record<string, unknown>;
+  categoryCounts.All = Number(countRow.all_count || 0);
+  for (const itemCategory of TEMPLATE_CATEGORIES) {
+    if (itemCategory !== "All") categoryCounts[itemCategory] = Number(countRow[itemCategory] || 0);
+  }
+
+  const itemClauses = [...clauses];
+  const itemValues = [...values];
+  if (category) {
+    itemValues.push(category);
+    const placeholder = `$${itemValues.length}`;
+    itemClauses.push(`(category = ${placeholder} OR tags ? ${placeholder})`);
+  }
+  itemValues.push(pageSize);
+  const limitPlaceholder = `$${itemValues.length}`;
+  itemValues.push(offset);
+  const offsetPlaceholder = `$${itemValues.length}`;
   const result = await pool.query(
     `SELECT id, source, source_prompt_id, source_url, title, prompt, thumbnail_url, media_type, model, aspect_ratio, category, tags, author_name, published, featured
      FROM prompt_templates
-     WHERE ${clauses.join(" AND ")}
+     WHERE ${itemClauses.join(" AND ")}
      ORDER BY updated_at DESC, created_at DESC, id DESC
-     LIMIT 240`,
-    values,
+     LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
+    itemValues,
   );
 
-  return result.rows
-    .map((row) => normalizeTemplate(row as Record<string, unknown>))
-    .filter((item) => {
-      if (mediaType && item.mediaType !== mediaType) return false;
-      if (category && item.category !== category && !item.tags.includes(category)) return false;
-      if (query) {
-        const haystack = `${item.title} ${item.prompt} ${item.tags.join(" ")} ${item.model}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      return item.published;
-    });
+  const selectedTotal = category ? categoryCounts[category] || 0 : categoryCounts.All;
+  return {
+    items: result.rows.map((row) => normalizeTemplate(row as Record<string, unknown>)),
+    total: selectedTotal,
+    page,
+    pageSize,
+    categoryCounts,
+  };
 }
