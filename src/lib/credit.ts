@@ -1,4 +1,4 @@
-import type { CreateTaskInput, ImageResolution, KlingMotionMode, VideoResolution } from "@/lib/ai/types";
+import type { CreateTaskInput, ImageResolution, KlingMotionMode, SeedanceVideoResolution, VideoResolution } from "@/lib/ai/types";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 
 export type CreditSettings = {
@@ -6,6 +6,7 @@ export type CreditSettings = {
   imageCredits: Record<ImageResolution, number>;
   videoCredits: Record<VideoResolution, number>;
   grokVideoCreditsPerSecond: Record<VideoResolution, number>;
+  seedanceVideoCredits: Record<SeedanceVideoResolution, number>;
   klingMotionCredits: Record<KlingMotionMode, number>;
   imageEditExtraCost: number;
   defaultUserCredits: number;
@@ -25,6 +26,7 @@ type CreditSettingsPatch = {
   imageCredits?: Partial<Record<ImageResolution, number>>;
   videoCredits?: Partial<Record<VideoResolution, number>>;
   grokVideoCreditsPerSecond?: Partial<Record<VideoResolution, number>>;
+  seedanceVideoCredits?: Partial<Record<SeedanceVideoResolution, number>>;
   klingMotionCredits?: Partial<Record<KlingMotionMode, number>>;
   imageEditExtraCost?: number;
   defaultUserCredits?: number;
@@ -48,6 +50,7 @@ const DEFAULT_SETTINGS: CreditSettings = {
   imageCredits: { "1k": 8, "2k": 16, "4k": 32 },
   videoCredits: { "480p": 45, "720p": 80 },
   grokVideoCreditsPerSecond: { "480p": 1.6, "720p": 3 },
+  seedanceVideoCredits: { "480p": 60, "720p": 100, "1080p": 160, "4k": 300 },
   klingMotionCredits: { "720p": 80, "1080p": 120 },
   imageEditExtraCost: 4,
   defaultUserCredits: 500,
@@ -66,6 +69,7 @@ function cloneSettings(settings: CreditSettings) {
     imageCredits: { ...settings.imageCredits },
     videoCredits: { ...settings.videoCredits },
     grokVideoCreditsPerSecond: { ...settings.grokVideoCreditsPerSecond },
+    seedanceVideoCredits: { ...settings.seedanceVideoCredits },
     klingMotionCredits: { ...settings.klingMotionCredits },
   };
 }
@@ -88,6 +92,12 @@ function normalizeSettings(input?: Partial<CreditSettings> | null): CreditSettin
     grokVideoCreditsPerSecond: {
       "480p": asNonNegativeNumber(source.grokVideoCreditsPerSecond?.["480p"] ?? DEFAULT_SETTINGS.grokVideoCreditsPerSecond["480p"], DEFAULT_SETTINGS.grokVideoCreditsPerSecond["480p"]),
       "720p": asNonNegativeNumber(source.grokVideoCreditsPerSecond?.["720p"] ?? DEFAULT_SETTINGS.grokVideoCreditsPerSecond["720p"], DEFAULT_SETTINGS.grokVideoCreditsPerSecond["720p"]),
+    },
+    seedanceVideoCredits: {
+      "480p": asNonNegativeNumber(source.seedanceVideoCredits?.["480p"] ?? DEFAULT_SETTINGS.seedanceVideoCredits["480p"], DEFAULT_SETTINGS.seedanceVideoCredits["480p"]),
+      "720p": asNonNegativeNumber(source.seedanceVideoCredits?.["720p"] ?? DEFAULT_SETTINGS.seedanceVideoCredits["720p"], DEFAULT_SETTINGS.seedanceVideoCredits["720p"]),
+      "1080p": asNonNegativeNumber(source.seedanceVideoCredits?.["1080p"] ?? DEFAULT_SETTINGS.seedanceVideoCredits["1080p"], DEFAULT_SETTINGS.seedanceVideoCredits["1080p"]),
+      "4k": asNonNegativeNumber(source.seedanceVideoCredits?.["4k"] ?? DEFAULT_SETTINGS.seedanceVideoCredits["4k"], DEFAULT_SETTINGS.seedanceVideoCredits["4k"]),
     },
     klingMotionCredits: {
       "720p": asNonNegativeNumber(source.klingMotionCredits?.["720p"] ?? DEFAULT_SETTINGS.klingMotionCredits["720p"], DEFAULT_SETTINGS.klingMotionCredits["720p"]),
@@ -159,6 +169,14 @@ export async function updateCreditSettings(next: CreditSettingsPatch) {
       "720p": asNonNegativeNumber(next.grokVideoCreditsPerSecond["720p"] ?? updated.grokVideoCreditsPerSecond["720p"], updated.grokVideoCreditsPerSecond["720p"]),
     };
   }
+  if (next.seedanceVideoCredits) {
+    updated.seedanceVideoCredits = {
+      "480p": asNonNegativeNumber(next.seedanceVideoCredits["480p"] ?? updated.seedanceVideoCredits["480p"], updated.seedanceVideoCredits["480p"]),
+      "720p": asNonNegativeNumber(next.seedanceVideoCredits["720p"] ?? updated.seedanceVideoCredits["720p"], updated.seedanceVideoCredits["720p"]),
+      "1080p": asNonNegativeNumber(next.seedanceVideoCredits["1080p"] ?? updated.seedanceVideoCredits["1080p"], updated.seedanceVideoCredits["1080p"]),
+      "4k": asNonNegativeNumber(next.seedanceVideoCredits["4k"] ?? updated.seedanceVideoCredits["4k"], updated.seedanceVideoCredits["4k"]),
+    };
+  }
   if (next.klingMotionCredits) {
     updated.klingMotionCredits = {
       "720p": asNonNegativeNumber(next.klingMotionCredits["720p"] ?? updated.klingMotionCredits["720p"], updated.klingMotionCredits["720p"]),
@@ -226,16 +244,21 @@ export async function calculateTaskCost(input: CreateTaskInput) {
     return input.serviceId === "gpt-image-2-image" || input.serviceId === "seedream-5-lite-image" || input.serviceId === "qwen3-pro-image" ? base + settings.imageEditExtraCost : base;
   }
   if (input.serviceId === "grok-text-video" || input.serviceId === "grok-image-video") {
-    const quality = input.videoResolution || "480p";
+    const quality: VideoResolution = input.videoResolution === "720p" ? "720p" : "480p";
     const seconds = Math.max(1, Math.min(30, Math.floor(input.duration || 6)));
     const perSecond = settings.grokVideoCreditsPerSecond[quality];
     return Math.round(perSecond * seconds * 10) / 10;
+  }
+  if (input.serviceId === "seedance-2-text-video" || input.serviceId === "seedance-2-image-video") {
+    const allowed = new Set(["480p", "720p", "1080p", "4k"]);
+    const quality: SeedanceVideoResolution = allowed.has(input.videoResolution || "") ? (input.videoResolution as SeedanceVideoResolution) : "720p";
+    return settings.seedanceVideoCredits[quality];
   }
   if (input.serviceId === "kling-motion-control") {
     const mode = input.klingMotionMode === "1080p" ? "1080p" : "720p";
     return settings.klingMotionCredits[mode];
   }
-  const quality = input.videoResolution || "480p";
+  const quality: VideoResolution = input.videoResolution === "720p" ? "720p" : "480p";
   return settings.videoCredits[quality];
 }
 

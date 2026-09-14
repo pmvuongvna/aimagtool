@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
     imageEdit4k: await calculateTaskCost({ serviceId: "qwen3-pro-image", prompt: "x", imageResolution: "4k", inputUrl: "https://example.com/a.jpg" } as CreateTaskInput),
     grok480p: await calculateTaskCost({ serviceId: "grok-text-video", prompt: "x", videoResolution: "480p", duration: 1 } as CreateTaskInput),
     grok720p: await calculateTaskCost({ serviceId: "grok-text-video", prompt: "x", videoResolution: "720p", duration: 1 } as CreateTaskInput),
+    seedance480p: await calculateTaskCost({ serviceId: "seedance-2-text-video", prompt: "x", videoResolution: "480p", duration: 15 } as CreateTaskInput),
+    seedance720p: await calculateTaskCost({ serviceId: "seedance-2-text-video", prompt: "x", videoResolution: "720p", duration: 15 } as CreateTaskInput),
+    seedance1080p: await calculateTaskCost({ serviceId: "seedance-2-text-video", prompt: "x", videoResolution: "1080p", duration: 15 } as CreateTaskInput),
+    seedance4k: await calculateTaskCost({ serviceId: "seedance-2-text-video", prompt: "x", videoResolution: "4k", duration: 15 } as CreateTaskInput),
     kling720p: await calculateTaskCost({ serviceId: "kling-motion-control", prompt: "x", klingMotionMode: "720p", inputUrl: "https://example.com/a.jpg", referenceVideoUrl: "https://example.com/b.mp4" } as CreateTaskInput),
     kling1080p: await calculateTaskCost({ serviceId: "kling-motion-control", prompt: "x", klingMotionMode: "1080p", inputUrl: "https://example.com/a.jpg", referenceVideoUrl: "https://example.com/b.mp4" } as CreateTaskInput),
   };

@@ -1,5 +1,5 @@
 import { createTask } from "@/lib/kie";
-import type { AIServiceId, CharacterOrientation, CreateTaskInput, KlingMotionMode } from "./types";
+import type { AIServiceId, CharacterOrientation, CreateTaskInput, KlingMotionMode, SeedanceVideoResolution } from "./types";
 
 type ServiceConfig = {
   model: string;
@@ -35,6 +35,10 @@ function normalizeDuration(duration?: number) {
   return Math.max(1, Math.min(30, Math.floor(duration || 6)));
 }
 
+function normalizeSeedanceDuration(duration?: number) {
+  return Math.max(1, Math.min(15, Math.floor(duration || 15)));
+}
+
 function mapImageResolution(resolution?: CreateTaskInput["imageResolution"]) {
   if (!resolution) return "1K";
   if (resolution === "1k") return "1K";
@@ -55,6 +59,16 @@ function mapQwenImageSize(aspectRatio?: string) {
 
 function normalizeKlingMode(mode?: KlingMotionMode) {
   return mode === "1080p" ? "1080p" : "720p";
+}
+
+function normalizeSeedanceResolution(resolution?: CreateTaskInput["videoResolution"]): SeedanceVideoResolution {
+  const allowed = new Set(["480p", "720p", "1080p", "4k"]);
+  return allowed.has(resolution || "") ? (resolution as SeedanceVideoResolution) : "720p";
+}
+
+function normalizeSeedanceAspectRatio(aspectRatio?: string) {
+  const allowed = new Set(["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"]);
+  return allowed.has(aspectRatio || "") ? aspectRatio : "16:9";
 }
 
 function normalizeCharacterOrientation(value?: CharacterOrientation) {
@@ -146,6 +160,37 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
       resolution: payload.videoResolution || "480p",
       nsfw_checker: payload.nsfwChecker ?? true,
     }),
+  },
+  "seedance-2-text-video": {
+    model: "bytedance/seedance-2",
+    requiresReferenceImage: false,
+    buildInput: (payload) => ({
+      prompt: requirePromptWithinLimit(payload.prompt, 20000, "Seedance 2"),
+      generate_audio: true,
+      resolution: normalizeSeedanceResolution(payload.videoResolution),
+      aspect_ratio: normalizeSeedanceAspectRatio(payload.aspectRatio),
+      duration: normalizeSeedanceDuration(payload.duration),
+      web_search: false,
+      nsfw_checker: payload.nsfwChecker ?? true,
+    }),
+  },
+  "seedance-2-image-video": {
+    model: "bytedance/seedance-2",
+    requiresReferenceImage: true,
+    buildInput: (payload) => {
+      const imageUrl = requireHttpUrl(payload.inputUrl);
+      return {
+        first_frame_url: imageUrl,
+        prompt: requirePromptWithinLimit(payload.prompt, 20000, "Seedance 2"),
+        reference_image_urls: [imageUrl],
+        generate_audio: true,
+        resolution: normalizeSeedanceResolution(payload.videoResolution),
+        aspect_ratio: normalizeSeedanceAspectRatio(payload.aspectRatio),
+        duration: normalizeSeedanceDuration(payload.duration),
+        web_search: false,
+        nsfw_checker: payload.nsfwChecker ?? true,
+      };
+    },
   },
   "kling-motion-control": {
     model: "kling-2.6/motion-control",

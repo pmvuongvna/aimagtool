@@ -15,6 +15,7 @@ type AdminPayload = {
     imageCredits: { "1k": number; "2k": number; "4k": number };
     videoCredits: { "480p": number; "720p": number };
     grokVideoCreditsPerSecond: { "480p": number; "720p": number };
+    seedanceVideoCredits: { "480p": number; "720p": number; "1080p": number; "4k": number };
     klingMotionCredits: { "720p": number; "1080p": number };
     imageEditExtraCost: number;
     defaultUserCredits: number;
@@ -885,6 +886,16 @@ export default function AdminPage() {
               </div>
 
               <div className="admin-form-block">
+                <h3>Seedance 2 video</h3>
+                <div className="admin-subgrid">
+                  <label>Seedance 480p<input type="number" value={settings.seedanceVideoCredits["480p"]} onChange={(e) => setSettings({ ...settings, seedanceVideoCredits: { ...settings.seedanceVideoCredits, "480p": Number(e.target.value) } })} /></label>
+                  <label>Seedance 720p<input type="number" value={settings.seedanceVideoCredits["720p"]} onChange={(e) => setSettings({ ...settings, seedanceVideoCredits: { ...settings.seedanceVideoCredits, "720p": Number(e.target.value) } })} /></label>
+                  <label>Seedance 1080p<input type="number" value={settings.seedanceVideoCredits["1080p"]} onChange={(e) => setSettings({ ...settings, seedanceVideoCredits: { ...settings.seedanceVideoCredits, "1080p": Number(e.target.value) } })} /></label>
+                  <label>Seedance 4K<input type="number" value={settings.seedanceVideoCredits["4k"]} onChange={(e) => setSettings({ ...settings, seedanceVideoCredits: { ...settings.seedanceVideoCredits, "4k": Number(e.target.value) } })} /></label>
+                </div>
+              </div>
+
+              <div className="admin-form-block">
                 <h3>Kling motion control</h3>
                 <div className="admin-subgrid admin-subgrid-two">
                   <label>Kling 720p<input type="number" value={settings.klingMotionCredits["720p"]} onChange={(e) => setSettings({ ...settings, klingMotionCredits: { ...settings.klingMotionCredits, "720p": Number(e.target.value) } })} /></label>
@@ -897,7 +908,7 @@ export default function AdminPage() {
               <label>Default User Credits<input type="number" value={settings.defaultUserCredits} onChange={(e) => setSettings({ ...settings, defaultUserCredits: Number(e.target.value) })} /></label>
               <div className="admin-note-box">
                 <strong>Policy note</strong>
-                <span>Video 480p / 720p remain the fallback pool for future Veo-style models. Grok uses per-second pricing, while Kling motion control uses fixed 720p / 1080p task pricing.</span>
+                <span>Video 480p / 720p remain the fallback pool for future Veo-style models. Grok uses per-second pricing, while Seedance and Kling use fixed task pricing.</span>
               </div>
             </div>
 

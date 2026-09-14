@@ -27,6 +27,7 @@ type CreditSettingsPayload = {
   imageCredits?: { "1k"?: number; "2k"?: number; "4k"?: number };
   videoCredits?: { "480p"?: number; "720p"?: number };
   grokVideoCreditsPerSecond?: { "480p"?: number; "720p"?: number };
+  seedanceVideoCredits?: { "480p"?: number; "720p"?: number; "1080p"?: number; "4k"?: number };
   klingMotionCredits?: { "720p"?: number; "1080p"?: number };
   imageEditExtraCost?: number;
   defaultUserCredits?: number;

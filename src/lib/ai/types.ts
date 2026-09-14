@@ -7,10 +7,13 @@ export type AIServiceId =
   | "qwen3-pro-text"
   | "grok-text-video"
   | "grok-image-video"
+  | "seedance-2-text-video"
+  | "seedance-2-image-video"
   | "kling-motion-control";
 
 export type ImageResolution = "1k" | "2k" | "4k";
 export type VideoResolution = "480p" | "720p";
+export type SeedanceVideoResolution = "480p" | "720p" | "1080p" | "4k";
 export type VideoMode = "fun" | "normal" | "spicy";
 export type KlingMotionMode = "720p" | "1080p";
 export type CharacterOrientation = "image" | "video";
@@ -22,7 +25,7 @@ export type CreateTaskInput = {
   inputUrl?: string;
   referenceVideoUrl?: string;
   imageResolution?: ImageResolution;
-  videoResolution?: VideoResolution;
+  videoResolution?: VideoResolution | SeedanceVideoResolution;
   videoMode?: VideoMode;
   duration?: number;
   nsfwChecker?: boolean;
