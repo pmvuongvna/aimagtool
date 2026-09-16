@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Coins, Copy, ExternalLink, Image as ImageIcon, Search, Video, X } from "lucide-react";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory, type TemplateMediaType } from "@/lib/template-catalog";
+import { StudioNavigation } from "@/components/studio-navigation";
 import shellStyles from "../generate.module.css";
 import styles from "./templates.module.css";
 
@@ -74,7 +76,7 @@ export default function TemplatesClient() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    queueMicrotask(() => { if (!cancelled) setLoading(true); });
 
     async function loadTemplates() {
       try {
@@ -101,11 +103,6 @@ export default function TemplatesClient() {
     };
   }, [mediaType, page, pageSize, search, templateCategory]);
 
-  useEffect(() => {
-    setTemplateCategory("All");
-    setPage(1);
-  }, [mediaType]);
-
   const totalPages = Math.max(1, Math.ceil(totalTemplates / pageSize));
 
   async function copyPrompt() {
@@ -118,24 +115,15 @@ export default function TemplatesClient() {
   }
 
   return (
-    <div className={shellStyles.page}>
-      <div className={shellStyles.appShell}>
-        <aside className={shellStyles.sidebar}>
+    <div className={`${shellStyles.page} ${shellStyles.videoPage}`}>
+      <div className={`${shellStyles.appShell} ${shellStyles.videoAppShell}`}>
+        <aside className={`${shellStyles.sidebar} ${shellStyles.videoSidebar}`}>
           <Link href="/" className={shellStyles.logoLink}>
             <span className={shellStyles.logoMark} />
             <span className={shellStyles.logoText}>VizoAI</span>
           </Link>
 
-          <nav className={shellStyles.navMenu}>
-            <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>D</span><span className={shellStyles.navText}>Dashboard</span></Link>
-            <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>I</span><span className={shellStyles.navText}>Image</span></Link>
-            <Link className={shellStyles.navItem} href="/user/video"><span className={shellStyles.navIcon}>V</span><span className={shellStyles.navText}>Video</span></Link>
-            <Link className={shellStyles.navItem} href="/user/kling"><span className={shellStyles.navIcon}>K</span><span className={shellStyles.navText}>Kling Motion</span></Link>
-            <Link className={`${shellStyles.navItem} ${shellStyles.activeNav}`} href="/user/templates"><span className={shellStyles.navIcon}>T</span><span className={shellStyles.navText}>Templates</span></Link>
-            <Link className={shellStyles.navItem} href="/user/history"><span className={shellStyles.navIcon}>H</span><span className={shellStyles.navText}>History</span></Link>
-            <Link className={shellStyles.navItem} href="/user#styles"><span className={shellStyles.navIcon}>S</span><span className={shellStyles.navText}>Styles</span></Link>
-            <Link className={shellStyles.navItem} href="/admin"><span className={shellStyles.navIcon}>A</span><span className={shellStyles.navText}>Settings</span></Link>
-          </nav>
+          <StudioNavigation active="templates" />
 
           <div className={shellStyles.sidebarSpacer} />
 
@@ -151,16 +139,16 @@ export default function TemplatesClient() {
           </div>
         </aside>
 
-        <main className={shellStyles.main}>
+        <main className={`${shellStyles.main} ${shellStyles.videoMain}`}>
           <header className={shellStyles.topbar}>
             <div className={shellStyles.search}>
-              <span>Search</span>
+              <Search size={17} aria-hidden="true" />
               <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search templates, tags, models..." />
               <div className={shellStyles.shortcut}>Gallery</div>
             </div>
 
             <div className={shellStyles.topActions}>
-              <div className={shellStyles.creditsPill}>Credits {formatCredits(credits)}</div>
+              <div className={shellStyles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</div>
               <div className={shellStyles.userCard}>
                 <div className={shellStyles.avatar} />
                 <div>
@@ -175,22 +163,22 @@ export default function TemplatesClient() {
             <div>
               <p className={styles.eyebrow}>Prompt Gallery</p>
               <h1>Template gallery</h1>
-              <p className={styles.subtitle}>A dedicated inspiration page with masonry cards, tag filters, and a popup preview for prompt plus artwork, similar to MeiGen's browsing flow.</p>
+              <p className={styles.subtitle}>A dedicated inspiration page with masonry cards, tag filters, and a popup preview for prompt plus artwork, similar to MeiGen&apos;s browsing flow.</p>
             </div>
             <div className={styles.modeTabs}>
               <button
                 type="button"
                 className={`${styles.modeTab} ${mediaType === "image" ? styles.modeTabActive : ""}`}
-                onClick={() => { setMediaType("image"); setPage(1); }}
+                onClick={() => { setMediaType("image"); setTemplateCategory("All"); setPage(1); }}
               >
-                AI Image
+                <ImageIcon size={15} /> AI Image
               </button>
               <button
                 type="button"
                 className={`${styles.modeTab} ${mediaType === "video" ? styles.modeTabActive : ""}`}
-                onClick={() => { setMediaType("video"); setPage(1); }}
+                onClick={() => { setMediaType("video"); setTemplateCategory("All"); setPage(1); }}
               >
-                AI Video
+                <Video size={15} /> AI Video
               </button>
             </div>
           </section>
@@ -249,7 +237,7 @@ export default function TemplatesClient() {
       {selectedTemplate ? (
         <div className={styles.modalBackdrop} onClick={() => setSelectedTemplate(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <button type="button" className={styles.modalClose} onClick={() => setSelectedTemplate(null)}>âœ•</button>
+            <button type="button" className={styles.modalClose} onClick={() => setSelectedTemplate(null)} aria-label="Close preview"><X size={18} /></button>
             <div className={styles.modalMedia}>
               <img src={selectedTemplate.thumbnailUrl} alt={selectedTemplate.title} />
             </div>
@@ -275,12 +263,12 @@ export default function TemplatesClient() {
                 </div>
               ) : null}
               <div className={styles.modalActions}>
-                <button type="button" className={styles.copyBtn} onClick={copyPrompt}>{copied ? "Copied" : "Copy prompt"}</button>
+                <button type="button" className={styles.copyBtn} onClick={copyPrompt}><Copy size={16} /> {copied ? "Copied" : "Copy prompt"}</button>
                 <Link
                   href={selectedTemplate.mediaType === "image" ? `/user?prompt=${encodeURIComponent(selectedTemplate.prompt)}` : isKlingTemplate(selectedTemplate) ? `/user/kling?prompt=${encodeURIComponent(selectedTemplate.prompt)}` : `/user/video?prompt=${encodeURIComponent(selectedTemplate.prompt)}`}
                   className={styles.useBtn}
                 >
-                  Open generator
+                  <ExternalLink size={16} /> Open generator
                 </Link>
               </div>
             </div>
@@ -290,4 +278,3 @@ export default function TemplatesClient() {
     </div>
   );
 }
-

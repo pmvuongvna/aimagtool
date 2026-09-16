@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Coins, FolderKanban, Image as ImageIcon, Play, Search, Video } from "lucide-react";
 import { apiFetch, apiPath } from "@/lib/api-url";
+import { StudioNavigation } from "@/components/studio-navigation";
 import shellStyles from "../generate.module.css";
 import styles from "./history.module.css";
 
@@ -121,23 +123,15 @@ export default function HistoryClient() {
   const currentLightboxIsVideo = currentLightboxUrl ? isVideoUrl(currentLightboxUrl) : false;
 
   return (
-    <div className={shellStyles.page}>
-      <div className={shellStyles.appShell}>
-        <aside className={shellStyles.sidebar}>
+    <div className={`${shellStyles.page} ${shellStyles.videoPage}`}>
+      <div className={`${shellStyles.appShell} ${shellStyles.videoAppShell}`}>
+        <aside className={`${shellStyles.sidebar} ${shellStyles.videoSidebar}`}>
           <Link href="/" className={shellStyles.logoLink}>
             <span className={shellStyles.logoMark} />
             <span className={shellStyles.logoText}>VizoAI</span>
           </Link>
 
-          <nav className={shellStyles.navMenu}>
-            <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>⌂</span><span className={shellStyles.navText}>Dashboard</span></Link>
-            <Link className={shellStyles.navItem} href="/user"><span className={shellStyles.navIcon}>▧</span><span className={shellStyles.navText}>Tạo ảnh</span></Link>
-            <Link className={shellStyles.navItem} href="/user/video"><span className={shellStyles.navIcon}>▶</span><span className={shellStyles.navText}>Tạo video</span></Link>
-            <Link className={shellStyles.navItem} href="/user/kling"><span className={shellStyles.navIcon}>◉</span><span className={shellStyles.navText}>Kling Motion</span></Link>
-            <Link className={shellStyles.navItem} href="/user/templates"><span className={shellStyles.navIcon}>▦</span><span className={shellStyles.navText}>Mẫu có sẵn</span></Link>
-            <Link className={`${shellStyles.navItem} ${shellStyles.activeNav}`} href="/user/history"><span className={shellStyles.navIcon}>↺</span><span className={shellStyles.navText}>Lịch sử</span></Link>
-            <Link className={shellStyles.navItem} href="/admin"><span className={shellStyles.navIcon}>⚙</span><span className={shellStyles.navText}>Cài đặt</span></Link>
-          </nav>
+          <StudioNavigation active="history" />
 
           <div className={shellStyles.sidebarSpacer} />
 
@@ -153,16 +147,16 @@ export default function HistoryClient() {
           </div>
         </aside>
 
-        <main className={shellStyles.main}>
+        <main className={`${shellStyles.main} ${shellStyles.videoMain}`}>
           <header className={shellStyles.topbar}>
             <div className={shellStyles.search}>
-              <span>🔍</span>
+              <Search size={17} aria-hidden="true" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm prompt, ảnh, video trong 7 ngày gần nhất..." />
               <div className={shellStyles.shortcut}>7D</div>
             </div>
 
             <div className={shellStyles.topActions}>
-              <div className={shellStyles.creditsPill}>⚡ {formatCredits(credits)} Credits</div>
+              <div className={shellStyles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</div>
               <div className={shellStyles.userCard}>
                 <div className={shellStyles.avatar} />
                 <div>
@@ -187,9 +181,9 @@ export default function HistoryClient() {
           </section>
 
           <section className={styles.statsRow}>
-            <article className={shellStyles.statCard}><div className={`${shellStyles.statIcon} ${shellStyles.statPurple}`}>🖼</div><div><small>Ảnh 7 ngày</small><h3>{imageCount.toLocaleString("vi-VN")}</h3></div></article>
-            <article className={shellStyles.statCard}><div className={`${shellStyles.statIcon} ${shellStyles.statBlue}`}>🎬</div><div><small>Video 7 ngày</small><h3>{videoCount.toLocaleString("vi-VN")}</h3></div></article>
-            <article className={shellStyles.statCard}><div className={`${shellStyles.statIcon} ${shellStyles.statOrange}`}>📁</div><div><small>Tổng item</small><h3>{items.length.toLocaleString("vi-VN")}</h3></div></article>
+            <article className={shellStyles.statCard}><div className={`${shellStyles.statIcon} ${shellStyles.statPurple}`}><ImageIcon size={22} /></div><div><small>Ảnh 7 ngày</small><h3>{imageCount.toLocaleString("vi-VN")}</h3></div></article>
+            <article className={shellStyles.statCard}><div className={`${shellStyles.statIcon} ${shellStyles.statBlue}`}><Video size={22} /></div><div><small>Video 7 ngày</small><h3>{videoCount.toLocaleString("vi-VN")}</h3></div></article>
+            <article className={shellStyles.statCard}><div className={`${shellStyles.statIcon} ${shellStyles.statOrange}`}><FolderKanban size={22} /></div><div><small>Tổng item</small><h3>{items.length.toLocaleString("vi-VN")}</h3></div></article>
           </section>
 
           <section className={shellStyles.panel}>
@@ -212,7 +206,7 @@ export default function HistoryClient() {
                       <div className={styles.historyThumb}>
                         {isVideo ? <video src={thumbUrl} muted playsInline preload="metadata" /> : <img src={thumbUrl} alt={item.prompt} loading="lazy" />}
                         <span className={styles.typeBadge}>{isVideo ? "VIDEO" : "IMAGE"}</span>
-                        {isVideo ? <span className={styles.playBadge}>▶</span> : null}
+                        {isVideo ? <span className={styles.playBadge}><Play size={17} fill="currentColor" /></span> : null}
                       </div>
                       <div className={styles.historyBody}>
                         <strong>{truncate(item.prompt || (isVideo ? "Video đã tạo" : "Ảnh đã tạo"))}</strong>

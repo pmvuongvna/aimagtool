@@ -3,9 +3,27 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Bell,
+  ChevronDown,
+  Clapperboard,
+  Coins,
+  Image as ImageIcon,
+  LogOut,
+  MonitorUp,
+  Ratio,
+  Search,
+  Sparkles,
+  Timer,
+  Video,
+  WandSparkles,
+  Workflow,
+  type LucideIcon,
+} from "lucide-react";
 import type { CharacterOrientation, CreateTaskInput, KlingMotionMode, SeedanceVideoResolution, VideoMode, VideoResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory } from "@/lib/template-catalog";
+import { StudioNavigation } from "@/components/studio-navigation";
 import styles from "../generate.module.css";
 
 type AiVideoModel = "grok-imagine" | "seedance-2";
@@ -15,9 +33,9 @@ type VideoWorkflow = "text" | "image";
 type AiVideoModelDefinition = {
   id: AiVideoModel;
   label: string;
-  shortLabel: string;
   description: string;
   accent: "teal" | "violet";
+  icon: LucideIcon;
   badge?: string;
   maxDuration: number;
   defaultResolution: SeedanceVideoResolution;
@@ -31,7 +49,7 @@ type ProfileResponse = { userId: string; credits: number; previewCosts: { grok48
 type HistoryItem = { id: string; mediaType: "image" | "video"; urls: string[]; prompt: string; createdAt: string };
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string };
 type VideoDashboardCache = { userId: string; userName: string; credits: number; costPreview: ProfileResponse["previewCosts"] | null; history: HistoryItem[]; packages: CreditPackage[]; templates: PromptTemplate[] };
-type ControlDropdown = "aspect" | "quality" | "workflow" | "duration" | null;
+type ControlDropdown = "model" | "aspect" | "quality" | "workflow" | "duration" | null;
 type CardItem = { id: string; title: string; meta: string; thumbUrl: string; videoUrl: string; createdAt: string };
 const CACHE_KEY = "aistudio_video_dashboard_cache_v3";
 function isKlingTemplate(item: PromptTemplate) { return item.model.toLowerCase().includes("kling"); }
@@ -46,9 +64,9 @@ const AI_VIDEO_MODELS: readonly AiVideoModelDefinition[] = [
   {
     id: "grok-imagine",
     label: "Grok Imagine",
-    shortLabel: "Grok",
     description: "Fast cinematic video for everyday creation.",
     accent: "teal",
+    icon: Sparkles,
     maxDuration: 30,
     defaultResolution: "480p",
     resolutions: videoResolutionOptions,
@@ -58,9 +76,9 @@ const AI_VIDEO_MODELS: readonly AiVideoModelDefinition[] = [
   {
     id: "seedance-2",
     label: "Seedance 2",
-    shortLabel: "Seedance",
     description: "High-detail motion with output up to 4K.",
     accent: "violet",
+    icon: Clapperboard,
     badge: "NEW",
     maxDuration: 15,
     defaultResolution: "1080p",
@@ -83,7 +101,7 @@ function isVideoUrl(url: string) { return /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(ur
 function truncate(value: string, max = 38) { const clean = value.trim(); return clean.length <= max ? clean : `${clean.slice(0, max - 1)}...`; }
 export default function VideoClient({ initialPrompt, variant = "grok" }: { initialPrompt: string; variant?: VideoVariant }) {
   const router = useRouter();
-  const controlsRef = useRef<HTMLDivElement | null>(null);
+  const controlsRef = useRef<HTMLFormElement | null>(null);
   const isKlingPage = variant === "kling";
   const pageTitle = isKlingPage ? "Kling Motion" : "AI Video";
   const [userId, setUserId] = useState("");
@@ -282,58 +300,62 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const qualityLabel = videoModel === "kling-motion-control" ? klingMotionMode : resolution;
   const workflowLabel = videoModel === "kling-motion-control" ? "Motion Control" : (videoModeType === "text" ? "Text to Video" : "Image to Video");
   const secondaryLabel = videoModel === "kling-motion-control" ? characterOrientation : aspectRatio;
+  const ActiveModelIcon = activeAiModel?.icon ?? WandSparkles;
   return (
     <div className={`${styles.page} ${styles.videoPage}`}>
       <div className={`${styles.appShell} ${styles.videoAppShell}`}>
         <aside className={`${styles.sidebar} ${styles.videoSidebar}`}>
           <Link href="/" className={styles.logoLink}><span className={styles.logoMark} /><span className={styles.logoText}>VizoAI</span></Link>
-          <nav className={styles.navMenu}>
-            <Link className={styles.navItem} href="/user"><span className={styles.navIcon}>D</span><span className={styles.navText}>Dashboard</span></Link>
-            <Link className={styles.navItem} href="/user"><span className={styles.navIcon}>I</span><span className={styles.navText}>Create image</span></Link>
-            <Link className={`${styles.navItem} ${!isKlingPage ? styles.activeNav : ""}`} href="/user/video"><span className={styles.navIcon}>V</span><span className={styles.navText}>Create video</span></Link>
-            <Link className={`${styles.navItem} ${isKlingPage ? styles.activeNav : ""}`} href="/user/kling"><span className={styles.navIcon}>K</span><span className={styles.navText}>Kling Motion</span></Link>
-            <Link className={styles.navItem} href="/user/templates"><span className={styles.navIcon}>T</span><span className={styles.navText}>Templates</span></Link>
-            <Link className={styles.navItem} href="/user/history"><span className={styles.navIcon}>H</span><span className={styles.navText}>History</span></Link>
-            <a className={styles.navItem} href="#styles"><span className={styles.navIcon}>S</span><span className={styles.navText}>Styles</span></a>
-            <Link className={styles.navItem} href="/admin"><span className={styles.navIcon}>A</span><span className={styles.navText}>Settings</span></Link>
-          </nav>
+          <StudioNavigation active={isKlingPage ? "kling" : "video"} />
           <div className={styles.sidebarSpacer} />
           <div className={styles.upgradeCard}><h3>Upgrade Pro</h3><p>Unlock advanced video pipelines, motion control, and extra credits for continuous video campaigns.</p><button type="button">Upgrade now {"->"}</button></div>
           <div className={styles.planBox}><div className={styles.planRow}><span>Current plan</span><strong>{activePackage?.badge || "Free"}</strong></div><div className={styles.planRow}><span>Credits left</span><strong>{formatCredits(credits)}</strong></div></div>
         </aside>
         <main className={`${styles.main} ${styles.videoMain}`} id="dashboard">
           <header className={styles.topbar}>
-            <div className={styles.search}><span>Search</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search clips, prompts, history..." /><div className={styles.shortcut}>Ctrl K</div></div>
+            <div className={styles.search}><Search size={17} aria-hidden="true" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search clips, prompts, history..." /><div className={styles.shortcut}>Ctrl K</div></div>
             <div className={styles.topActions}>
-              <div className={styles.creditsPill}>Credits {formatCredits(credits)}</div>
-              <button type="button" className={styles.iconBtn}><span>Bell</span><span className={styles.iconDot} /></button>
-              <button type="button" className={styles.iconBtn} onClick={handleLogout}>Out</button>
+              <div className={styles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</div>
+              <button type="button" className={styles.iconBtn} aria-label="Notifications"><Bell size={17} aria-hidden="true" /><span className={styles.iconDot} /></button>
+              <button type="button" className={styles.iconBtn} onClick={handleLogout} aria-label="Log out"><LogOut size={17} aria-hidden="true" /></button>
               <div className={styles.userCard}><div className={styles.avatar} /><div><strong>{userName}</strong><span>{activePackage?.name || "Free Plan"}</span></div></div>
             </div>
           </header>
           <section className={`${styles.generator} ${styles.videoStudio} ${isKlingPage ? styles.klingGenerator : ""}`} id="generator">
             <div className={`${styles.generatorTabs} ${isKlingPage ? styles.klingGeneratorTabs : ""}`}>
-              <Link href="/user" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>AI Image</Link>
-              {!isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}>AI Video</button> : <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>AI Video</Link>}
-              {isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}>Kling Motion</button> : <Link href="/user/kling" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>Kling Motion</Link>}
+              <Link href="/user" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><ImageIcon size={15} /> AI Image</Link>
+              {!isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}><Video size={15} /> AI Video</button> : <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><Video size={15} /> AI Video</Link>}
+              {isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}><WandSparkles size={15} /> Kling Motion</button> : <Link href="/user/kling" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><WandSparkles size={15} /> Kling Motion</Link>}
             </div>
             <div className={styles.videoWorkspace}>
-            <form onSubmit={onGenerate} className={styles.videoComposer}>
+            <form onSubmit={onGenerate} className={styles.videoComposer} ref={controlsRef}>
               <div className={styles.composerHeading}>
                 <div><span className={styles.eyebrow}>CREATE VIDEO</span><h1>{pageTitle}</h1><p>Build the scene, choose a model, and render without leaving the workspace.</p></div>
                 <span className={styles.readyBadge}><i /> Ready</span>
               </div>
               {!isKlingPage ? (
-                <div className={styles.modelShelf} aria-label="AI video model">
+                <div className={styles.modelSelector} aria-label="AI video model">
                   <div className={styles.modelShelfHeader}><span>Model</span><small>{AI_VIDEO_MODELS.length} available</small></div>
-                  <div className={styles.modelShelfGrid}>
-                    {AI_VIDEO_MODELS.map((model) => (
-                      <button key={model.id} type="button" className={`${styles.modelTile} ${videoModel === model.id ? styles.modelTileActive : ""}`} onClick={() => selectAiVideoModel(model.id)}>
-                        <span className={`${styles.modelMark} ${model.accent === "violet" ? styles.modelMarkViolet : styles.modelMarkTeal}`}>{model.shortLabel.slice(0, 1)}</span>
-                        <span className={styles.modelTileCopy}><strong>{model.label}{model.badge ? <em>{model.badge}</em> : null}</strong><small>{model.description}</small></span>
-                        <span className={styles.modelRadio} aria-hidden="true" />
-                      </button>
-                    ))}
+                  <div className={styles.settingDropdown}>
+                    <button type="button" className={`${styles.modelSelectTrigger} ${activeAiModel?.accent === "violet" ? styles.modelSelectViolet : styles.modelSelectTeal} ${openControl === "model" ? styles.modelSelectOpen : ""}`} onClick={() => setOpenControl((current) => current === "model" ? null : "model")} aria-expanded={openControl === "model"}>
+                      <span className={styles.modelSelectIcon}><ActiveModelIcon size={19} strokeWidth={1.8} /></span>
+                      <span className={styles.modelTileCopy}><strong>{activeAiModel?.label}{activeAiModel?.badge ? <em>{activeAiModel.badge}</em> : null}</strong><small>{activeAiModel?.description}</small></span>
+                      <ChevronDown className={styles.modelSelectChevron} size={18} aria-hidden="true" />
+                    </button>
+                    {openControl === "model" ? (
+                      <div className={styles.modelSelectMenu}>
+                        {AI_VIDEO_MODELS.map((model) => {
+                          const ModelIcon = model.icon;
+                          return (
+                            <button key={model.id} type="button" className={`${styles.modelSelectOption} ${styles[`modelSelectOption${model.accent === "violet" ? "Violet" : "Teal"}`]} ${videoModel === model.id ? styles.modelSelectOptionActive : ""}`} onClick={() => selectAiVideoModel(model.id)}>
+                              <span className={styles.modelSelectIcon}><ModelIcon size={19} strokeWidth={1.8} /></span>
+                              <span className={styles.modelTileCopy}><strong>{model.label}{model.badge ? <em>{model.badge}</em> : null}</strong><small>{model.description}</small></span>
+                              <span className={styles.modelRadio} aria-hidden="true" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
@@ -341,12 +363,12 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
                 <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the scene, subject, motion, lighting, camera, and mood of the video..." />
                 <div className={styles.promptSide}><button type="button" className={styles.magicBtn}>+</button><span>{prompt.length}</span></div>
               </div>
-              <div className={styles.controlsCompact} ref={controlsRef}>
+              <div className={styles.controlsCompact}>
                 <div className={styles.optionCluster}>
-                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "aspect" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}><div className={styles.controlSelectIcon}>AR</div><div><small>{videoModel === "kling-motion-control" ? "Character" : "Aspect ratio"}</small><strong>{secondaryLabel}</strong></div></button>{openControl === "aspect" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? characterOrientationOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${characterOrientation === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setCharacterOrientation(value); setOpenControl(null); }}>{value}</button>) : videoAspectOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
-                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "quality" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "quality" ? null : "quality")}><div className={styles.controlSelectIcon}>Q</div><div><small>{videoModel === "kling-motion-control" ? "Output mode" : "Resolution"}</small><strong>{qualityLabel}</strong></div></button>{openControl === "quality" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? klingModeOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${klingMotionMode === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setKlingMotionMode(value); setOpenControl(null); }}>{value}</button>) : (activeAiModel?.resolutions ?? videoResolutionOptions).map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${resolution === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setResolution(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
-                  {!isKlingPage ? <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "duration" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "duration" ? null : "duration")}><div className={styles.controlSelectIcon}>S</div><div><small>Duration</small><strong>{duration}s</strong></div></button>{openControl === "duration" ? <div className={styles.settingMenu}>{durationOptions.filter((value) => value <= (activeAiModel?.maxDuration ?? 30)).map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${duration === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setDuration(value); setOpenControl(null); }}>{value} seconds</button>)}</div> : null}</div> : null}
-                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "workflow" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "workflow" ? null : "workflow")}><div className={styles.controlSelectIcon}>WF</div><div><small>{videoModel === "kling-motion-control" ? "Workflow" : "Generation mode"}</small><strong>{workflowLabel}</strong></div></button>{openControl === "workflow" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? <button type="button" className={`${styles.settingMenuItem} ${styles.settingMenuItemActive}`} onClick={() => setOpenControl(null)}>Motion Control</button> : <><button type="button" className={`${styles.settingMenuItem} ${videoModeType === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("text"); setOpenControl(null); }}>Text to Video</button><button type="button" className={`${styles.settingMenuItem} ${videoModeType === "image" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>Image to Video</button></>}</div> : null}</div>
+                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "aspect" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}><div className={styles.controlSelectIcon}><Ratio size={16} /></div><div><small>{videoModel === "kling-motion-control" ? "Character" : "Aspect ratio"}</small><strong>{secondaryLabel}</strong></div></button>{openControl === "aspect" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? characterOrientationOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${characterOrientation === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setCharacterOrientation(value); setOpenControl(null); }}>{value}</button>) : videoAspectOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
+                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "quality" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "quality" ? null : "quality")}><div className={styles.controlSelectIcon}><MonitorUp size={16} /></div><div><small>{videoModel === "kling-motion-control" ? "Output mode" : "Resolution"}</small><strong>{qualityLabel}</strong></div></button>{openControl === "quality" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? klingModeOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${klingMotionMode === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setKlingMotionMode(value); setOpenControl(null); }}>{value}</button>) : (activeAiModel?.resolutions ?? videoResolutionOptions).map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${resolution === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setResolution(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
+                  {!isKlingPage ? <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "duration" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "duration" ? null : "duration")}><div className={styles.controlSelectIcon}><Timer size={16} /></div><div><small>Duration</small><strong>{duration}s</strong></div></button>{openControl === "duration" ? <div className={styles.settingMenu}>{durationOptions.filter((value) => value <= (activeAiModel?.maxDuration ?? 30)).map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${duration === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setDuration(value); setOpenControl(null); }}>{value} seconds</button>)}</div> : null}</div> : null}
+                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "workflow" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "workflow" ? null : "workflow")}><div className={styles.controlSelectIcon}><Workflow size={16} /></div><div><small>{videoModel === "kling-motion-control" ? "Workflow" : "Generation mode"}</small><strong>{workflowLabel}</strong></div></button>{openControl === "workflow" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? <button type="button" className={`${styles.settingMenuItem} ${styles.settingMenuItemActive}`} onClick={() => setOpenControl(null)}>Motion Control</button> : <><button type="button" className={`${styles.settingMenuItem} ${videoModeType === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("text"); setOpenControl(null); }}>Text to Video</button><button type="button" className={`${styles.settingMenuItem} ${videoModeType === "image" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>Image to Video</button></>}</div> : null}</div>
                 </div>
                 <div className={styles.actionCluster}>
                   <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>{showAdvancedSettings ? "Hide advanced" : "Advanced settings"}</button>
@@ -386,7 +408,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
                 <div className={styles.segmentTabs}><button type="button" className={`${styles.segmentTab} ${activeTab === "result" ? styles.segmentTabActive : ""}`} onClick={() => setActiveTab("result")}>Result</button><button type="button" className={`${styles.segmentTab} ${activeTab === "history" ? styles.segmentTabActive : ""}`} onClick={() => setActiveTab("history")}>History</button></div>
               </div>
               <div className={styles.previewStage}>
-                {loading ? <div className={styles.previewEmpty}><div className={styles.spinner} /><strong>Rendering your video</strong><span>{statusText}</span></div> : filteredCards[0] ? <><video src={filteredCards[0].videoUrl} controls muted playsInline /><button type="button" className={styles.previewExpand} onClick={() => setLightboxUrl(filteredCards[0].videoUrl)}>Open preview</button></> : <div className={styles.previewEmpty}><span className={styles.previewGlyph}>V</span><strong>Your render will appear here</strong><span>Set up the scene and start generating.</span></div>}
+                {loading ? <div className={styles.previewEmpty}><div className={styles.spinner} /><strong>Rendering your video</strong><span>{statusText}</span></div> : filteredCards[0] ? <><video src={filteredCards[0].videoUrl} controls muted playsInline /><button type="button" className={styles.previewExpand} onClick={() => setLightboxUrl(filteredCards[0].videoUrl)}>Open preview</button></> : <div className={styles.previewEmpty}><span className={styles.previewGlyph}><Clapperboard size={20} /></span><strong>Your render will appear here</strong><span>Set up the scene and start generating.</span></div>}
               </div>
               <div className={styles.outputSummary}>
                 <div><span>Model</span><strong>{modelLabel}</strong></div>

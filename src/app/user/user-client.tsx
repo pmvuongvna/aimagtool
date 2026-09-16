@@ -3,9 +3,23 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Bell,
+  Coins,
+  FolderKanban,
+  Image as ImageIcon,
+  Images,
+  LogOut,
+  Palette,
+  Ratio,
+  Search,
+  Sparkles,
+  WandSparkles,
+  Workflow,
+} from "lucide-react";
 import type { AIServiceId, CreateTaskInput, ImageResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
-import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory } from "@/lib/template-catalog";
+import { StudioNavigation } from "@/components/studio-navigation";
 import styles from "./generate.module.css";
 
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
@@ -19,7 +33,6 @@ type DashboardCache = {
   costPreview: ProfileResponse["previewCosts"] | null;
   history: HistoryItem[];
   packages: CreditPackage[];
-  templates: PromptTemplate[];
 };
 
 type ControlDropdown = "aspect" | "style" | "model" | "mode" | null;
@@ -104,9 +117,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [openControl, setOpenControl] = useState<ControlDropdown>(null);
   const controlsRef = useRef<HTMLDivElement | null>(null);
-  const [templateLibrary, setTemplateLibrary] = useState<PromptTemplate[]>([]);
-  const [templateCategory, setTemplateCategory] = useState<TemplateCategory>("All");
-
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo ảnh.");
   const [loading, setLoading] = useState(false);
@@ -120,7 +130,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     if (typeof window === "undefined") return;
     try {
       const raw = window.sessionStorage.getItem(CACHE_KEY);
-      const base: DashboardCache = raw ? (JSON.parse(raw) as DashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [], templates: [] };
+      const base: DashboardCache = raw ? (JSON.parse(raw) as DashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [] };
       window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next }));
     } catch {}
   }, []);
@@ -142,12 +152,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, [router]);
 
   useEffect(() => {
-    if (generationMode === "image") {
-      setShowAdvancedSettings(true);
-    }
-  }, [generationMode]);
-
-  useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
       if (!controlsRef.current) return;
       if (!controlsRef.current.contains(event.target as Node)) {
@@ -161,26 +165,26 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      try {
-        const raw = window.sessionStorage.getItem(CACHE_KEY);
-        if (raw) {
-          const cached = JSON.parse(raw) as DashboardCache;
-          if (cached.userId) setUserId(cached.userId);
-          if (cached.userName) setUserName(cached.userName);
-          if (typeof cached.credits === "number") setCredits(cached.credits);
-          if (cached.costPreview) setCostPreview(cached.costPreview);
-          if (Array.isArray(cached.history)) setHistory(cached.history.filter((x) => x.mediaType === "image"));
-          if (Array.isArray(cached.packages)) setPackages(cached.packages);
-          if (Array.isArray(cached.templates)) setTemplateLibrary(cached.templates);
-        }
-      } catch {}
+      queueMicrotask(() => {
+        try {
+          const raw = window.sessionStorage.getItem(CACHE_KEY);
+          if (raw) {
+            const cached = JSON.parse(raw) as DashboardCache;
+            if (cached.userId) setUserId(cached.userId);
+            if (cached.userName) setUserName(cached.userName);
+            if (typeof cached.credits === "number") setCredits(cached.credits);
+            if (cached.costPreview) setCostPreview(cached.costPreview);
+            if (Array.isArray(cached.history)) setHistory(cached.history.filter((x) => x.mediaType === "image"));
+            if (Array.isArray(cached.packages)) setPackages(cached.packages);
+          }
+        } catch {}
+      });
     }
 
     async function bootstrap() {
-      const [profileRes, packageRes, templateRes] = await Promise.all([
+      const [profileRes, packageRes] = await Promise.all([
         apiFetch(apiPath("/api/user/profile")),
         apiFetch(apiPath("/api/public/credit-packages")),
-        apiFetch(apiPath("/api/public/templates?mediaType=image")),
       ]);
 
       if (profileRes.ok) {
@@ -208,12 +212,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
         saveCache({ packages: nextPackages });
       }
 
-      if (templateRes.ok) {
-        const payload = (await templateRes.json()) as { items?: PromptTemplate[] };
-        const nextTemplates = payload.items || [];
-        setTemplateLibrary(nextTemplates);
-        saveCache({ templates: nextTemplates });
-      }
     }
 
     void bootstrap();
@@ -373,38 +371,16 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const createdImageCount = history.reduce((sum, item) => sum + item.urls.length, 0) + resultUrls.length;
   const projectCount = history.length;
   const activePackage = packages[0];
-  const filteredTemplates = useMemo(() => {
-    if (templateCategory === "All") return templateLibrary;
-    return templateLibrary.filter((item) => item.category === templateCategory || item.tags.includes(templateCategory));
-  }, [templateCategory, templateLibrary]);
-
-  const applyTemplate = useCallback((item: PromptTemplate) => {
-    setPrompt(item.prompt);
-    if (aspectOptions.includes(item.aspectRatio)) setAspectRatio(item.aspectRatio);
-    const matchedStyle = styleOptions.find((style) => item.tags.includes(style) || item.prompt.toLowerCase().includes(style.toLowerCase()));
-    if (matchedStyle) setActiveStyle(matchedStyle);
-    setActiveTab("result");
-    document.getElementById("generator")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
-
   return (
-    <div className={styles.page}>
-      <div className={styles.appShell}>
-        <aside className={styles.sidebar}>
+    <div className={`${styles.page} ${styles.videoPage}`}>
+      <div className={`${styles.appShell} ${styles.videoAppShell}`}>
+        <aside className={`${styles.sidebar} ${styles.videoSidebar}`}>
           <Link href="/" className={styles.logoLink}>
             <span className={styles.logoMark} />
             <span className={styles.logoText}>VizoAI</span>
           </Link>
 
-          <nav className={styles.navMenu}>
-            <a className={`${styles.navItem} ${styles.activeNav}`} href="#dashboard"><span className={styles.navIcon}>⌂</span><span className={styles.navText}>Dashboard</span></a>
-            <a className={styles.navItem} href="#generator"><span className={styles.navIcon}>▧</span><span className={styles.navText}>Tạo ảnh</span></a>
-            <Link className={styles.navItem} href="/user/video"><span className={styles.navIcon}>▶</span><span className={styles.navText}>Tạo video</span></Link>
-            <Link className={styles.navItem} href="/user/templates"><span className={styles.navIcon}>▦</span><span className={styles.navText}>Mẫu có sẵn</span></Link>
-            <Link className={styles.navItem} href="/user/history"><span className={styles.navIcon}>↺</span><span className={styles.navText}>Lịch sử</span></Link>
-            <a className={styles.navItem} href="#styles"><span className={styles.navIcon}>♡</span><span className={styles.navText}>Phong cách</span></a>
-            <Link className={styles.navItem} href="/admin"><span className={styles.navIcon}>⚙</span><span className={styles.navText}>Cài đặt</span></Link>
-          </nav>
+          <StudioNavigation active="image" />
 
           <div className={styles.sidebarSpacer} />
 
@@ -420,18 +396,18 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           </div>
         </aside>
 
-        <main className={styles.main} id="dashboard">
+        <main className={`${styles.main} ${styles.videoMain}`} id="dashboard">
           <header className={styles.topbar}>
             <div className={styles.search}>
-              <span>🔍</span>
+              <Search size={17} aria-hidden="true" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm ảnh, prompt, lịch sử..." />
               <div className={styles.shortcut}>Ctrl K</div>
             </div>
 
             <div className={styles.topActions}>
-              <div className={styles.creditsPill}>⚡ {formatCredits(credits)} Credits</div>
-              <button type="button" className={styles.iconBtn}><span>🔔</span><span className={styles.iconDot} /></button>
-              <button type="button" className={styles.iconBtn} onClick={handleLogout}>⎋</button>
+              <div className={styles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</div>
+              <button type="button" className={styles.iconBtn} aria-label="Thông báo"><Bell size={17} aria-hidden="true" /><span className={styles.iconDot} /></button>
+              <button type="button" className={styles.iconBtn} onClick={handleLogout} aria-label="Đăng xuất"><LogOut size={17} aria-hidden="true" /></button>
               <div className={styles.userCard}>
                 <div className={styles.avatar} />
                 <div>
@@ -444,9 +420,9 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
           <section className={styles.generator} id="generator">
             <div className={styles.generatorTabs}>
-              <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}>✨ AI Image</button>
-              <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>🎬 AI Video</Link>
-              <Link href="/user/kling" className={`${styles.generatorTab} ${styles.generatorTabLink}`}>🎞 Kling Motion</Link>
+              <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}><ImageIcon size={15} /> AI Image</button>
+              <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><Images size={15} /> AI Video</Link>
+              <Link href="/user/kling" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><WandSparkles size={15} /> Kling Motion</Link>
             </div>
 
             <form onSubmit={onGenerate}>
@@ -466,7 +442,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     className={`${styles.settingButton} ${openControl === "aspect" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}
                   >
-                    <div className={styles.controlSelectIcon}>▭</div>
+                    <div className={styles.controlSelectIcon}><Ratio size={16} /></div>
                     <div>
                       <small>Tỷ lệ ảnh</small>
                       <strong>{aspectRatio}</strong>
@@ -489,7 +465,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     className={`${styles.settingButton} ${openControl === "style" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "style" ? null : "style")}
                   >
-                    <div className={styles.controlSelectIcon}>✺</div>
+                    <div className={styles.controlSelectIcon}><Palette size={16} /></div>
                     <div>
                       <small>Phong cách</small>
                       <strong>{activeStyle}</strong>
@@ -512,22 +488,22 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     className={`${styles.settingButton} ${openControl === "model" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "model" ? null : "model")}
                   >
-                    <div className={styles.controlSelectIcon}>▤</div>
+                    <div className={styles.controlSelectIcon}><Sparkles size={16} /></div>
                     <div>
                       <small>Model</small>
                       <strong>{imageModel === "gpt" ? "GPT Image 2" : imageModel === "seedream" ? "Seedream 5 Lite" : "Qwen3 Pro"}</strong>
                     </div>
                   </button>
                   {openControl === "model" ? (
-                    <div className={styles.settingMenu}>
-                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "gpt" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("gpt"); if (imageResolution === "1k") setImageResolution("2k"); setOpenControl(null); }}>
-                        GPT Image 2
+                    <div className={`${styles.settingMenu} ${styles.modelChoiceMenu}`}>
+                      <button type="button" className={`${styles.modelChoiceOption} ${styles.modelChoiceTeal} ${imageModel === "gpt" ? styles.modelChoiceActive : ""}`} onClick={() => { setImageModel("gpt"); if (imageResolution === "1k") setImageResolution("2k"); setOpenControl(null); }}>
+                        <span><Sparkles size={16} /></span><div><strong>GPT Image 2</strong><small>Versatile image generation</small></div>
                       </button>
-                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "seedream" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("seedream"); setOpenControl(null); }}>
-                        Seedream 5 Lite
+                      <button type="button" className={`${styles.modelChoiceOption} ${styles.modelChoiceViolet} ${imageModel === "seedream" ? styles.modelChoiceActive : ""}`} onClick={() => { setImageModel("seedream"); setOpenControl(null); }}>
+                        <span><WandSparkles size={16} /></span><div><strong>Seedream 5 Lite</strong><small>Fast creative rendering</small></div>
                       </button>
-                      <button type="button" className={`${styles.settingMenuItem} ${imageModel === "qwen3" ? styles.settingMenuItemActive : ""}`} onClick={() => { setImageModel("qwen3"); setShowAdvancedSettings(true); setOpenControl(null); }}>
-                        Qwen3 Pro
+                      <button type="button" className={`${styles.modelChoiceOption} ${styles.modelChoiceAmber} ${imageModel === "qwen3" ? styles.modelChoiceActive : ""}`} onClick={() => { setImageModel("qwen3"); setShowAdvancedSettings(true); setOpenControl(null); }}>
+                        <span><Images size={16} /></span><div><strong>Qwen3 Pro</strong><small>Detailed professional output</small></div>
                       </button>
                     </div>
                   ) : null}
@@ -539,7 +515,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     className={`${styles.settingButton} ${generationMode === "image" || openControl === "mode" ? styles.settingButtonActive : ""}`}
                     onClick={() => setOpenControl((prev) => prev === "mode" ? null : "mode")}
                   >
-                    <div className={styles.controlSelectIcon}>🖼</div>
+                    <div className={styles.controlSelectIcon}><Workflow size={16} /></div>
                     <div>
                       <small>Chế độ tạo</small>
                       <strong>{generationMode === "text" ? "Text to Image" : "Image to Image"}</strong>
@@ -607,7 +583,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
                     <div className={styles.fieldBlock}>
                       <div className={styles.fieldBlockHeader}><h4>Workflow</h4><span className={styles.fieldHint}>{generationMode === "image" ? "Đang bật ảnh tham chiếu" : "Prompt thuần"}</span></div>
-                      <select value={generationMode} onChange={(e) => setGenerationMode(e.target.value as "text" | "image")}>
+                      <select value={generationMode} onChange={(e) => { const nextMode = e.target.value as "text" | "image"; setGenerationMode(nextMode); if (nextMode === "image") setShowAdvancedSettings(true); }}>
                         <option value="text">Text to Image</option>
                         <option value="image">Image to Image</option>
                       </select>
@@ -648,10 +624,10 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           </section>
 
           <section className={styles.statsGrid}>
-            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statPurple}`}>🖼</div><div><small>Ảnh đã tạo</small><h3>{createdImageCount.toLocaleString("vi-VN")}</h3></div><div className={styles.statUp}>↑ 18%</div></article>
-            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statBlue}`}>✨</div><div><small>Model đang dùng</small><h3>{imageModel === "gpt" ? "GPT" : imageModel === "seedream" ? "Lite" : "Qwen3"}</h3></div><div className={styles.statUp}>↑ 9%</div></article>
-            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statOrange}`}>⚡</div><div><small>Credits còn lại</small><h3>{formatCredits(credits)}</h3><div className={styles.progressTrack}><span style={{ width: `${progressWidth}%` }} /></div></div></article>
-            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statGreen}`}>📁</div><div><small>Dự án đã lưu</small><h3>{projectCount.toLocaleString("vi-VN")}</h3></div><div className={styles.statUp}>↑ 6%</div></article>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statPurple}`}><ImageIcon size={22} /></div><div><small>Ảnh đã tạo</small><h3>{createdImageCount.toLocaleString("vi-VN")}</h3></div><div className={styles.statUp}>+18%</div></article>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statBlue}`}><Sparkles size={22} /></div><div><small>Model đang dùng</small><h3>{imageModel === "gpt" ? "GPT" : imageModel === "seedream" ? "Lite" : "Qwen3"}</h3></div><div className={styles.statUp}>+9%</div></article>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statOrange}`}><Coins size={22} /></div><div><small>Credits còn lại</small><h3>{formatCredits(credits)}</h3><div className={styles.progressTrack}><span style={{ width: `${progressWidth}%` }} /></div></div></article>
+            <article className={styles.statCard}><div className={`${styles.statIcon} ${styles.statGreen}`}><FolderKanban size={22} /></div><div><small>Dự án đã lưu</small><h3>{projectCount.toLocaleString("vi-VN")}</h3></div><div className={styles.statUp}>+6%</div></article>
           </section>
 
           <section className={styles.contentGrid} id="recent">
@@ -673,7 +649,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                   {filteredCards.slice(0, 8).map((item) => (
                     <button key={item.id} type="button" className={styles.creationCard} onClick={() => openUrls(item.urls)}>
                       <div className={styles.creationThumb}>
-                        <span className={styles.creationType}>▧</span>
+                        <span className={styles.creationType}><ImageIcon size={13} /></span>
                         <img src={item.thumbUrl} alt={item.title} />
                       </div>
                       <div className={styles.creationMeta}>
@@ -700,12 +676,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     </div>
   );
 }
-
-
-
-
-
-
 
 
 

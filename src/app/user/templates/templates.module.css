@@ -621,3 +621,233 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Shared studio visual language */
+.eyebrow {
+  color: #efb64d;
+}
+
+.pageIntro h1 {
+  color: #f1f4f2;
+  font-size: 30px;
+  letter-spacing: 0;
+}
+
+.subtitle {
+  color: #929da0;
+}
+
+.modeTabs {
+  gap: 2px;
+  padding: 3px;
+  border-color: #30383d;
+  border-radius: 6px;
+  background: #171c1f;
+}
+
+.modeTab {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  border-radius: 4px;
+  color: #99a3a6;
+  font-size: 13px;
+}
+
+.modeTabActive {
+  color: #10221e;
+  border-color: #52d2b5;
+  background: #52d2b5;
+}
+
+.galleryShell {
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.sidebar {
+  top: 12px;
+  padding: 12px;
+  border-color: #30383d;
+  border-radius: 6px;
+  background: #171c1f;
+}
+
+.sidebarTitle {
+  color: #768184;
+}
+
+.tagList {
+  gap: 4px;
+}
+
+.tagBtn {
+  min-height: 36px;
+  padding: 8px 9px;
+  border-radius: 4px;
+  color: #a4adaf;
+  font-size: 12px;
+}
+
+.tagBtn:hover,
+.tagBtnActive {
+  color: #e2faf4;
+  border-color: #315c52;
+  background: #1c302b;
+}
+
+.tagCount {
+  color: #9de5d4;
+  background: #253a35;
+}
+
+.masonry {
+  column-gap: 12px;
+}
+
+.card {
+  margin-bottom: 12px;
+  border: 1px solid #30383d;
+  border-radius: 6px;
+  background: #181d20;
+  box-shadow: none;
+}
+
+.card:focus-visible,
+.card:hover {
+  border-color: #52d2b5;
+  outline: none;
+}
+
+.emptyState {
+  min-height: 260px;
+  border-color: #30383d;
+  border-radius: 6px;
+  color: #929da0;
+  background: #151a1d;
+}
+
+.galleryFooter {
+  color: #879194;
+}
+
+.pageBtn {
+  border-color: #394348;
+  border-radius: 5px;
+  color: #c8d1ce;
+  background: #1b2124;
+}
+
+.pageInfo {
+  color: #dce2df;
+}
+
+.modal {
+  border: 1px solid #394348;
+  border-radius: 8px;
+  background: #181d20;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.46);
+}
+
+.modalMedia {
+  background: #090b0c;
+}
+
+.modalBody {
+  color: #f1f4f2;
+}
+
+.modalBody h2 {
+  color: #f1f4f2;
+}
+
+.modalTopline span,
+.modalInfo span,
+.modalTags span {
+  border-radius: 4px;
+  color: #c9fff2;
+  background: #203b35;
+}
+
+.modalPrompt {
+  color: #bbc4c1;
+}
+
+.modalMetaText {
+  color: #8d9799;
+}
+
+.copyBtn,
+.useBtn {
+  gap: 8px;
+  border-radius: 6px;
+}
+
+.copyBtn {
+  border-color: #465158;
+  color: #dce4e1;
+  background: #202629;
+}
+
+.useBtn {
+  color: #10221e;
+  background: #52d2b5;
+  box-shadow: none;
+}
+
+@media (max-width: 920px) {
+  .pageIntro h1,
+  .modalBody h2 {
+    color: #f1f4f2;
+  }
+
+  .subtitle {
+    color: #929da0;
+  }
+
+  .modeTabs,
+  .sidebar {
+    border-color: #30383d;
+    border-radius: 6px;
+    background: #171c1f;
+  }
+
+  .modeTab {
+    color: #99a3a6;
+  }
+
+  .modeTabActive {
+    color: #10221e;
+    border-color: #52d2b5;
+    background: #52d2b5;
+  }
+
+  .tagBtn {
+    color: #a4adaf;
+    border-color: #30383d;
+    background: #1c2124;
+  }
+
+  .tagBtnActive {
+    color: #e2faf4;
+    border-color: #315c52;
+    background: #1c302b;
+  }
+
+  .card {
+    border-radius: 6px;
+    background: #181d20;
+  }
+
+  .modal {
+    border-radius: 8px 8px 6px 6px;
+    background: #181d20;
+  }
+
+  .modalMedia {
+    background: #090b0c;
+  }
+}

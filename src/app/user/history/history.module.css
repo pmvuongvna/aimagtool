@@ -263,3 +263,91 @@
     aspect-ratio: 16 / 10;
   }
 }
+
+/* Shared studio visual language */
+.eyebrow {
+  color: #efb64d;
+}
+
+.intro h1 {
+  color: #f1f4f2;
+  font-size: 30px;
+  letter-spacing: 0;
+}
+
+.subtitle,
+.headerNote {
+  color: #929da0;
+}
+
+.filterTabs {
+  gap: 2px;
+  padding: 3px;
+  border-color: #30383d;
+  border-radius: 6px;
+  background: #171c1f;
+}
+
+.filterTab {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 4px;
+  color: #99a3a6;
+  font-size: 13px;
+}
+
+.filterTabActive {
+  color: #10221e;
+  border-color: #52d2b5;
+  background: #52d2b5;
+}
+
+.statsRow {
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.historyGrid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.historyCard {
+  border-color: #30383d;
+  border-radius: 6px;
+  background: #181d20;
+  color: #f1f4f2;
+  box-shadow: none;
+}
+
+.historyCard:hover {
+  transform: none;
+  border-color: #52d2b5;
+  box-shadow: 0 0 0 2px rgba(82, 210, 181, 0.07);
+}
+
+.historyThumb {
+  background: #090b0c;
+}
+
+.typeBadge {
+  border-color: #394247;
+  border-radius: 4px;
+  color: #dce4e1;
+  background: rgba(15, 18, 19, 0.84);
+}
+
+.playBadge {
+  width: 36px;
+  height: 36px;
+  color: #10221e;
+  background: #52d2b5;
+}
+
+.historyBody strong {
+  color: #edf1ef;
+}
+
+.historyMeta {
+  color: #879194;
+}
