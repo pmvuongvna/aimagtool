@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
         requestedCount: result.checked,
         importedCount: result.updated,
         message: result.updated > 0
-          ? `Repaired metadata for ${result.updated} MeiGen templates.`
+          ? `Repaired ${result.updated} MeiGen templates (${result.repairedPrompts} prompts recovered, ${result.unpublishedInvalid} invalid entries unpublished).`
           : "No MeiGen templates needed metadata repair.",
         details: result,
       });

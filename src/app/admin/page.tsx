@@ -455,7 +455,7 @@ export default function AdminPage() {
 
   async function repairMeigenTemplates() {
     setTemplateLoading(true);
-    setStatus("Repairing MeiGen metadata...");
+    setStatus("Repairing MeiGen prompts and metadata...");
     const res = await apiFetch(apiPath("/api/admin/templates"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -464,9 +464,9 @@ export default function AdminPage() {
     const payload = (await res.json().catch(() => ({}))) as { result?: { run?: ImportRun }; snapshot?: TemplateSnapshot };
     if (res.ok && payload.snapshot) {
       setTemplateSnapshot(payload.snapshot);
-      setStatus(payload.result?.run?.message || "MeiGen metadata repaired");
+      setStatus(payload.result?.run?.message || "MeiGen prompts and metadata repaired");
     } else {
-      setStatus("Repair MeiGen metadata failed");
+      setStatus("Repair MeiGen data failed");
     }
     setTemplateLoading(false);
   }

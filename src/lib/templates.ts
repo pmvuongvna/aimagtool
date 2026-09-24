@@ -1,6 +1,7 @@
 import { DEFAULT_PROMPT_TEMPLATES, TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateMediaType } from "@/lib/template-catalog";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 import { normalizeR2PublicImageUrl } from "@/lib/r2";
+import { isUsablePromptText } from "@/lib/prompt-safety";
 
 export type PublicPromptTemplate = PromptTemplate;
 
@@ -211,6 +212,7 @@ export async function getPublicTemplates(options?: {
   if (!hasDatabase()) {
     const baseItems = Array.from(memoryTemplatesMap.values()).filter((item) => {
       if (!item.published || (mediaType && item.mediaType !== mediaType)) return false;
+      if (item.source === "meigen" && !isUsablePromptText(item.prompt)) return false;
       if (query) {
         const haystack = `${item.title} ${item.prompt} ${item.tags.join(" ")} ${item.model}`.toLowerCase();
         if (!haystack.includes(query)) return false;
@@ -295,7 +297,9 @@ export async function getPublicTemplates(options?: {
 
   const selectedTotal = category ? categoryCounts[category] || 0 : categoryCounts.All;
   return {
-    items: result.rows.map((row) => normalizeTemplate(row as Record<string, unknown>)),
+    items: result.rows
+      .map((row) => normalizeTemplate(row as Record<string, unknown>))
+      .filter((item) => item.source !== "meigen" || isUsablePromptText(item.prompt)),
     total: selectedTotal,
     page,
     pageSize,

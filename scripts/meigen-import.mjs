@@ -59,6 +59,73 @@ function sanitize(value = "") {
   return String(value).replace(/\s+/g, " ").replace(/&quot;/g, '"').trim();
 }
 
+function looksLikeExecutablePrompt(value = "") {
+  const normalized = sanitize(value);
+  if (!normalized) return false;
+  if ([
+    /^\(?\s*(?:async\s+)?function\b/i,
+    /\bself\.__next_f\.push\b/i,
+    /<\/?(?:script|style)\b/i,
+    /\bdocument\.documentElement\b/i,
+    /\bnavigator\.(?:language|languages)\b/i,
+    /\b(?:localStorage|sessionStorage)\./i,
+  ].some((pattern) => pattern.test(normalized))) return true;
+
+  const codeSignals = [
+    /\b(?:var|let|const)\s+[A-Za-z_$][\w$]*\s*=/,
+    /\b(?:document|window|navigator)\./,
+    /\b(?:try|catch)\s*[{(]/,
+    /\b(?:replaceAll|toLowerCase|indexOf)\s*\(/,
+    /=>/,
+  ].filter((pattern) => pattern.test(normalized)).length;
+  return codeSignals >= 2;
+}
+
+function isUsablePrompt(value = "") {
+  const normalized = sanitize(value);
+  if (normalized.length < 24 || normalized.length > 8000) return false;
+  if (looksLikeExecutablePrompt(normalized)) return false;
+  if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) return false;
+  if (/^(?:home|search|history|favorites|tags|related creations)$/i.test(normalized)) return false;
+  if (normalized.includes('"$L') || normalized.includes('["$') || /\b(?:className|aria-hidden|webpackChunk|__NEXT_DATA__)\b/.test(normalized)) return false;
+  return true;
+}
+
+function selectBestPrompt(candidates = []) {
+  return candidates
+    .map((candidate, index) => {
+      const value = sanitize(candidate.value || "");
+      if (!isUsablePrompt(value)) return null;
+      const wordCount = value.split(/\s+/).length;
+      const lengthScore = Math.min(value.length, 1200) / 12;
+      const longTextPenalty = Math.max(0, value.length - 2500) / 8;
+      return { value, score: (candidate.priority || 0) + Math.min(wordCount, 120) + lengthScore - longTextPenalty - index / 1000 };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)[0]?.value || "";
+}
+
+function extractStructuredPromptCandidates(data) {
+  const candidates = [];
+  const visit = (value, key = "") => {
+    if (typeof value === "string") {
+      const normalizedKey = key.replace(/[_-]/g, "").toLowerCase();
+      if (normalizedKey.includes("prompt")) candidates.push({ value, priority: 320 });
+      else if (["description", "content", "text"].includes(normalizedKey)) candidates.push({ value, priority: 120 });
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item) => visit(item, key));
+      return;
+    }
+    if (value && typeof value === "object") {
+      Object.entries(value).forEach(([childKey, childValue]) => visit(childValue, childKey));
+    }
+  };
+  visit(data);
+  return candidates;
+}
+
 function normalizeListingUrls(urls = []) {
   const source = Array.isArray(urls) && urls.length > 0 ? urls : DEFAULT_LISTING_URLS;
   const normalized = [...new Set(
@@ -551,13 +618,14 @@ async function extractTemplate(candidate) {
   const markdown = page.format === "markdown" ? page.body : "";
   
   const stringHits = [];
+  const structuredPromptCandidates = [];
   if (html) {
     const nextData = extractNextData(html);
+    structuredPromptCandidates.push(...extractStructuredPromptCandidates(nextData));
     walk(nextData, (value) => {
       if (typeof value !== "string") return;
       const normalized = sanitize(value);
-      if (normalized.length < 30 || normalized.length > 50000) return;
-      if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) return;
+      if (!isUsablePrompt(normalized)) return;
       stringHits.push(normalized);
     });
     
@@ -572,30 +640,19 @@ async function extractTemplate(candidate) {
           cleanStr = quotedStr.slice(1, -1).replace(/\\"/g, '"');
         }
         const normalized = sanitize(cleanStr);
-        if (normalized.length < 30 || normalized.length > 8000) continue;
-        if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) continue;
-        if (
-          normalized.includes('"$') ||
-          normalized.includes('["$') ||
-          normalized.includes('"$L') ||
-          normalized.includes('section') ||
-          normalized.includes('children') ||
-          normalized.includes('className') ||
-          normalized.includes('Related creations') ||
-          normalized.includes('aria-hidden')
-        ) {
-          continue;
-        }
+        if (!isUsablePrompt(normalized)) continue;
+        if (/\b(?:section|children|Related creations)\b/i.test(normalized)) continue;
         stringHits.push(normalized);
       }
     }
   }
 
-  const promptCandidates = [candidate.prompt, ...stringHits];
-  if (markdown) {
-    promptCandidates.push(extractPromptFromMarkdown(markdown));
-  }
-  const prompt = promptCandidates.filter(Boolean).sort((a, b) => b.length - a.length)[0] || "";
+  const prompt = selectBestPrompt([
+    { value: candidate.prompt, priority: 420 },
+    { value: markdown ? extractPromptFromMarkdown(markdown) : "", priority: 380 },
+    ...structuredPromptCandidates,
+    ...stringHits.map((value) => ({ value, priority: 20 })),
+  ]);
 
   if (!prompt || prompt.length < 24) {
     return { item: null, relatedCandidates: [] };

@@ -4,6 +4,7 @@ import { request as httpsRequest } from "node:https";
 import { TEMPLATE_CATEGORIES, DEFAULT_PROMPT_TEMPLATES, type PromptTemplate, type TemplateCategory, type TemplateMediaType } from "@/lib/template-catalog";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 import { mirrorRemoteImageToR2, normalizeR2PublicImageUrl } from "@/lib/r2";
+import { isUsablePromptText, normalizePromptText, selectBestPrompt } from "@/lib/prompt-safety";
 
 export type PromptImportSettings = {
   enabled: boolean;
@@ -388,7 +389,28 @@ function extractMeta(html: string, property: string) {
 }
 
 function sanitizePrompt(value: string) {
-  return value.replace(/\s+/g, " ").replace(/&quot;/g, '"').trim();
+  return normalizePromptText(value);
+}
+
+function extractStructuredPromptCandidates(data: unknown) {
+  const candidates: Array<{ value: string; priority: number }> = [];
+  const visit = (value: unknown, key = "") => {
+    if (typeof value === "string") {
+      const normalizedKey = key.replace(/[_-]/g, "").toLowerCase();
+      if (normalizedKey.includes("prompt")) candidates.push({ value, priority: 320 });
+      else if (["description", "content", "text"].includes(normalizedKey)) candidates.push({ value, priority: 120 });
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item) => visit(item, key));
+      return;
+    }
+    if (value && typeof value === "object") {
+      Object.entries(value as Record<string, unknown>).forEach(([childKey, childValue]) => visit(childValue, childKey));
+    }
+  };
+  visit(data);
+  return candidates;
 }
 
 function normalizeCandidateThumbnailUrl(value: string) {
@@ -956,12 +978,12 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
   const markdown = page.format === "markdown" ? page.body : "";
   const nextData = html ? extractNextData(html) : null;
   const stringHits: string[] = [];
+  const structuredPromptCandidates = extractStructuredPromptCandidates(nextData);
   
   walk(nextData, (value) => {
     if (typeof value !== "string") return;
     const normalized = sanitizePrompt(value);
-    if (normalized.length < 30 || normalized.length > 50000) return;
-    if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) return;
+    if (!isUsablePromptText(normalized)) return;
     stringHits.push(normalized);
   });
 
@@ -977,30 +999,19 @@ async function extractDetailPrompt(candidate: CandidateSummary) {
           cleanStr = quotedStr.slice(1, -1).replace(/\\"/g, '"');
         }
         const normalized = sanitizePrompt(cleanStr);
-        if (normalized.length < 30 || normalized.length > 8000) continue;
-        if (/(^https?:\/\/)|(^\/)|(^[A-Z0-9_-]{18,}$)/i.test(normalized)) continue;
-        if (
-          normalized.includes('"$') ||
-          normalized.includes('["$') ||
-          normalized.includes('"$L') ||
-          normalized.includes('section') ||
-          normalized.includes('children') ||
-          normalized.includes('className') ||
-          normalized.includes('Related creations') ||
-          normalized.includes('aria-hidden')
-        ) {
-          continue;
-        }
+        if (!isUsablePromptText(normalized)) continue;
+        if (/\b(?:section|children|Related creations)\b/i.test(normalized)) continue;
         stringHits.push(normalized);
       }
     }
   }
 
-  const promptCandidates = [candidate.prompt, ...stringHits];
-  if (markdown) {
-    promptCandidates.push(extractPromptFromMarkdown(markdown));
-  }
-  const prompt = promptCandidates.filter((value): value is string => Boolean(value)).sort((a, b) => b.length - a.length)[0] || "";
+  const prompt = selectBestPrompt([
+    { value: candidate.prompt, priority: 420 },
+    { value: markdown ? extractPromptFromMarkdown(markdown) : "", priority: 380 },
+    ...structuredPromptCandidates,
+    ...stringHits.map((value) => ({ value, priority: 20 })),
+  ]);
   const title = candidate.title || extractMeta(html, "og:title") || extractMeta(html, "twitter:title") || extractTitleFromMarkdown(markdown);
   const thumbnailUrl = normalizeCandidateThumbnailUrl(candidate.thumbnailUrl || extractMeta(html, "og:image") || extractMeta(html, "twitter:image") || extractThumbnailFromMarkdown(markdown));
   const authorName = candidate.authorName || extractMeta(html, "author") || extractAuthorFromMarkdown(markdown);
@@ -1090,6 +1101,9 @@ async function resolveTemplateThumbnailUrl(input: PromptTemplateAdminInput) {
 }
 
 export async function createOrUpdateTemplate(input: PromptTemplateAdminInput) {
+  if ((input.source || "internal") === "meigen" && !isUsablePromptText(input.prompt)) {
+    throw new Error("Rejected MeiGen template because its prompt contains executable or invalid page content.");
+  }
   const preparedInput = normalizeMeigenTemplateInput(input);
   const resolvedThumbnailUrl = await resolveTemplateThumbnailUrl(preparedInput);
   const normalized: PromptTemplate = {
@@ -1306,16 +1320,71 @@ export async function clearBrokenTemplateThumbnails() {
   return { checked, removedTemplates };
 }
 
+async function recoverStoredMeigenPrompt(item: {
+  title: string;
+  prompt: string;
+  thumbnailUrl: string;
+  model: string;
+  authorName?: string;
+  tags: string[];
+  sourcePromptId?: string;
+  sourceUrl?: string;
+}) {
+  if (isUsablePromptText(item.prompt)) return { prompt: item.prompt, recovered: false, error: "" };
+  const detailUrl = item.sourceUrl || item.sourcePromptId || "";
+  if (!/^https:\/\/www\.meigen\.ai\/prompt\//i.test(detailUrl)) {
+    return { prompt: item.prompt, recovered: false, error: "Missing MeiGen detail URL" };
+  }
+
+  try {
+    const detail = await extractDetailPrompt({
+      title: item.title,
+      detailUrl,
+      thumbnailUrl: item.thumbnailUrl,
+      model: item.model,
+      authorName: item.authorName,
+      tags: item.tags,
+    });
+    if (!isUsablePromptText(detail.prompt)) {
+      return { prompt: item.prompt, recovered: false, error: `No valid prompt found at ${detailUrl}` };
+    }
+    return { prompt: detail.prompt, recovered: true, error: "" };
+  } catch (error) {
+    return {
+      prompt: item.prompt,
+      recovered: false,
+      error: error instanceof Error ? error.message : `Unable to reload ${detailUrl}`,
+    };
+  }
+}
+
 export async function repairStoredMeigenTemplates() {
   if (!hasDatabase()) {
     let checked = 0;
     let updated = 0;
+    let repairedPrompts = 0;
+    let unpublishedInvalid = 0;
+    const errors: string[] = [];
     for (const [id, item] of memoryTemplates.entries()) {
       if (item.source !== "meigen") continue;
       checked += 1;
-      const repaired = normalizeMeigenTemplateInput({
+      const promptResult = await recoverStoredMeigenPrompt({
         title: item.title,
         prompt: item.prompt,
+        thumbnailUrl: item.thumbnailUrl,
+        model: item.model,
+        authorName: item.authorName,
+        tags: item.tags,
+        sourcePromptId: item.sourcePromptId,
+        sourceUrl: item.sourceUrl,
+      });
+      const published = isUsablePromptText(promptResult.prompt) ? item.published : false;
+      if (promptResult.recovered) repairedPrompts += 1;
+      if (item.published && !published) unpublishedInvalid += 1;
+      if (promptResult.error) errors.push(promptResult.error);
+      const repaired = normalizeMeigenTemplateInput({
+        title: item.title,
+        prompt: promptResult.prompt,
         thumbnailUrl: item.thumbnailUrl,
         mediaType: item.mediaType,
         model: item.model,
@@ -1323,7 +1392,7 @@ export async function repairStoredMeigenTemplates() {
         category: item.category,
         tags: item.tags,
         authorName: item.authorName,
-        published: item.published,
+        published,
         featured: item.featured,
         source: item.source,
         sourcePromptId: item.sourcePromptId,
@@ -1332,6 +1401,8 @@ export async function repairStoredMeigenTemplates() {
 
       const nextItem: PromptTemplate = {
         ...item,
+        prompt: promptResult.prompt,
+        published,
         mediaType: repaired.mediaType,
         model: repaired.model.trim(),
         aspectRatio: repaired.aspectRatio.trim() || (repaired.mediaType === "video" ? "16:9" : "1:1"),
@@ -1345,7 +1416,7 @@ export async function repairStoredMeigenTemplates() {
       }
     }
 
-    return { checked, updated };
+    return { checked, updated, repairedPrompts, unpublishedInvalid, errors: errors.slice(0, 10) };
   }
 
   await ensureSchema();
@@ -1358,6 +1429,9 @@ export async function repairStoredMeigenTemplates() {
 
   let checked = 0;
   let updated = 0;
+  let repairedPrompts = 0;
+  let unpublishedInvalid = 0;
+  const errors: string[] = [];
 
   for (const row of result.rows as Array<Record<string, unknown>>) {
     checked += 1;
@@ -1367,17 +1441,36 @@ export async function repairStoredMeigenTemplates() {
       aspectRatio: string;
       category: TemplateCategory;
       tags: string[];
+      prompt: string;
+      published: boolean;
     } = {
       mediaType: row.media_type === "video" ? "video" : "image",
       model: String(row.model || "").trim(),
       aspectRatio: String(row.aspect_ratio || "").trim(),
       category: normalizeTemplateCategory(String(row.category || "All")),
       tags: Array.isArray(row.tags) ? row.tags.map((item) => String(item)) : [],
+      prompt: String(row.prompt || ""),
+      published: Boolean(row.published),
     };
+
+    const promptResult = await recoverStoredMeigenPrompt({
+      title: String(row.title || ""),
+      prompt: current.prompt,
+      thumbnailUrl: normalizeR2PublicImageUrl(String(row.thumbnail_url || "")),
+      model: current.model,
+      authorName: row.author_name ? String(row.author_name) : undefined,
+      tags: current.tags,
+      sourcePromptId: row.source_prompt_id ? String(row.source_prompt_id) : undefined,
+      sourceUrl: row.source_url ? String(row.source_url) : undefined,
+    });
+    const published = isUsablePromptText(promptResult.prompt) ? current.published : false;
+    if (promptResult.recovered) repairedPrompts += 1;
+    if (current.published && !published) unpublishedInvalid += 1;
+    if (promptResult.error) errors.push(promptResult.error);
 
     const repaired = normalizeMeigenTemplateInput({
       title: String(row.title || ""),
-      prompt: String(row.prompt || ""),
+      prompt: promptResult.prompt,
       thumbnailUrl: normalizeR2PublicImageUrl(String(row.thumbnail_url || "")),
       mediaType: current.mediaType,
       model: current.model,
@@ -1385,7 +1478,7 @@ export async function repairStoredMeigenTemplates() {
       category: current.category,
       tags: current.tags,
       authorName: row.author_name ? String(row.author_name) : undefined,
-      published: Boolean(row.published),
+      published,
       featured: Boolean(row.featured),
       source: "meigen",
       sourcePromptId: row.source_prompt_id ? String(row.source_prompt_id) : undefined,
@@ -1398,6 +1491,8 @@ export async function repairStoredMeigenTemplates() {
       aspectRatio: repaired.aspectRatio.trim() || (repaired.mediaType === "video" ? "16:9" : "1:1"),
       category: normalizeTemplateCategory(repaired.category),
       tags: normalizeTags(repaired.tags || []),
+      prompt: promptResult.prompt,
+      published,
     };
 
     if (
@@ -1406,6 +1501,8 @@ export async function repairStoredMeigenTemplates() {
       && current.aspectRatio === next.aspectRatio
       && current.category === next.category
       && JSON.stringify(current.tags) === JSON.stringify(next.tags)
+      && current.prompt === next.prompt
+      && current.published === next.published
     ) {
       continue;
     }
@@ -1417,14 +1514,16 @@ export async function repairStoredMeigenTemplates() {
            aspect_ratio = $4,
            category = $5,
            tags = $6::jsonb,
+           prompt = $7,
+           published = $8,
            updated_at = NOW()
        WHERE id = $1`,
-      [String(row.id), next.mediaType, next.model, next.aspectRatio, next.category, JSON.stringify(next.tags)],
+      [String(row.id), next.mediaType, next.model, next.aspectRatio, next.category, JSON.stringify(next.tags), next.prompt, next.published],
     );
     updated += 1;
   }
 
-  return { checked, updated };
+  return { checked, updated, repairedPrompts, unpublishedInvalid, errors: errors.slice(0, 10) };
 }
 
 function shouldImportNow(settings: PromptImportSettings, now = new Date()) {
