@@ -351,3 +351,98 @@
 .historyMeta {
   color: #879194;
 }
+
+/* Light studio theme */
+.eyebrow {
+  color: #5b66ec;
+}
+
+.intro h1 {
+  color: #151c29;
+  font-size: 34px;
+}
+
+.subtitle,
+.headerNote {
+  color: #737d8f;
+}
+
+.filterTabs {
+  gap: 4px;
+  padding: 5px;
+  border-color: #e5e8ef;
+  border-radius: 14px;
+  background: #eef0f4;
+}
+
+.filterTab {
+  height: 40px;
+  padding: 0 15px;
+  border-radius: 10px;
+  color: #687183;
+}
+
+.filterTabActive {
+  color: #4e59e6;
+  border-color: #eceeff;
+  background: #ffffff;
+  box-shadow: 0 5px 14px rgba(31, 38, 72, 0.08);
+}
+
+.statsRow {
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.historyGrid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+.historyCard {
+  border-color: #e2e5ed;
+  border-radius: 18px;
+  color: #273042;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(31, 38, 72, 0.06);
+}
+
+.historyCard:hover {
+  transform: translateY(-3px);
+  border-color: #cfd4ff;
+  box-shadow: 0 18px 38px rgba(31, 38, 72, 0.11);
+}
+
+.historyThumb {
+  background: #eef0f5;
+}
+
+.typeBadge {
+  border-color: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: #ffffff;
+  background: rgba(22, 27, 39, 0.76);
+  backdrop-filter: blur(10px);
+}
+
+.playBadge {
+  color: #ffffff;
+  background: #5965f3;
+}
+
+.historyBody strong {
+  color: #273042;
+}
+
+.historyMeta {
+  color: #8790a1;
+}
+
+@media (max-width: 920px) {
+  .intro h1 { color: #151c29; }
+  .subtitle, .headerNote { color: #737d8f; }
+  .filterTabs { border-color: #e5e8ef; background: #eef0f4; }
+  .filterTab { color: #687183; }
+  .filterTabActive { color: #4e59e6; border-color: #eceeff; background: #fff; }
+  .historyCard { border-radius: 16px; background: #fff; }
+}

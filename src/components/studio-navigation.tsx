@@ -14,8 +14,8 @@ const items = [
   { id: "dashboard", active: ["dashboard"], href: "/user", label: "Home", icon: House },
   { id: "image", active: ["image"], href: "/user#generator", label: "Image", icon: ImageIcon },
   { id: "video", active: ["video"], href: "/user/video", label: "Video", icon: Video },
-  { id: "kling", active: ["kling", "styles"], href: "/user/kling", label: "Tools", icon: WandSparkles },
-  { id: "history", active: ["history", "templates"], href: "/user/history", label: "Library", icon: FolderOpen },
+  { id: "kling", active: ["kling", "styles"], href: "/user/tools", label: "Tools", icon: WandSparkles },
+  { id: "history", active: ["history", "templates"], href: "/user/templates", label: "Library", icon: FolderOpen },
 ] as const;
 
 export function StudioNavigation({ active }: { active: StudioSection }) {
