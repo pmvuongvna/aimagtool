@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import type { CharacterOrientation, CreateTaskInput, KlingMotionMode, SeedanceVideoResolution, VideoMode, VideoResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
-import { TEMPLATE_CATEGORIES, type PromptTemplate, type TemplateCategory } from "@/lib/template-catalog";
 import { StudioNavigation } from "@/components/studio-navigation";
 import styles from "../generate.module.css";
 
@@ -48,11 +47,10 @@ type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: n
 type ProfileResponse = { userId: string; credits: number; previewCosts: { grok480p: number; grok720p: number; seedance480p: number; seedance720p: number; seedance1080p: number; seedance4k: number; kling720p: number; kling1080p: number } };
 type HistoryItem = { id: string; mediaType: "image" | "video"; urls: string[]; prompt: string; createdAt: string };
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string };
-type VideoDashboardCache = { userId: string; userName: string; credits: number; costPreview: ProfileResponse["previewCosts"] | null; history: HistoryItem[]; packages: CreditPackage[]; templates: PromptTemplate[] };
+type VideoDashboardCache = { userId: string; userName: string; credits: number; costPreview: ProfileResponse["previewCosts"] | null; history: HistoryItem[]; packages: CreditPackage[] };
 type ControlDropdown = "model" | "aspect" | "quality" | "workflow" | "duration" | null;
 type CardItem = { id: string; title: string; meta: string; thumbUrl: string; videoUrl: string; createdAt: string };
 const CACHE_KEY = "aistudio_video_dashboard_cache_v3";
-function isKlingTemplate(item: PromptTemplate) { return item.model.toLowerCase().includes("kling"); }
 const videoAspectOptions = ["auto", "2:3", "16:9", "9:16", "4:3", "3:4", "1:1"];
 const durationOptions = [5, 6, 10, 15, 20, 25, 30];
 const videoResolutionOptions: VideoResolution[] = ["480p", "720p"];
@@ -125,8 +123,6 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const [activeTab, setActiveTab] = useState<"result" | "history">("result");
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(variant === "kling");
   const [openControl, setOpenControl] = useState<ControlDropdown>(null);
-  const [templateLibrary, setTemplateLibrary] = useState<PromptTemplate[]>([]);
-  const [templateCategory, setTemplateCategory] = useState<TemplateCategory>("All");
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState(isKlingPage ? "Ready for Kling Motion generation." : "Ready for video generation.");
   const [loading, setLoading] = useState(false);
@@ -134,7 +130,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const saveCache = useCallback((next: Partial<VideoDashboardCache>) => { if (typeof window === "undefined") return; try { const raw = window.sessionStorage.getItem(CACHE_KEY); const base: VideoDashboardCache = raw ? (JSON.parse(raw) as VideoDashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [], templates: [] }; window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next })); } catch {} }, []);
+  const saveCache = useCallback((next: Partial<VideoDashboardCache>) => { if (typeof window === "undefined") return; try { const raw = window.sessionStorage.getItem(CACHE_KEY); const base: VideoDashboardCache = raw ? (JSON.parse(raw) as VideoDashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [] }; window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next })); } catch {} }, []);
   const activeAiModel = isAiVideoModel(videoModel) ? AI_VIDEO_MODEL_MAP[videoModel] : null;
   const selectAiVideoModel = useCallback((nextModel: AiVideoModel) => {
     const definition = AI_VIDEO_MODEL_MAP[nextModel];
@@ -160,16 +156,14 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
             if (cached.costPreview) setCostPreview(cached.costPreview);
             if (Array.isArray(cached.history)) setHistory(cached.history.filter((x) => x.mediaType === "video"));
             if (Array.isArray(cached.packages)) setPackages(cached.packages);
-            if (Array.isArray(cached.templates)) setTemplateLibrary(cached.templates.filter((item) => variant === "kling" ? isKlingTemplate(item) : !isKlingTemplate(item)));
           }
         } catch {}
       });
     }
     async function bootstrap() {
-      const [profileRes, packageRes, templateRes] = await Promise.all([
+      const [profileRes, packageRes] = await Promise.all([
         apiFetch(apiPath("/api/user/profile")),
         apiFetch(apiPath("/api/public/credit-packages")),
-        apiFetch(apiPath("/api/public/templates?mediaType=video")),
       ]);
       if (profileRes.ok) {
         const data = (await profileRes.json()) as ProfileResponse & { user?: { id: string; name: string } | null };
@@ -193,16 +187,9 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
         setPackages(nextPackages);
         saveCache({ packages: nextPackages });
       }
-      if (templateRes.ok) {
-        const payload = (await templateRes.json()) as { items?: PromptTemplate[] };
-        const allTemplates = payload.items || [];
-        const nextTemplates = allTemplates.filter((item) => variant === "kling" ? isKlingTemplate(item) : !isKlingTemplate(item));
-        setTemplateLibrary(nextTemplates);
-        saveCache({ templates: allTemplates });
-      }
     }
     void bootstrap();
-  }, [saveCache, variant]);
+  }, [saveCache]);
   const checkTask = useCallback(async (targetTaskId: string) => {
     const res = await apiFetch(apiPath(`/api/ai/task/${targetTaskId}`));
     const payload = (await res.json()) as Record<string, unknown>;
@@ -293,8 +280,6 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const displayCards = activeTab === "result" && (loading || resultCards.length > 0) ? resultCards : historyCards;
   const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
   const filteredHistoryCards = historyCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
-  const filteredTemplates = useMemo(() => { if (templateCategory === "All") return templateLibrary; return templateLibrary.filter((item) => item.category === templateCategory || item.tags.includes(templateCategory)); }, [templateCategory, templateLibrary]);
-  const applyTemplate = useCallback((item: PromptTemplate) => { setPrompt(item.prompt); if (variant !== "kling" && videoAspectOptions.includes(item.aspectRatio)) setAspectRatio(item.aspectRatio); if (variant !== "kling") { const templateModel = item.model.toLowerCase(); selectAiVideoModel(templateModel.includes("seedance") ? "seedance-2" : "grok-imagine"); } setVideoModeType("text"); setActiveTab("result"); document.getElementById("generator")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [selectAiVideoModel, variant]);
   const activePackage = packages[0];
   const modelLabel = videoModel === "kling-motion-control" ? "Kling 2.6" : AI_VIDEO_MODEL_MAP[videoModel].label;
   const qualityLabel = videoModel === "kling-motion-control" ? klingMotionMode : resolution;
@@ -428,15 +413,6 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
             <div className={styles.panel}>
               <div className={styles.panelHead}><div><span className={styles.eyebrow}>LIBRARY</span><h2>Recent renders</h2></div><button type="button" className={styles.textLinkBtn} onClick={() => router.push("/user/history")}>View full history</button></div>
               {filteredHistoryCards.length === 0 ? <div className={styles.emptyState}>Your completed video renders will collect here.</div> : <div className={styles.creationGrid}>{filteredHistoryCards.slice(0, 8).map((item) => <button key={item.id} type="button" className={styles.creationCard} onClick={() => setLightboxUrl(item.videoUrl)}><div className={styles.creationThumb}><span className={styles.creationType}>Video</span><video src={item.videoUrl} muted playsInline /></div><div className={styles.creationMeta}><strong>{item.title}</strong><span>{item.meta}</span></div></button>)}</div>}
-            </div>
-          </section>
-          <section className={styles.quickPromptSection} id="styles">
-            <div className={styles.quickPromptPanel}>
-              <div className={styles.quickPromptHeader}><div><h3>{isKlingPage ? "Kling Motion templates" : "Quick video templates"}</h3><p>{isKlingPage ? "Pick a Kling preset and send it straight into the motion control workflow." : "Pick a template prompt and apply it to the video form instantly."}</p></div><button type="button" className={styles.quickPromptCta} onClick={() => router.push("/user/templates")}>View all</button></div>
-              <div className={styles.quickPromptBody}>
-                <aside className={styles.quickPromptSidebar}><span>TAGS</span><div className={styles.quickPromptTags}>{TEMPLATE_CATEGORIES.map((category) => <button key={category} type="button" className={`${styles.quickPromptTag} ${templateCategory === category ? styles.quickPromptTagActive : ""}`} onClick={() => setTemplateCategory(category)}>{category}</button>)}</div></aside>
-                <div className={styles.quickPromptGrid}>{filteredTemplates.slice(0, 6).map((item) => <article key={item.id} className={styles.quickPromptCard}><div className={styles.quickPromptThumb} style={{ backgroundImage: `url(${item.thumbnailUrl})` }} /><div className={styles.quickPromptCopy}><strong>{item.title}</strong><span>{item.aspectRatio} - {item.model}</span><p>{item.prompt}</p><button type="button" className={styles.quickPromptUseBtn} onClick={() => applyTemplate(item)}>Use prompt</button></div></article>)}</div>
-              </div>
             </div>
           </section>
         </main>
