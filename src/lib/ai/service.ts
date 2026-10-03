@@ -31,6 +31,14 @@ function requireHttpUrl(inputUrl?: string, fieldName = "inputUrl") {
   return normalized;
 }
 
+function requireHttpUrls(inputUrls?: string[], fallbackUrl?: string) {
+  const candidates = inputUrls?.length ? inputUrls : fallbackUrl ? [fallbackUrl] : [];
+  if (candidates.length < 1 || candidates.length > 10) {
+    throw new Error("Qwen 2.1 Image to Image requires between 1 and 10 reference images.");
+  }
+  return candidates.map((url, index) => requireHttpUrl(url, `inputUrls[${index}]`));
+}
+
 function normalizeDuration(duration?: number) {
   return Math.max(1, Math.min(30, Math.floor(duration || 6)));
 }
@@ -55,6 +63,31 @@ function mapSeedreamQuality(resolution?: CreateTaskInput["imageResolution"]) {
 function mapQwenImageSize(aspectRatio?: string) {
   const allowed = new Set(["1:1", "3:4", "4:3", "9:16", "16:9"]);
   return allowed.has(aspectRatio || "") ? aspectRatio : "1:1";
+}
+
+function normalizeQwen21AspectRatio(aspectRatio?: string, allowAuto = false) {
+  const allowed = new Set(["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16", "21:9", "9:21"]);
+  if (allowAuto && aspectRatio === "auto") return "auto";
+  return allowed.has(aspectRatio || "") ? aspectRatio : allowAuto ? "auto" : "3:2";
+}
+
+function normalizeQwen21Resolution(resolution?: CreateTaskInput["imageResolution"]) {
+  return resolution === "2k" ? "2K" : "1K";
+}
+
+function normalizeImageSeed(seed?: number) {
+  if (!Number.isFinite(seed)) return 0;
+  return Math.max(0, Math.floor(seed || 0));
+}
+
+function getQwen21OutputSettings(payload: CreateTaskInput) {
+  const background = payload.imageBackground === "transparent" ? "transparent" : "opaque";
+  const allowedFormats = new Set(["png", "webp", "jpeg"]);
+  const outputFormat = allowedFormats.has(payload.imageOutputFormat || "") ? payload.imageOutputFormat! : "png";
+  if (background === "transparent" && outputFormat === "jpeg") {
+    throw new Error("Qwen 2.1 cannot combine a transparent background with JPEG output.");
+  }
+  return { background, outputFormat };
 }
 
 function normalizeKlingMode(mode?: KlingMotionMode) {
@@ -114,6 +147,52 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
       aspect_ratio: payload.aspectRatio || "1:1",
       quality: mapSeedreamQuality(payload.imageResolution),
     }),
+  },
+  "qwen2-1-text": {
+    model: "qwen2-1/text-to-image",
+    requiresReferenceImage: false,
+    buildInput: (payload) => {
+      const { background, outputFormat } = getQwen21OutputSettings(payload);
+      return {
+        prompt: requirePromptWithinLimit(payload.prompt, 5000, "Qwen 2.1"),
+        aspect_ratio: normalizeQwen21AspectRatio(payload.aspectRatio),
+        resolution: normalizeQwen21Resolution(payload.imageResolution),
+        background,
+        output_format: outputFormat,
+        enhance_prompt: payload.enhancePrompt ?? true,
+        seed: normalizeImageSeed(payload.seed),
+        nsfw_checker: payload.nsfwChecker ?? false,
+      };
+    },
+  },
+  "qwen2-1-image": {
+    model: "qwen2-1/image-to-image",
+    requiresReferenceImage: true,
+    buildInput: (payload) => {
+      const imageUrls = requireHttpUrls(payload.inputUrls, payload.inputUrl);
+      const maskUrl = payload.maskUrl?.trim() ? requireHttpUrl(payload.maskUrl, "maskUrl") : undefined;
+      const { background, outputFormat } = getQwen21OutputSettings(payload);
+      if (maskUrl && imageUrls.length !== 1) {
+        throw new Error("Qwen 2.1 inpainting requires exactly one reference image.");
+      }
+      if (maskUrl && background === "transparent") {
+        throw new Error("Qwen 2.1 inpainting cannot use a transparent background.");
+      }
+
+      return {
+        image_urls: imageUrls,
+        prompt: requirePromptWithinLimit(payload.prompt, 5000, "Qwen 2.1"),
+        ...(maskUrl ? { mask_url: maskUrl } : {
+          aspect_ratio: normalizeQwen21AspectRatio(payload.aspectRatio, true),
+          enhance_prompt: payload.enhancePrompt ?? true,
+        }),
+        resolution: normalizeQwen21Resolution(payload.imageResolution),
+        background,
+        output_format: outputFormat,
+        seed: normalizeImageSeed(payload.seed),
+        nsfw_checker: payload.nsfwChecker ?? false,
+      };
+    },
   },
   "qwen3-pro-text": {
     model: "qwen3/pro-text-to-image",

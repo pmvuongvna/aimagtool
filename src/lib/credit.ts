@@ -4,12 +4,20 @@ import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 export type CreditSettings = {
   creditPackages: CreditPackage[];
   imageCredits: Record<ImageResolution, number>;
+  qwen21ImageCredits: Qwen21ImageCredits;
   videoCredits: Record<VideoResolution, number>;
   grokVideoCreditsPerSecond: Record<VideoResolution, number>;
   seedanceVideoCredits: Record<SeedanceVideoResolution, number>;
   klingMotionCredits: Record<KlingMotionMode, number>;
   imageEditExtraCost: number;
   defaultUserCredits: number;
+};
+
+export type Qwen21ImageCredits = {
+  text1k: number;
+  text2k: number;
+  image1k: number;
+  image2k: number;
 };
 
 export type CreditPackage = {
@@ -24,6 +32,7 @@ export type CreditPackage = {
 type CreditSettingsPatch = {
   creditPackages?: CreditPackage[];
   imageCredits?: Partial<Record<ImageResolution, number>>;
+  qwen21ImageCredits?: Partial<Qwen21ImageCredits>;
   videoCredits?: Partial<Record<VideoResolution, number>>;
   grokVideoCreditsPerSecond?: Partial<Record<VideoResolution, number>>;
   seedanceVideoCredits?: Partial<Record<SeedanceVideoResolution, number>>;
@@ -48,6 +57,7 @@ const DEFAULT_SETTINGS: CreditSettings = {
     { id: "studio", name: "Studio", credits: 10000, priceVnd: 1299000, badge: "Pro", active: true },
   ],
   imageCredits: { "1k": 8, "2k": 16, "4k": 32 },
+  qwen21ImageCredits: { text1k: 8, text2k: 16, image1k: 12, image2k: 20 },
   videoCredits: { "480p": 45, "720p": 80 },
   grokVideoCreditsPerSecond: { "480p": 1.6, "720p": 3 },
   seedanceVideoCredits: { "480p": 60, "720p": 100, "1080p": 160, "4k": 300 },
@@ -67,6 +77,7 @@ function cloneSettings(settings: CreditSettings) {
     ...settings,
     creditPackages: settings.creditPackages.map((item) => ({ ...item })),
     imageCredits: { ...settings.imageCredits },
+    qwen21ImageCredits: { ...settings.qwen21ImageCredits },
     videoCredits: { ...settings.videoCredits },
     grokVideoCreditsPerSecond: { ...settings.grokVideoCreditsPerSecond },
     seedanceVideoCredits: { ...settings.seedanceVideoCredits },
@@ -84,6 +95,12 @@ function normalizeSettings(input?: Partial<CreditSettings> | null): CreditSettin
       "1k": asNonNegativeNumber(source.imageCredits?.["1k"] ?? DEFAULT_SETTINGS.imageCredits["1k"], DEFAULT_SETTINGS.imageCredits["1k"]),
       "2k": asNonNegativeNumber(source.imageCredits?.["2k"] ?? DEFAULT_SETTINGS.imageCredits["2k"], DEFAULT_SETTINGS.imageCredits["2k"]),
       "4k": asNonNegativeNumber(source.imageCredits?.["4k"] ?? DEFAULT_SETTINGS.imageCredits["4k"], DEFAULT_SETTINGS.imageCredits["4k"]),
+    },
+    qwen21ImageCredits: {
+      text1k: asNonNegativeNumber(source.qwen21ImageCredits?.text1k ?? DEFAULT_SETTINGS.qwen21ImageCredits.text1k, DEFAULT_SETTINGS.qwen21ImageCredits.text1k),
+      text2k: asNonNegativeNumber(source.qwen21ImageCredits?.text2k ?? DEFAULT_SETTINGS.qwen21ImageCredits.text2k, DEFAULT_SETTINGS.qwen21ImageCredits.text2k),
+      image1k: asNonNegativeNumber(source.qwen21ImageCredits?.image1k ?? DEFAULT_SETTINGS.qwen21ImageCredits.image1k, DEFAULT_SETTINGS.qwen21ImageCredits.image1k),
+      image2k: asNonNegativeNumber(source.qwen21ImageCredits?.image2k ?? DEFAULT_SETTINGS.qwen21ImageCredits.image2k, DEFAULT_SETTINGS.qwen21ImageCredits.image2k),
     },
     videoCredits: {
       "480p": asNonNegativeNumber(source.videoCredits?.["480p"] ?? DEFAULT_SETTINGS.videoCredits["480p"], DEFAULT_SETTINGS.videoCredits["480p"]),
@@ -155,6 +172,14 @@ export async function updateCreditSettings(next: CreditSettingsPatch) {
       "1k": asNonNegativeNumber(next.imageCredits["1k"] ?? updated.imageCredits["1k"], updated.imageCredits["1k"]),
       "2k": asNonNegativeNumber(next.imageCredits["2k"] ?? updated.imageCredits["2k"], updated.imageCredits["2k"]),
       "4k": asNonNegativeNumber(next.imageCredits["4k"] ?? updated.imageCredits["4k"], updated.imageCredits["4k"]),
+    };
+  }
+  if (next.qwen21ImageCredits) {
+    updated.qwen21ImageCredits = {
+      text1k: asNonNegativeNumber(next.qwen21ImageCredits.text1k ?? updated.qwen21ImageCredits.text1k, updated.qwen21ImageCredits.text1k),
+      text2k: asNonNegativeNumber(next.qwen21ImageCredits.text2k ?? updated.qwen21ImageCredits.text2k, updated.qwen21ImageCredits.text2k),
+      image1k: asNonNegativeNumber(next.qwen21ImageCredits.image1k ?? updated.qwen21ImageCredits.image1k, updated.qwen21ImageCredits.image1k),
+      image2k: asNonNegativeNumber(next.qwen21ImageCredits.image2k ?? updated.qwen21ImageCredits.image2k, updated.qwen21ImageCredits.image2k),
     };
   }
   if (next.videoCredits) {
@@ -231,6 +256,13 @@ export async function setUserCredits(userId: string, credits: number) {
 
 export async function calculateTaskCost(input: CreateTaskInput) {
   const settings = await getCreditSettings();
+  if (input.serviceId === "qwen2-1-text" || input.serviceId === "qwen2-1-image") {
+    const quality = input.imageResolution === "2k" ? "2k" : "1k";
+    if (input.serviceId === "qwen2-1-image") {
+      return quality === "2k" ? settings.qwen21ImageCredits.image2k : settings.qwen21ImageCredits.image1k;
+    }
+    return quality === "2k" ? settings.qwen21ImageCredits.text2k : settings.qwen21ImageCredits.text1k;
+  }
   if (
     input.serviceId === "gpt-image-2-text" ||
     input.serviceId === "gpt-image-2-image" ||

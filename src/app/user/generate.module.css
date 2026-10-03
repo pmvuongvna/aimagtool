@@ -2664,6 +2664,11 @@
   background: #4a3920;
 }
 
+.modelChoiceBlue > span {
+  color: #dbeafe;
+  background: #253d63;
+}
+
 .modelChoiceTeal.modelChoiceActive {
   border-color: #34776a;
   background: #1a2d29;
@@ -2677,6 +2682,11 @@
 .modelChoiceAmber.modelChoiceActive {
   border-color: #7c6539;
   background: #302719;
+}
+
+.modelChoiceBlue.modelChoiceActive {
+  border-color: #466b9f;
+  background: #1d2d45;
 }
 
 .videoPage .actionCluster {
@@ -3687,6 +3697,14 @@
   background: #eff1ff;
 }
 
+.toolbarButton:disabled {
+  color: #a8afbd;
+  border-color: #e7e9ef;
+  background: #f5f6f8;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .imageStudioPage .settingMenu {
   top: calc(100% + 8px);
   min-width: 190px;
@@ -3730,6 +3748,17 @@
 
 .imageStudioPage .modelChoiceOption small {
   color: #8790a2;
+}
+
+.imageStudioPage .modelChoiceOption strong em {
+  margin-left: 7px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  color: #3f4bd8;
+  background: #e6e9ff;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .imageStudioPage .generateBtn {
@@ -3792,9 +3821,134 @@
   background: #f8f9fb;
 }
 
+.qwenOptionBlock {
+  align-content: start;
+}
+
+.toggleRow {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid #eceef3;
+  cursor: pointer;
+}
+
+.toggleRow:last-child {
+  border-bottom: 0;
+}
+
+.toggleRow span,
+.toggleRow strong,
+.toggleRow small {
+  display: block;
+}
+
+.toggleRow strong {
+  color: #30394b;
+  font-size: 12px;
+}
+
+.toggleRow small {
+  margin-top: 3px;
+  color: #838b9b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.toggleRow input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: #5865f2;
+}
+
 .imageStudioPage .referencePreview {
   border-color: #e2e5ed;
   background: #f8f9fb;
+}
+
+.referenceGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.referenceThumb {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #e2e5ed;
+  border-radius: 10px;
+  background: #f5f6fa;
+}
+
+.referenceThumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.referenceThumb button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 7px;
+  color: #ffffff;
+  background: rgba(24, 29, 43, 0.78);
+  cursor: pointer;
+}
+
+.maskEditor {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #eceef3;
+}
+
+.maskPreview {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.maskPreview img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: 1px solid #e2e5ed;
+  border-radius: 9px;
+  background: #f5f6fa;
+}
+
+.maskPreview button {
+  height: 36px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #e2e5ed;
+  border-radius: 9px;
+  color: #596273;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.validationNote {
+  margin: 10px 0 0;
+  color: #c2415d;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .imageStudioPage .statusBar {
@@ -4231,6 +4385,10 @@
 
   .imageStudioPage .advancedPanelWide {
     grid-column: auto;
+  }
+
+  .referenceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .imageStudioPage .statusBar {

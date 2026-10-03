@@ -36,6 +36,7 @@ type AdminPayload = {
   settings: {
     creditPackages: CreditPackage[];
     imageCredits: { "1k": number; "2k": number; "4k": number };
+    qwen21ImageCredits: { text1k: number; text2k: number; image1k: number; image2k: number };
     videoCredits: { "480p": number; "720p": number };
     grokVideoCreditsPerSecond: { "480p": number; "720p": number };
     seedanceVideoCredits: { "480p": number; "720p": number; "1080p": number; "4k": number };
@@ -193,7 +194,7 @@ export default function AdminPage() {
     void load();
   }, []);
 
-  const imageCostTotal = useMemo(() => settings ? settings.imageCredits["1k"] + settings.imageCredits["2k"] + settings.imageCredits["4k"] : 0, [settings]);
+  const imageCostTotal = useMemo(() => settings ? settings.imageCredits["1k"] + settings.imageCredits["2k"] + settings.imageCredits["4k"] + Object.values(settings.qwen21ImageCredits).reduce((sum, value) => sum + value, 0) : 0, [settings]);
   const videoCostTotal = useMemo(() => settings ? settings.videoCredits["480p"] + settings.videoCredits["720p"] : 0, [settings]);
   const totalCreditsAllocated = useMemo(() => users.reduce((sum, item) => sum + item.credits, 0), [users]);
   const adminCount = useMemo(() => users.filter((item) => item.role === "admin").length, [users]);
@@ -701,7 +702,7 @@ export default function AdminPage() {
               <div>
                 <p className="admin-kicker">Credit policy</p>
                 <h2>Credit Matrix</h2>
-                <p className="admin-hint">Manage image tiers, Grok per-second pricing, Kling motion pricing, fallback video policy, and package distribution from one structured block.</p>
+                <p className="admin-hint">Manage shared image tiers, dedicated Qwen 2.1 pricing, video rates, and package distribution from one structured block.</p>
               </div>
               <div className="admin-mini-stats">
                 <span>{activePackageCount} active packages</span>
@@ -713,9 +714,20 @@ export default function AdminPage() {
               <div className="admin-form-block">
                 <h3>Image generation</h3>
                 <div className="admin-subgrid">
-                  <label>Image 1K / Seedream Basic 2K / Qwen 1K<input type="number" value={settings.imageCredits["1k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "1k": Number(e.target.value) } })} /></label>
-                  <label>Image 2K / Seedream High 3K / Qwen 2K<input type="number" value={settings.imageCredits["2k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "2k": Number(e.target.value) } })} /></label>
-                  <label>Image 4K / Seedream Ultra 4K / Qwen 4K<input type="number" value={settings.imageCredits["4k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "4k": Number(e.target.value) } })} /></label>
+                  <label>Image 1K / Seedream Basic 2K<input type="number" value={settings.imageCredits["1k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "1k": Number(e.target.value) } })} /></label>
+                  <label>Image 2K / Seedream High 3K<input type="number" value={settings.imageCredits["2k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "2k": Number(e.target.value) } })} /></label>
+                  <label>Image 4K / Seedream Ultra 4K<input type="number" value={settings.imageCredits["4k"]} onChange={(e) => setSettings({ ...settings, imageCredits: { ...settings.imageCredits, "4k": Number(e.target.value) } })} /></label>
+                  <label>Other Image Edit Extra<input type="number" value={settings.imageEditExtraCost} onChange={(e) => setSettings({ ...settings, imageEditExtraCost: Number(e.target.value) })} /></label>
+                </div>
+              </div>
+
+              <div className="admin-form-block">
+                <h3>Qwen 2.1 image</h3>
+                <div className="admin-subgrid">
+                  <label>Text to Image 1K<input type="number" min="0" value={settings.qwen21ImageCredits.text1k} onChange={(e) => setSettings({ ...settings, qwen21ImageCredits: { ...settings.qwen21ImageCredits, text1k: Number(e.target.value) } })} /></label>
+                  <label>Text to Image 2K<input type="number" min="0" value={settings.qwen21ImageCredits.text2k} onChange={(e) => setSettings({ ...settings, qwen21ImageCredits: { ...settings.qwen21ImageCredits, text2k: Number(e.target.value) } })} /></label>
+                  <label>Image to Image 1K<input type="number" min="0" value={settings.qwen21ImageCredits.image1k} onChange={(e) => setSettings({ ...settings, qwen21ImageCredits: { ...settings.qwen21ImageCredits, image1k: Number(e.target.value) } })} /></label>
+                  <label>Image to Image 2K<input type="number" min="0" value={settings.qwen21ImageCredits.image2k} onChange={(e) => setSettings({ ...settings, qwen21ImageCredits: { ...settings.qwen21ImageCredits, image2k: Number(e.target.value) } })} /></label>
                 </div>
               </div>
 
@@ -724,7 +736,6 @@ export default function AdminPage() {
                 <div className="admin-subgrid">
                   <label>Video 480p<input type="number" value={settings.videoCredits["480p"]} onChange={(e) => setSettings({ ...settings, videoCredits: { ...settings.videoCredits, "480p": Number(e.target.value) } })} /></label>
                   <label>Video 720p<input type="number" value={settings.videoCredits["720p"]} onChange={(e) => setSettings({ ...settings, videoCredits: { ...settings.videoCredits, "720p": Number(e.target.value) } })} /></label>
-                  <label>Image Edit Extra<input type="number" value={settings.imageEditExtraCost} onChange={(e) => setSettings({ ...settings, imageEditExtraCost: Number(e.target.value) })} /></label>
                 </div>
               </div>
 
@@ -759,7 +770,7 @@ export default function AdminPage() {
               <label>Default User Credits<input type="number" value={settings.defaultUserCredits} onChange={(e) => setSettings({ ...settings, defaultUserCredits: Number(e.target.value) })} /></label>
               <div className="admin-note-box">
                 <strong>Policy note</strong>
-                <span>Video 480p / 720p remain the fallback pool for future Veo-style models. Grok uses per-second pricing, while Seedance and Kling use fixed task pricing.</span>
+                <span>Qwen 2.1 uses its dedicated Text/Image 1K and 2K rates. Other image models use the shared tier plus the edit surcharge where applicable.</span>
               </div>
             </div>
 

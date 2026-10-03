@@ -24,13 +24,13 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import type { AIServiceId, CreateTaskInput, ImageResolution } from "@/lib/ai/types";
+import type { AIServiceId, CreateTaskInput, ImageBackground, ImageOutputFormat, ImageResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import { StudioNavigation } from "@/components/studio-navigation";
 import styles from "./generate.module.css";
 
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
-type ProfileResponse = { userId: string; credits: number; previewCosts: { image1k: number; image2k: number; image4k: number; imageEdit1k: number; imageEdit2k: number; imageEdit4k: number } };
+type ProfileResponse = { userId: string; credits: number; previewCosts: { image1k: number; image2k: number; image4k: number; imageEdit1k: number; imageEdit2k: number; imageEdit4k: number; qwen21Text1k: number; qwen21Text2k: number; qwen21Image1k: number; qwen21Image2k: number } };
 type HistoryItem = { id: string; mediaType: "image" | "video"; urls: string[]; prompt: string; createdAt: string };
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string };
 type DashboardCache = {
@@ -55,13 +55,31 @@ type CardItem = {
 };
 
 type GalleryFilter = "all" | "image" | "video" | "realistic" | "anime" | "cinematic";
+type ImageModelId = "gpt" | "seedream" | "qwen3" | "qwen2";
+type ImageModelOption = {
+  id: ImageModelId;
+  label: string;
+  description: string;
+  textServiceId: AIServiceId;
+  imageServiceId?: AIServiceId;
+  aspectRatios: string[];
+  imageAspectRatios?: string[];
+  resolutions: ImageResolution[];
+};
 
 const CACHE_KEY = "aistudio_user_dashboard_cache_v1";
-const aspectOptions = ["1:1", "16:9", "4:3", "3:4", "9:16"];
+const defaultAspectOptions = ["1:1", "16:9", "4:3", "3:4", "9:16"];
+const qwen21AspectOptions = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16", "21:9", "9:21"];
 const styleOptions = ["Cinematic", "Ảnh thực", "Anime", "3D Render", "Editorial"];
 const quantityOptions = [1, 2];
 const resolutionOptions: ImageResolution[] = ["1k", "2k", "4k"];
 const QWEN_PROMPT_MAX_LENGTH = 5000;
+const IMAGE_MODELS: ImageModelOption[] = [
+  { id: "gpt", label: "GPT Image 2", description: "Versatile image generation", textServiceId: "gpt-image-2-text", imageServiceId: "gpt-image-2-image", aspectRatios: defaultAspectOptions, resolutions: resolutionOptions },
+  { id: "seedream", label: "Seedream 5 Lite", description: "Fast creative rendering", textServiceId: "seedream-5-lite-text", imageServiceId: "seedream-5-lite-image", aspectRatios: defaultAspectOptions, resolutions: resolutionOptions },
+  { id: "qwen3", label: "Qwen3 Pro", description: "Detailed professional output", textServiceId: "qwen3-pro-text", imageServiceId: "qwen3-pro-image", aspectRatios: defaultAspectOptions, resolutions: resolutionOptions },
+  { id: "qwen2", label: "Qwen 2.1", description: "Text, reference and local image editing", textServiceId: "qwen2-1-text", imageServiceId: "qwen2-1-image", aspectRatios: qwen21AspectOptions, imageAspectRatios: ["auto", ...qwen21AspectOptions], resolutions: ["1k", "2k"] },
+];
 const PROMPT_SUGGESTIONS = [
   "Phong cảnh núi yên bình lúc bình minh",
   "Thành phố tương lai giữa những tầng mây",
@@ -119,6 +137,14 @@ function truncate(value: string, max = 34) {
   return `${clean.slice(0, max - 1)}…`;
 }
 
+function getImageModel(modelId: ImageModelId) {
+  return IMAGE_MODELS.find((model) => model.id === modelId) || IMAGE_MODELS[0];
+}
+
+function parseReferenceUrls(value: string) {
+  return Array.from(new Set(value.split(/[\n,]/).map((url) => url.trim()).filter(Boolean))).slice(0, 10);
+}
+
 export default function UserClient({ initialPrompt }: { initialPrompt: string }) {
   const router = useRouter();
   const [userId, setUserId] = useState("");
@@ -129,13 +155,19 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   const [prompt, setPrompt] = useState(initialPrompt.trim() || "Cô gái đứng trên đỉnh núi, ánh hoàng hôn vàng cam, siêu thực, cinematic.");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [imageModel, setImageModel] = useState<"gpt" | "seedream" | "qwen3">("gpt");
+  const [imageModel, setImageModel] = useState<ImageModelId>("gpt");
   const [generationMode, setGenerationMode] = useState<"text" | "image">("text");
-  const [referenceUrl, setReferenceUrl] = useState("");
+  const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
+  const [maskUrl, setMaskUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [quantity, setQuantity] = useState(1);
   const [imageResolution, setImageResolution] = useState<ImageResolution>("2k");
+  const [imageBackground, setImageBackground] = useState<ImageBackground>("opaque");
+  const [imageOutputFormat, setImageOutputFormat] = useState<ImageOutputFormat>("png");
+  const [enhancePrompt, setEnhancePrompt] = useState(true);
+  const [imageSeed, setImageSeed] = useState(0);
+  const [imageNsfwChecker, setImageNsfwChecker] = useState(false);
   const [galleryFilter, setGalleryFilter] = useState<GalleryFilter>("all");
   const [activeStyle, setActiveStyle] = useState("Cinematic");
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
@@ -160,16 +192,52 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     } catch {}
   }, []);
 
+  const selectedImageModel = getImageModel(imageModel);
+  const supportsImageWorkflow = Boolean(selectedImageModel.imageServiceId);
+  const availableAspectRatios = generationMode === "image" && selectedImageModel.imageAspectRatios ? selectedImageModel.imageAspectRatios : selectedImageModel.aspectRatios;
+  const validReferenceUrls = referenceUrls.filter((url) => /^https?:\/\//.test(url));
+  const qwenMaskInvalid = imageModel === "qwen2" && Boolean(maskUrl) && (validReferenceUrls.length !== 1 || imageBackground === "transparent");
+
   const currentCost = useMemo(() => {
-    const single = imageModel === "qwen3" && generationMode === "image"
+    if (imageModel === "qwen2") {
+      const single = generationMode === "image"
+        ? (imageResolution === "2k" ? costPreview?.qwen21Image2k : costPreview?.qwen21Image1k)
+        : (imageResolution === "2k" ? costPreview?.qwen21Text2k : costPreview?.qwen21Text1k);
+      return single ? single * quantity : null;
+    }
+    const single = generationMode === "image"
       ? (imageResolution === "4k" ? costPreview?.imageEdit4k : imageResolution === "2k" ? costPreview?.imageEdit2k : costPreview?.imageEdit1k)
       : (imageResolution === "4k" ? costPreview?.image4k : imageResolution === "2k" ? costPreview?.image2k : costPreview?.image1k);
     return single ? single * quantity : null;
   }, [costPreview, generationMode, imageModel, imageResolution, quantity]);
 
   const composedPrompt = composeImagePrompt(prompt, negativePrompt, activeStyle);
-  const promptTooLong = imageModel === "qwen3" && composedPrompt.length > QWEN_PROMPT_MAX_LENGTH;
-  const canGenerate = prompt.trim().length >= 3 && !promptTooLong && (generationMode === "text" || /^https?:\/\//.test(referenceUrl)) && !uploading;
+  const promptTooLong = (imageModel === "qwen3" || imageModel === "qwen2") && composedPrompt.length > QWEN_PROMPT_MAX_LENGTH;
+  const canGenerate = prompt.trim().length >= 3 && !promptTooLong && !qwenMaskInvalid && (generationMode === "text" || (supportsImageWorkflow && validReferenceUrls.length > 0 && (imageModel !== "qwen2" || validReferenceUrls.length <= 10))) && !uploading;
+
+  function changeGenerationMode(nextMode: "text" | "image") {
+    setGenerationMode(nextMode);
+    if (imageModel === "qwen2") {
+      if (nextMode === "image" && !selectedImageModel.imageAspectRatios?.includes(aspectRatio)) setAspectRatio("auto");
+      if (nextMode === "text" && aspectRatio === "auto") setAspectRatio("3:2");
+    }
+    if (nextMode === "image") setShowAdvancedSettings(true);
+  }
+
+  function selectImageModel(nextModelId: ImageModelId) {
+    const nextModel = getImageModel(nextModelId);
+    setImageModel(nextModelId);
+    if (!nextModel.imageServiceId) setGenerationMode("text");
+    if (nextModelId !== "qwen2") {
+      setReferenceUrls((current) => current.slice(0, 1));
+      setMaskUrl("");
+    }
+    if (!nextModel.resolutions.includes(imageResolution)) setImageResolution(nextModel.resolutions[nextModel.resolutions.length - 1]);
+    const nextAspectRatios = generationMode === "image" && nextModel.imageAspectRatios ? nextModel.imageAspectRatios : nextModel.aspectRatios;
+    if (!nextAspectRatios.includes(aspectRatio)) setAspectRatio(nextAspectRatios.includes("16:9") ? "16:9" : nextAspectRatios[0]);
+    if (nextModelId === "qwen2" || nextModelId === "qwen3") setShowAdvancedSettings(true);
+    setOpenControl(null);
+  }
 
   useEffect(() => {
     router.prefetch("/user/video");
@@ -271,20 +339,47 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     return [];
   }
 
-  async function handleFileUpload(file: File) {
+  async function uploadImageFile(file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await apiFetch(apiPath("/api/ai/upload"), { method: "POST", body: fd });
+    const payload = (await res.json()) as { url?: string; error?: string };
+    if (!res.ok || !payload.url) throw new Error(payload.error || "Upload thất bại.");
+    return payload.url;
+  }
+
+  async function handleReferenceUploads(files: File[]) {
+    if (!files.length) return;
+    const remainingSlots = imageModel === "qwen2" ? Math.max(0, 10 - referenceUrls.length) : 1;
+    const selectedFiles = files.slice(0, remainingSlots);
+    if (!selectedFiles.length) {
+      setStatusText("Qwen 2.1 hỗ trợ tối đa 10 ảnh tham chiếu.");
+      return;
+    }
     setUploading(true);
-    setStatusText("Đang upload ảnh tham chiếu...");
+    setStatusText(`Đang upload ${selectedFiles.length} ảnh tham chiếu...`);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await apiFetch(apiPath("/api/ai/upload"), { method: "POST", body: fd });
-      const payload = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !payload.url) {
-        setStatusText(payload.error || "Upload thất bại.");
-        return;
-      }
-      setReferenceUrl(payload.url);
-      setStatusText("Đã upload ảnh tham chiếu.");
+      const uploadedUrls: string[] = [];
+      for (const file of selectedFiles) uploadedUrls.push(await uploadImageFile(file));
+      setReferenceUrls((current) => imageModel === "qwen2" ? Array.from(new Set([...current, ...uploadedUrls])).slice(0, 10) : [uploadedUrls[0]]);
+      setStatusText(`Đã upload ${uploadedUrls.length} ảnh tham chiếu.`);
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "Upload thất bại.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleMaskUpload(file: File) {
+    setUploading(true);
+    setStatusText("Đang upload mask...");
+    try {
+      const url = await uploadImageFile(file);
+      setMaskUrl(url);
+      setImageBackground("opaque");
+      setStatusText("Đã upload mask chỉnh sửa cục bộ.");
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "Upload mask thất bại.");
     } finally {
       setUploading(false);
     }
@@ -293,22 +388,30 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   async function onGenerate(e: FormEvent) {
     e.preventDefault();
     if (!canGenerate) return;
+    const serviceId = generationMode === "image" ? selectedImageModel.imageServiceId : selectedImageModel.textServiceId;
+    if (!serviceId) {
+      setStatusText(`${selectedImageModel.label} chỉ hỗ trợ Text to Image.`);
+      return;
+    }
     setLoading(true);
     setResultUrls([]);
     setStatusText("Đang tạo ảnh...");
 
     const body: CreateTaskInput = {
-      serviceId: (
-        imageModel === "gpt"
-          ? (generationMode === "text" ? "gpt-image-2-text" : "gpt-image-2-image")
-          : imageModel === "seedream"
-            ? (generationMode === "text" ? "seedream-5-lite-text" : "seedream-5-lite-image")
-            : (generationMode === "text" ? "qwen3-pro-text" : "qwen3-pro-image")
-      ) as AIServiceId,
+      serviceId,
       prompt: composedPrompt,
       aspectRatio,
       imageResolution,
-      inputUrl: generationMode === "image" ? referenceUrl : undefined,
+      inputUrl: generationMode === "image" ? validReferenceUrls[0] : undefined,
+      inputUrls: generationMode === "image" && imageModel === "qwen2" ? validReferenceUrls : undefined,
+      maskUrl: generationMode === "image" && imageModel === "qwen2" ? maskUrl || undefined : undefined,
+      ...(imageModel === "qwen2" ? {
+        imageBackground,
+        imageOutputFormat,
+        enhancePrompt,
+        seed: imageSeed,
+        nsfwChecker: imageNsfwChecker,
+      } : {}),
     };
 
     const taskIds: string[] = [];
@@ -376,7 +479,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     id: `${url}-${index}`,
     mediaType: "image",
     title: truncate(prompt),
-    meta: `${imageModel === "gpt" ? "GPT Image 2" : imageModel === "seedream" ? "Seedream 5 Lite" : "Qwen3 Pro"} · ${imageResolution.toUpperCase()} · ${aspectRatio}`,
+    meta: `${selectedImageModel.label} · ${imageResolution.toUpperCase()} · ${aspectRatio}`,
     thumbUrl: url,
     urls: resultUrls,
     createdAt: new Date().toISOString(),
@@ -461,7 +564,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
               <div className={styles.imageComposer} ref={controlsRef}>
                 <div className={styles.promptBox}>
                   <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Mô tả điều anh muốn tạo..." />
-                  <span className={styles.promptCount}>{imageModel === "qwen3" ? `${composedPrompt.length}/${QWEN_PROMPT_MAX_LENGTH}` : prompt.length}</span>
+                  <span className={styles.promptCount}>{imageModel === "qwen3" || imageModel === "qwen2" ? `${composedPrompt.length}/${QWEN_PROMPT_MAX_LENGTH}` : prompt.length}</span>
                 </div>
 
                 <div className={styles.composerToolbar}>
@@ -469,9 +572,10 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     <button
                       type="button"
                       className={`${styles.toolbarButton} ${generationMode === "image" ? styles.toolbarButtonActive : ""}`}
+                      disabled={!supportsImageWorkflow}
+                      title={supportsImageWorkflow ? "Dùng ảnh tham chiếu" : `${selectedImageModel.label} chỉ hỗ trợ Text to Image`}
                       onClick={() => {
-                        setGenerationMode((current) => current === "image" ? "text" : "image");
-                        setShowAdvancedSettings(true);
+                        changeGenerationMode(generationMode === "image" ? "text" : "image");
                       }}
                     >
                       <Upload size={17} />
@@ -509,9 +613,9 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                   </button>
                   {openControl === "aspect" ? (
                     <div className={styles.settingMenu}>
-                      {aspectOptions.map((value) => (
+                      {availableAspectRatios.map((value) => (
                         <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>
-                          {value}
+                          {value === "auto" ? "Tự động" : value}
                         </button>
                       ))}
                     </div>
@@ -525,19 +629,19 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     onClick={() => setOpenControl((prev) => prev === "model" ? null : "model")}
                   >
                     <Sparkles size={17} />
-                    <span>{imageModel === "gpt" ? "GPT Image 2" : imageModel === "seedream" ? "Seedream 5 Lite" : "Qwen3 Pro"}</span>
+                    <span>{selectedImageModel.label}</span>
                   </button>
                   {openControl === "model" ? (
                     <div className={`${styles.settingMenu} ${styles.modelChoiceMenu}`}>
-                      <button type="button" className={`${styles.modelChoiceOption} ${styles.modelChoiceTeal} ${imageModel === "gpt" ? styles.modelChoiceActive : ""}`} onClick={() => { setImageModel("gpt"); if (imageResolution === "1k") setImageResolution("2k"); setOpenControl(null); }}>
-                        <span><Sparkles size={16} /></span><div><strong>GPT Image 2</strong><small>Versatile image generation</small></div>
-                      </button>
-                      <button type="button" className={`${styles.modelChoiceOption} ${styles.modelChoiceViolet} ${imageModel === "seedream" ? styles.modelChoiceActive : ""}`} onClick={() => { setImageModel("seedream"); setOpenControl(null); }}>
-                        <span><WandSparkles size={16} /></span><div><strong>Seedream 5 Lite</strong><small>Fast creative rendering</small></div>
-                      </button>
-                      <button type="button" className={`${styles.modelChoiceOption} ${styles.modelChoiceAmber} ${imageModel === "qwen3" ? styles.modelChoiceActive : ""}`} onClick={() => { setImageModel("qwen3"); setShowAdvancedSettings(true); setOpenControl(null); }}>
-                        <span><Images size={16} /></span><div><strong>Qwen3 Pro</strong><small>Detailed professional output</small></div>
-                      </button>
+                      {IMAGE_MODELS.map((model) => {
+                        const ModelIcon = model.id === "gpt" ? Sparkles : model.id === "seedream" ? WandSparkles : Images;
+                        const toneClass = model.id === "gpt" ? styles.modelChoiceTeal : model.id === "seedream" ? styles.modelChoiceViolet : model.id === "qwen3" ? styles.modelChoiceAmber : styles.modelChoiceBlue;
+                        return (
+                          <button key={model.id} type="button" className={`${styles.modelChoiceOption} ${toneClass} ${imageModel === model.id ? styles.modelChoiceActive : ""}`} onClick={() => selectImageModel(model.id)}>
+                            <span><ModelIcon size={16} /></span><div><strong>{model.label}{model.id === "qwen2" ? <em>MỚI</em> : null}</strong><small>{model.description}</small></div>
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
@@ -554,12 +658,18 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       onClick={() => {
                         setPrompt("");
                         setNegativePrompt("");
-                        setReferenceUrl("");
+                        setReferenceUrls([]);
+                        setMaskUrl("");
                         setActiveStyle("Cinematic");
-                        setGenerationMode("text");
+                        changeGenerationMode("text");
                         setAspectRatio("16:9");
                         setQuantity(1);
                         setImageResolution("2k");
+                        setImageBackground("opaque");
+                        setImageOutputFormat("png");
+                        setEnhancePrompt(true);
+                        setImageSeed(0);
+                        setImageNsfwChecker(false);
                       }}
                     >
                       <RotateCcw size={17} />
@@ -589,31 +699,98 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     </div>
 
                     <div className={styles.fieldBlock}>
-                      <div className={styles.fieldBlockHeader}><h4>Độ phân giải</h4><span className={styles.fieldHint}>{imageModel === "qwen3" ? "1K / 2K / 4K" : imageModel === "gpt" ? "1K / 2K / 4K" : "Basic 2K / High 3K / Ultra 4K"}</span></div>
+                      <div className={styles.fieldBlockHeader}><h4>Độ phân giải</h4><span className={styles.fieldHint}>{imageModel === "qwen2" ? "1K / 2K" : imageModel === "seedream" ? "Basic 2K / High 3K / Ultra 4K" : "1K / 2K / 4K"}</span></div>
                       <select value={imageResolution} onChange={(e) => setImageResolution(e.target.value as ImageResolution)}>
-                        {resolutionOptions.map((value) => <option key={value} value={value}>{imageModel === "seedream" ? (value === "1k" ? "Basic (2K)" : value === "2k" ? "High (3K)" : "Ultra (4K)") : value.toUpperCase()}</option>)}
+                        {selectedImageModel.resolutions.map((value) => <option key={value} value={value}>{imageModel === "seedream" ? (value === "1k" ? "Basic (2K)" : value === "2k" ? "High (3K)" : "Ultra (4K)") : value.toUpperCase()}</option>)}
                       </select>
                     </div>
 
                     <div className={styles.fieldBlock}>
                       <div className={styles.fieldBlockHeader}><h4>Workflow</h4><span className={styles.fieldHint}>{generationMode === "image" ? "Đang bật ảnh tham chiếu" : "Prompt thuần"}</span></div>
-                      <select value={generationMode} onChange={(e) => { const nextMode = e.target.value as "text" | "image"; setGenerationMode(nextMode); if (nextMode === "image") setShowAdvancedSettings(true); }}>
+                      <select value={generationMode} onChange={(e) => changeGenerationMode(e.target.value as "text" | "image")}>
                         <option value="text">Text to Image</option>
-                        <option value="image">Image to Image</option>
+                        <option value="image" disabled={!supportsImageWorkflow}>Image to Image{supportsImageWorkflow ? "" : " (không hỗ trợ)"}</option>
                       </select>
                     </div>
 
+                    {imageModel === "qwen2" ? (
+                      <>
+                        <div className={styles.fieldBlock}>
+                          <div className={styles.fieldBlockHeader}><h4>Nền ảnh</h4><span className={styles.fieldHint}>Có thể xuất alpha thật</span></div>
+                          <select value={imageBackground} onChange={(e) => {
+                            const nextBackground = e.target.value as ImageBackground;
+                            setImageBackground(nextBackground);
+                            if (nextBackground === "transparent" && imageOutputFormat === "jpeg") setImageOutputFormat("png");
+                          }}>
+                            <option value="opaque">Nền thông thường</option>
+                            <option value="transparent" disabled={Boolean(maskUrl)}>Nền trong suốt{maskUrl ? " (không dùng với mask)" : ""}</option>
+                          </select>
+                        </div>
+
+                        <div className={styles.fieldBlock}>
+                          <div className={styles.fieldBlockHeader}><h4>Định dạng</h4><span className={styles.fieldHint}>PNG, WebP hoặc JPEG</span></div>
+                          <select value={imageOutputFormat} onChange={(e) => setImageOutputFormat(e.target.value as ImageOutputFormat)}>
+                            <option value="png">PNG</option>
+                            <option value="webp">WebP</option>
+                            <option value="jpeg" disabled={imageBackground === "transparent"}>JPEG</option>
+                          </select>
+                        </div>
+
+                        <div className={styles.fieldBlock}>
+                          <div className={styles.fieldBlockHeader}><h4>Seed</h4><span className={styles.fieldHint}>0 để dùng mặc định</span></div>
+                          <input type="number" min={0} step={1} value={imageSeed} onChange={(e) => setImageSeed(Math.max(0, Math.floor(Number(e.target.value) || 0)))} />
+                        </div>
+
+                        <div className={`${styles.fieldBlock} ${styles.qwenOptionBlock}`}>
+                          <div className={styles.fieldBlockHeader}><h4>Tối ưu model</h4><span className={styles.fieldHint}>Áp dụng riêng cho Qwen 2.1</span></div>
+                          <label className={styles.toggleRow}>
+                            <span><strong>Enhance prompt</strong><small>AI mở rộng mô tả để tăng chất lượng ảnh.</small></span>
+                            <input type="checkbox" checked={enhancePrompt} onChange={(e) => setEnhancePrompt(e.target.checked)} />
+                          </label>
+                          <label className={styles.toggleRow}>
+                            <span><strong>Kiểm duyệt nội dung</strong><small>Mặc định tắt, có thể bật cho từng tác vụ.</small></span>
+                            <input type="checkbox" checked={imageNsfwChecker} onChange={(e) => setImageNsfwChecker(e.target.checked)} />
+                          </label>
+                        </div>
+                      </>
+                    ) : null}
+
                     {generationMode === "image" ? (
                       <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
-                        <div className={styles.fieldBlockHeader}><h4>Ảnh tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : referenceUrl ? "Đã có URL ảnh" : "Upload hoặc dán URL"}</span></div>
+                        <div className={styles.fieldBlockHeader}><h4>Ảnh tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : `${validReferenceUrls.length}/${imageModel === "qwen2" ? 10 : 1} ảnh`}</span></div>
                         <div className={styles.uploadRow}>
-                          <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file); }} />
-                          <input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL sau khi upload)" />
+                          <input type="file" accept="image/jpeg,image/png,image/webp" multiple={imageModel === "qwen2"} onChange={(e) => void handleReferenceUploads(Array.from(e.target.files || []))} />
+                          {imageModel === "qwen2" ? (
+                            <textarea rows={3} value={referenceUrls.join("\n")} onChange={(e) => setReferenceUrls(parseReferenceUrls(e.target.value))} placeholder="Mỗi URL ảnh trên một dòng, tối đa 10 ảnh" />
+                          ) : (
+                            <input value={referenceUrls[0] || ""} onChange={(e) => setReferenceUrls(e.target.value.trim() ? [e.target.value] : [])} placeholder="https://... (URL sau khi upload)" />
+                          )}
                         </div>
-                        {referenceUrl ? (
-                          <div className={styles.referencePreview}>
-                            <img src={referenceUrl} alt="Ảnh tham chiếu" />
-                            <div className={styles.referencePreviewMeta}>Ảnh tham chiếu hiện tại sẽ được dùng cho workflow Image to Image.</div>
+                        {validReferenceUrls.length ? (
+                          <div className={styles.referenceGrid}>
+                            {validReferenceUrls.map((url, index) => (
+                              <div className={styles.referenceThumb} key={`${url}-${index}`}>
+                                <img src={url} alt={`Ảnh tham chiếu ${index + 1}`} />
+                                <button type="button" aria-label={`Bỏ ảnh tham chiếu ${index + 1}`} onClick={() => setReferenceUrls((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={14} /></button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {imageModel === "qwen2" ? (
+                          <div className={styles.maskEditor}>
+                            <div className={styles.fieldBlockHeader}><h4>Mask chỉnh sửa cục bộ</h4><span className={styles.fieldHint}>Không bắt buộc, cần đúng 1 ảnh tham chiếu</span></div>
+                            <div className={styles.uploadRow}>
+                              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleMaskUpload(file); }} />
+                              <input value={maskUrl} onChange={(e) => { const nextUrl = e.target.value; setMaskUrl(nextUrl); if (nextUrl.trim()) setImageBackground("opaque"); }} placeholder="https://... URL mask đen trắng" />
+                            </div>
+                            {maskUrl ? (
+                              <div className={styles.maskPreview}>
+                                <img src={maskUrl} alt="Mask chỉnh sửa cục bộ" />
+                                <button type="button" onClick={() => setMaskUrl("")}><X size={14} /> Bỏ mask</button>
+                              </div>
+                            ) : null}
+                            {qwenMaskInvalid ? <p className={styles.validationNote}>Mask chỉ dùng với đúng một ảnh tham chiếu và nền thông thường.</p> : null}
                           </div>
                         ) : null}
                       </div>
@@ -623,7 +800,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt</span></div>
                       <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
                       <div style={{ marginTop: 10 }} className={styles.subtleNote}>
-                        {imageModel === "qwen3" ? "Qwen3 Pro hỗ trợ Text to Image và Image to Image theo Kie.ai; Image to Image cần ảnh tham chiếu." : imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
+                        {imageModel === "qwen2" ? "Qwen 2.1 hỗ trợ Text to Image và Image to Image với tối đa 10 ảnh tham chiếu. Mask chuyển sang chỉnh sửa cục bộ; NSFW checker mặc định tắt." : imageModel === "qwen3" ? "Qwen3 Pro hỗ trợ Text to Image và Image to Image theo Kie.ai; Image to Image cần ảnh tham chiếu." : imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
                       </div>
                     </div>
                   </div>
