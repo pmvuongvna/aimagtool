@@ -58,7 +58,7 @@ export async function getTaskDetails(taskId: string) {
   });
 }
 
-export async function uploadFileToKie(file: File, kind: "image" | "video" = "image") {
+export async function uploadFileToKie(file: File, kind: "image" | "video" | "audio" = "image") {
   const apiKey = getApiKey();
   const endpoints = [
     `${KIE_UPLOAD_QUICKSTART_URL}/file-stream-upload`,
@@ -71,7 +71,7 @@ export async function uploadFileToKie(file: File, kind: "image" | "video" = "ima
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("uploadPath", kind === "video" ? "videos" : "images");
+      form.append("uploadPath", kind === "video" ? "videos" : kind === "audio" ? "audios" : "images");
       if (file.name) form.append("fileName", file.name);
 
       const res = await fetch(endpoint, {

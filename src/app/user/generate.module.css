@@ -3650,6 +3650,8 @@
 
 .imageStudioPage .optionCluster {
   min-width: 0;
+  position: relative;
+  z-index: 40;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -3907,6 +3909,106 @@
   color: #ffffff;
   background: rgba(24, 29, 43, 0.78);
   cursor: pointer;
+}
+
+.seedanceAssetList {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.seedanceAssetItem {
+  min-width: 0;
+  position: relative;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e2e5ed;
+  border-radius: 10px;
+  background: #f8f9fb;
+}
+
+.seedanceAssetItem video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: block;
+  border-radius: 7px;
+  background: #121722;
+  object-fit: cover;
+}
+
+.seedanceAssetItem audio {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+}
+
+.seedanceAssetItem span {
+  color: #596273;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.seedanceAssetItem button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 7px;
+  color: #ffffff;
+  background: rgba(24, 29, 43, 0.78);
+  cursor: pointer;
+}
+
+.returnedFrameStrip {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #e4e7ee;
+  background: #f8f9fb;
+}
+
+.returnedFrameStrip > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #30394b;
+  font-size: 11px;
+}
+
+.returnedFrameStrip > div:first-child span {
+  color: #838b9b;
+}
+
+.returnedFrameStrip > div:last-child {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.returnedFrameStrip button {
+  width: 72px;
+  height: 52px;
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #dfe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.returnedFrameStrip img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .maskEditor {
@@ -4389,6 +4491,10 @@
 
   .referenceGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .seedanceAssetList {
+    grid-template-columns: 1fr;
   }
 
   .imageStudioPage .statusBar {

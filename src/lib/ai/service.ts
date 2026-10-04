@@ -31,12 +31,26 @@ function requireHttpUrl(inputUrl?: string, fieldName = "inputUrl") {
   return normalized;
 }
 
-function requireHttpUrls(inputUrls?: string[], fallbackUrl?: string) {
+function requireHttpUrls(inputUrls?: string[], fallbackUrl?: string, modelLabel = "Image to Image") {
   const candidates = inputUrls?.length ? inputUrls : fallbackUrl ? [fallbackUrl] : [];
   if (candidates.length < 1 || candidates.length > 10) {
-    throw new Error("Qwen 2.1 Image to Image requires between 1 and 10 reference images.");
+    throw new Error(`${modelLabel} requires between 1 and 10 reference images.`);
   }
   return candidates.map((url, index) => requireHttpUrl(url, `inputUrls[${index}]`));
+}
+
+function normalizeSeedream5FlashAspectRatio(aspectRatio?: string) {
+  const allowed = new Set(["1:1", "4:3", "3:4", "16:9", "9:16", "2:3", "3:2", "21:9"]);
+  return allowed.has(aspectRatio || "") ? aspectRatio : "1:1";
+}
+
+function normalizeSeedream5FlashSize(size?: CreateTaskInput["imageSize"]) {
+  if (size === "1.5k") return "1.5K";
+  return size === "2k" ? "2K" : "1K";
+}
+
+function normalizeSeedream5FlashFormat(format?: CreateTaskInput["imageOutputFormat"]) {
+  return format === "png" ? "png" : "jpeg";
 }
 
 function normalizeDuration(duration?: number) {
@@ -104,6 +118,36 @@ function normalizeSeedanceAspectRatio(aspectRatio?: string) {
   return allowed.has(aspectRatio || "") ? aspectRatio : "16:9";
 }
 
+function normalizeSeedance25Resolution(resolution?: CreateTaskInput["videoResolution"]) {
+  return resolution === "480p" || resolution === "1080p" ? resolution : "720p";
+}
+
+function normalizeSeedance25AspectRatio(aspectRatio?: string) {
+  const allowed = new Set(["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"]);
+  return allowed.has(aspectRatio || "") ? aspectRatio : "adaptive";
+}
+
+function normalizeSeedance25Duration(duration?: number) {
+  if (duration === -1) return -1;
+  return Math.max(1, Math.min(30, Math.floor(duration || 5)));
+}
+
+function normalizeOptionalPrompt(prompt: string, maxLength: number, modelName: string) {
+  const normalized = prompt.trim();
+  if (normalized.length > maxLength) throw new Error(`${modelName} prompt must be ${maxLength} characters or fewer.`);
+  return normalized;
+}
+
+function optionalHttpUrl(url?: string, fieldName = "url") {
+  return url?.trim() ? requireHttpUrl(url, fieldName) : undefined;
+}
+
+function optionalHttpUrls(urls: string[] | undefined, maxCount: number, fieldName: string) {
+  const normalized = (urls || []).map((url) => url.trim()).filter(Boolean);
+  if (normalized.length > maxCount) throw new Error(`${fieldName} supports up to ${maxCount} files.`);
+  return normalized.map((url, index) => requireHttpUrl(url, `${fieldName}[${index}]`));
+}
+
 function normalizeCharacterOrientation(value?: CharacterOrientation) {
   return value === "video" ? "video" : "image";
 }
@@ -148,6 +192,29 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
       quality: mapSeedreamQuality(payload.imageResolution),
     }),
   },
+  "seedream-5-flash-text": {
+    model: "seedream/5-flash-text-to-image",
+    requiresReferenceImage: false,
+    buildInput: (payload) => ({
+      prompt: requirePromptWithinLimit(payload.prompt, 5000, "Seedream 5 Flash"),
+      aspect_ratio: normalizeSeedream5FlashAspectRatio(payload.aspectRatio),
+      size: normalizeSeedream5FlashSize(payload.imageSize),
+      output_format: normalizeSeedream5FlashFormat(payload.imageOutputFormat),
+      nsfw_checker: payload.nsfwChecker ?? false,
+    }),
+  },
+  "seedream-5-flash-image": {
+    model: "seedream/5-flash-image-to-image",
+    requiresReferenceImage: true,
+    buildInput: (payload) => ({
+      image_urls: requireHttpUrls(payload.inputUrls, payload.inputUrl, "Seedream 5 Flash Image to Image"),
+      prompt: requirePromptWithinLimit(payload.prompt, 5000, "Seedream 5 Flash"),
+      aspect_ratio: normalizeSeedream5FlashAspectRatio(payload.aspectRatio),
+      size: normalizeSeedream5FlashSize(payload.imageSize),
+      output_format: normalizeSeedream5FlashFormat(payload.imageOutputFormat),
+      nsfw_checker: payload.nsfwChecker ?? false,
+    }),
+  },
   "qwen2-1-text": {
     model: "qwen2-1/text-to-image",
     requiresReferenceImage: false,
@@ -169,7 +236,7 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
     model: "qwen2-1/image-to-image",
     requiresReferenceImage: true,
     buildInput: (payload) => {
-      const imageUrls = requireHttpUrls(payload.inputUrls, payload.inputUrl);
+      const imageUrls = requireHttpUrls(payload.inputUrls, payload.inputUrl, "Qwen 2.1 Image to Image");
       const maskUrl = payload.maskUrl?.trim() ? requireHttpUrl(payload.maskUrl, "maskUrl") : undefined;
       const { background, outputFormat } = getQwen21OutputSettings(payload);
       if (maskUrl && imageUrls.length !== 1) {
@@ -267,6 +334,33 @@ const SERVICES: Record<AIServiceId, ServiceConfig> = {
         aspect_ratio: normalizeSeedanceAspectRatio(payload.aspectRatio),
         duration: normalizeSeedanceDuration(payload.duration),
         web_search: false,
+        nsfw_checker: payload.nsfwChecker ?? true,
+      };
+    },
+  },
+  "seedance-2-5-video": {
+    model: "bytedance/seedance-2-5",
+    requiresReferenceImage: false,
+    buildInput: (payload) => {
+      const firstFrameUrl = optionalHttpUrl(payload.firstFrameUrl, "firstFrameUrl");
+      const lastFrameUrl = optionalHttpUrl(payload.lastFrameUrl, "lastFrameUrl");
+      const referenceImageUrls = optionalHttpUrls(payload.referenceImageUrls, 10, "referenceImageUrls");
+      const referenceVideoUrls = optionalHttpUrls(payload.referenceVideoUrls, 3, "referenceVideoUrls");
+      const referenceAudioUrls = optionalHttpUrls(payload.referenceAudioUrls, 3, "referenceAudioUrls");
+      return {
+        ...(firstFrameUrl ? { first_frame_url: firstFrameUrl } : {}),
+        ...(lastFrameUrl ? { last_frame_url: lastFrameUrl } : {}),
+        prompt: normalizeOptionalPrompt(payload.prompt, 30000, "Seedance 2.5"),
+        ...(referenceImageUrls.length ? { reference_image_urls: referenceImageUrls } : {}),
+        ...(referenceVideoUrls.length ? { reference_video_urls: referenceVideoUrls } : {}),
+        ...(referenceAudioUrls.length ? { reference_audio_urls: referenceAudioUrls } : {}),
+        generate_audio: payload.generateAudio ?? true,
+        return_last_frame: payload.returnLastFrame ?? false,
+        resolution: normalizeSeedance25Resolution(payload.videoResolution),
+        aspect_ratio: normalizeSeedance25AspectRatio(payload.aspectRatio),
+        duration: normalizeSeedance25Duration(payload.duration),
+        output_format: payload.videoOutputFormat === "mov" ? "mov" : "mp4",
+        web_search: payload.webSearch ?? false,
         nsfw_checker: payload.nsfwChecker ?? true,
       };
     },

@@ -37,9 +37,11 @@ type AdminPayload = {
     creditPackages: CreditPackage[];
     imageCredits: { "1k": number; "2k": number; "4k": number };
     qwen21ImageCredits: { text1k: number; text2k: number; image1k: number; image2k: number };
+    seedream5FlashImageCredits: { text1k: number; text15k: number; text2k: number; image1k: number; image15k: number; image2k: number };
     videoCredits: { "480p": number; "720p": number };
     grokVideoCreditsPerSecond: { "480p": number; "720p": number };
     seedanceVideoCredits: { "480p": number; "720p": number; "1080p": number; "4k": number };
+    seedance25VideoCredits: { "480p": number; "720p": number; "1080p": number };
     klingMotionCredits: { "720p": number; "1080p": number };
     imageEditExtraCost: number;
     defaultUserCredits: number;
@@ -194,7 +196,7 @@ export default function AdminPage() {
     void load();
   }, []);
 
-  const imageCostTotal = useMemo(() => settings ? settings.imageCredits["1k"] + settings.imageCredits["2k"] + settings.imageCredits["4k"] + Object.values(settings.qwen21ImageCredits).reduce((sum, value) => sum + value, 0) : 0, [settings]);
+  const imageCostTotal = useMemo(() => settings ? settings.imageCredits["1k"] + settings.imageCredits["2k"] + settings.imageCredits["4k"] + Object.values(settings.qwen21ImageCredits).reduce((sum, value) => sum + value, 0) + Object.values(settings.seedream5FlashImageCredits).reduce((sum, value) => sum + value, 0) : 0, [settings]);
   const videoCostTotal = useMemo(() => settings ? settings.videoCredits["480p"] + settings.videoCredits["720p"] : 0, [settings]);
   const totalCreditsAllocated = useMemo(() => users.reduce((sum, item) => sum + item.credits, 0), [users]);
   const adminCount = useMemo(() => users.filter((item) => item.role === "admin").length, [users]);
@@ -702,7 +704,7 @@ export default function AdminPage() {
               <div>
                 <p className="admin-kicker">Credit policy</p>
                 <h2>Credit Matrix</h2>
-                <p className="admin-hint">Manage shared image tiers, dedicated Qwen 2.1 pricing, video rates, and package distribution from one structured block.</p>
+                <p className="admin-hint">Manage shared image tiers, dedicated model pricing, video rates, and package distribution from one structured block.</p>
               </div>
               <div className="admin-mini-stats">
                 <span>{activePackageCount} active packages</span>
@@ -728,6 +730,18 @@ export default function AdminPage() {
                   <label>Text to Image 2K<input type="number" min="0" value={settings.qwen21ImageCredits.text2k} onChange={(e) => setSettings({ ...settings, qwen21ImageCredits: { ...settings.qwen21ImageCredits, text2k: Number(e.target.value) } })} /></label>
                   <label>Image to Image 1K<input type="number" min="0" value={settings.qwen21ImageCredits.image1k} onChange={(e) => setSettings({ ...settings, qwen21ImageCredits: { ...settings.qwen21ImageCredits, image1k: Number(e.target.value) } })} /></label>
                   <label>Image to Image 2K<input type="number" min="0" value={settings.qwen21ImageCredits.image2k} onChange={(e) => setSettings({ ...settings, qwen21ImageCredits: { ...settings.qwen21ImageCredits, image2k: Number(e.target.value) } })} /></label>
+                </div>
+              </div>
+
+              <div className="admin-form-block">
+                <h3>Seedream 5 Flash image</h3>
+                <div className="admin-subgrid">
+                  <label>Text to Image 1K<input type="number" min="0" value={settings.seedream5FlashImageCredits.text1k} onChange={(e) => setSettings({ ...settings, seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits, text1k: Number(e.target.value) } })} /></label>
+                  <label>Text to Image 1.5K<input type="number" min="0" value={settings.seedream5FlashImageCredits.text15k} onChange={(e) => setSettings({ ...settings, seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits, text15k: Number(e.target.value) } })} /></label>
+                  <label>Text to Image 2K<input type="number" min="0" value={settings.seedream5FlashImageCredits.text2k} onChange={(e) => setSettings({ ...settings, seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits, text2k: Number(e.target.value) } })} /></label>
+                  <label>Image to Image 1K<input type="number" min="0" value={settings.seedream5FlashImageCredits.image1k} onChange={(e) => setSettings({ ...settings, seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits, image1k: Number(e.target.value) } })} /></label>
+                  <label>Image to Image 1.5K<input type="number" min="0" value={settings.seedream5FlashImageCredits.image15k} onChange={(e) => setSettings({ ...settings, seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits, image15k: Number(e.target.value) } })} /></label>
+                  <label>Image to Image 2K<input type="number" min="0" value={settings.seedream5FlashImageCredits.image2k} onChange={(e) => setSettings({ ...settings, seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits, image2k: Number(e.target.value) } })} /></label>
                 </div>
               </div>
 
@@ -758,6 +772,15 @@ export default function AdminPage() {
               </div>
 
               <div className="admin-form-block">
+                <h3>Seedance 2.5 video</h3>
+                <div className="admin-subgrid">
+                  <label>Seedance 2.5 480p<input type="number" min="0" value={settings.seedance25VideoCredits["480p"]} onChange={(e) => setSettings({ ...settings, seedance25VideoCredits: { ...settings.seedance25VideoCredits, "480p": Number(e.target.value) } })} /></label>
+                  <label>Seedance 2.5 720p<input type="number" min="0" value={settings.seedance25VideoCredits["720p"]} onChange={(e) => setSettings({ ...settings, seedance25VideoCredits: { ...settings.seedance25VideoCredits, "720p": Number(e.target.value) } })} /></label>
+                  <label>Seedance 2.5 1080p<input type="number" min="0" value={settings.seedance25VideoCredits["1080p"]} onChange={(e) => setSettings({ ...settings, seedance25VideoCredits: { ...settings.seedance25VideoCredits, "1080p": Number(e.target.value) } })} /></label>
+                </div>
+              </div>
+
+              <div className="admin-form-block">
                 <h3>Kling motion control</h3>
                 <div className="admin-subgrid admin-subgrid-two">
                   <label>Kling 720p<input type="number" value={settings.klingMotionCredits["720p"]} onChange={(e) => setSettings({ ...settings, klingMotionCredits: { ...settings.klingMotionCredits, "720p": Number(e.target.value) } })} /></label>
@@ -770,7 +793,7 @@ export default function AdminPage() {
               <label>Default User Credits<input type="number" value={settings.defaultUserCredits} onChange={(e) => setSettings({ ...settings, defaultUserCredits: Number(e.target.value) })} /></label>
               <div className="admin-note-box">
                 <strong>Policy note</strong>
-                <span>Qwen 2.1 uses its dedicated Text/Image 1K and 2K rates. Other image models use the shared tier plus the edit surcharge where applicable.</span>
+                <span>Qwen 2.1 and Seedream 5 Flash use dedicated Text/Image rates. Other image models use the shared tier plus the edit surcharge where applicable.</span>
               </div>
             </div>
 

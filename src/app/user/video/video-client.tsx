@@ -18,14 +18,15 @@ import {
   Video,
   WandSparkles,
   Workflow,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import type { CharacterOrientation, CreateTaskInput, KlingMotionMode, SeedanceVideoResolution, VideoMode, VideoResolution } from "@/lib/ai/types";
+import type { CharacterOrientation, CreateTaskInput, KlingMotionMode, SeedanceVideoResolution, VideoMode, VideoOutputFormat, VideoResolution } from "@/lib/ai/types";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import { StudioNavigation } from "@/components/studio-navigation";
 import styles from "../generate.module.css";
 
-type AiVideoModel = "grok-imagine" | "seedance-2";
+type AiVideoModel = "grok-imagine" | "seedance-2" | "seedance-2-5";
 type VideoModel = AiVideoModel | "kling-motion-control";
 type VideoVariant = "grok" | "kling";
 type VideoWorkflow = "text" | "image";
@@ -42,9 +43,11 @@ type AiVideoModelDefinition = {
   serviceIds: Record<VideoWorkflow, CreateTaskInput["serviceId"]>;
   supportsVideoMode: boolean;
   nsfwChecker?: boolean;
+  aspectRatios: readonly string[];
+  supportsAdvancedReferences?: boolean;
 };
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
-type ProfileResponse = { userId: string; credits: number; previewCosts: { grok480p: number; grok720p: number; seedance480p: number; seedance720p: number; seedance1080p: number; seedance4k: number; kling720p: number; kling1080p: number } };
+type ProfileResponse = { userId: string; credits: number; previewCosts: { grok480p: number; grok720p: number; seedance480p: number; seedance720p: number; seedance1080p: number; seedance4k: number; seedance25_480p: number; seedance25_720p: number; seedance25_1080p: number; kling720p: number; kling1080p: number } };
 type HistoryItem = { id: string; mediaType: "image" | "video"; urls: string[]; prompt: string; createdAt: string };
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string };
 type VideoDashboardCache = { userId: string; userName: string; credits: number; costPreview: ProfileResponse["previewCosts"] | null; history: HistoryItem[]; packages: CreditPackage[] };
@@ -52,7 +55,9 @@ type ControlDropdown = "model" | "aspect" | "quality" | "workflow" | "duration" 
 type CardItem = { id: string; title: string; meta: string; thumbUrl: string; videoUrl: string; createdAt: string };
 const CACHE_KEY = "aistudio_video_dashboard_cache_v3";
 const videoAspectOptions = ["auto", "2:3", "16:9", "9:16", "4:3", "3:4", "1:1"];
+const seedance25AspectOptions = ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16", "21:9"];
 const durationOptions = [5, 6, 10, 15, 20, 25, 30];
+const seedance25DurationOptions = [-1, ...durationOptions];
 const videoResolutionOptions: VideoResolution[] = ["480p", "720p"];
 const seedanceResolutionOptions: SeedanceVideoResolution[] = ["480p", "720p", "1080p", "4k"];
 const videoModeOptions: VideoMode[] = ["normal", "fun", "spicy"];
@@ -70,6 +75,7 @@ const AI_VIDEO_MODELS: readonly AiVideoModelDefinition[] = [
     resolutions: videoResolutionOptions,
     serviceIds: { text: "grok-text-video", image: "grok-image-video" },
     supportsVideoMode: true,
+    aspectRatios: videoAspectOptions,
   },
   {
     id: "seedance-2",
@@ -84,6 +90,23 @@ const AI_VIDEO_MODELS: readonly AiVideoModelDefinition[] = [
     serviceIds: { text: "seedance-2-text-video", image: "seedance-2-image-video" },
     supportsVideoMode: false,
     nsfwChecker: true,
+    aspectRatios: videoAspectOptions,
+  },
+  {
+    id: "seedance-2-5",
+    label: "Seedance 2.5",
+    description: "Multi-reference video with frames, video, audio, and 1080p output.",
+    accent: "violet",
+    icon: Clapperboard,
+    badge: "NEW",
+    maxDuration: 30,
+    defaultResolution: "720p",
+    resolutions: ["480p", "720p", "1080p"],
+    serviceIds: { text: "seedance-2-5-video", image: "seedance-2-5-video" },
+    supportsVideoMode: false,
+    nsfwChecker: true,
+    aspectRatios: seedance25AspectOptions,
+    supportsAdvancedReferences: true,
   },
 ];
 const AI_VIDEO_MODEL_MAP = Object.fromEntries(AI_VIDEO_MODELS.map((model) => [model.id, model])) as Record<AiVideoModel, AiVideoModelDefinition>;
@@ -97,6 +120,9 @@ function firstNonEmptyString(values: unknown[]) { for (const item of values) { i
 function extractTaskError(payload: Record<string, unknown>, data: Record<string, unknown>) { const result = data.result as Record<string, unknown> | undefined; const resultJson = data.resultJson as Record<string, unknown> | undefined; return firstNonEmptyString([payload.error, payload.msg, data.fail_reason, data.failReason, data.error, data.error_message, data.errorMessage, result?.error, result?.message, resultJson?.error, resultJson?.message]); }
 function isVideoUrl(url: string) { return /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(url); }
 function truncate(value: string, max = 38) { const clean = value.trim(); return clean.length <= max ? clean : `${clean.slice(0, max - 1)}...`; }
+function isHttpUrl(value: string) { return /^https?:\/\//.test(value.trim()); }
+function parseUrlList(value: string, max: number) { return Array.from(new Set(value.split(/[\n,]/).map((url) => url.trim()).filter(Boolean))).slice(0, max); }
+function formatDuration(value: number) { return value === -1 ? "Auto" : `${value}s`; }
 export default function VideoClient({ initialPrompt, variant = "grok" }: { initialPrompt: string; variant?: VideoVariant }) {
   const router = useRouter();
   const controlsRef = useRef<HTMLFormElement | null>(null);
@@ -112,14 +138,25 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const [videoModeType, setVideoModeType] = useState<VideoWorkflow>("text");
   const [referenceUrl, setReferenceUrl] = useState("");
   const [referenceVideoUrl, setReferenceVideoUrl] = useState("");
+  const [firstFrameUrl, setFirstFrameUrl] = useState("");
+  const [lastFrameUrl, setLastFrameUrl] = useState("");
+  const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
+  const [referenceVideoUrls, setReferenceVideoUrls] = useState<string[]>([]);
+  const [referenceAudioUrls, setReferenceAudioUrls] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingAsset, setUploadingAsset] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState("2:3");
   const [mode, setMode] = useState<VideoMode>("normal");
   const [duration, setDuration] = useState(6);
   const [resolution, setResolution] = useState<SeedanceVideoResolution>("480p");
   const [klingMotionMode, setKlingMotionMode] = useState<KlingMotionMode>("720p");
   const [characterOrientation, setCharacterOrientation] = useState<CharacterOrientation>("image");
+  const [generateAudio, setGenerateAudio] = useState(true);
+  const [returnLastFrame, setReturnLastFrame] = useState(false);
+  const [videoOutputFormat, setVideoOutputFormat] = useState<VideoOutputFormat>("mp4");
+  const [webSearch, setWebSearch] = useState(false);
+  const [videoNsfwChecker, setVideoNsfwChecker] = useState(true);
   const [activeTab, setActiveTab] = useState<"result" | "history">("result");
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(variant === "kling");
   const [openControl, setOpenControl] = useState<ControlDropdown>(null);
@@ -127,20 +164,38 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const [statusText, setStatusText] = useState(isKlingPage ? "Ready for Kling Motion generation." : "Ready for video generation.");
   const [loading, setLoading] = useState(false);
   const [resultUrl, setResultUrl] = useState("");
+  const [resultAssetUrls, setResultAssetUrls] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const saveCache = useCallback((next: Partial<VideoDashboardCache>) => { if (typeof window === "undefined") return; try { const raw = window.sessionStorage.getItem(CACHE_KEY); const base: VideoDashboardCache = raw ? (JSON.parse(raw) as VideoDashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [] }; window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next })); } catch {} }, []);
   const activeAiModel = isAiVideoModel(videoModel) ? AI_VIDEO_MODEL_MAP[videoModel] : null;
+  const validReferenceImageUrls = referenceImageUrls.filter(isHttpUrl);
+  const validReferenceVideoUrls = referenceVideoUrls.filter(isHttpUrl);
+  const validReferenceAudioUrls = referenceAudioUrls.filter(isHttpUrl);
   const selectAiVideoModel = useCallback((nextModel: AiVideoModel) => {
     const definition = AI_VIDEO_MODEL_MAP[nextModel];
     setVideoModel(nextModel);
-    setDuration((current) => Math.min(current, definition.maxDuration));
+    setDuration((current) => current === -1 && nextModel !== "seedance-2-5" ? 5 : Math.min(current, definition.maxDuration));
     setResolution((current) => definition.resolutions.includes(current) ? current : definition.defaultResolution);
+    setAspectRatio((current) => definition.aspectRatios.includes(current) ? current : definition.aspectRatios[0]);
+    if (definition.supportsAdvancedReferences) setShowAdvancedSettings(true);
     setOpenControl(null);
   }, []);
-  const currentCost = useMemo(() => { if (!costPreview) return null; if (videoModel === "kling-motion-control") return klingMotionMode === "1080p" ? costPreview.kling1080p : costPreview.kling720p; if (videoModel === "seedance-2") { if (resolution === "4k") return costPreview.seedance4k ?? 300; if (resolution === "1080p") return costPreview.seedance1080p ?? 160; if (resolution === "720p") return costPreview.seedance720p ?? 100; return costPreview.seedance480p ?? 60; } const grokResolution: VideoResolution = resolution === "720p" ? "720p" : "480p"; const rate = grokResolution === "720p" ? costPreview.grok720p : costPreview.grok480p; return Math.round(rate * duration * 10) / 10; }, [costPreview, videoModel, klingMotionMode, resolution, duration]);
-  const canGenerate = useMemo(() => { const hasPrompt = prompt.trim().length >= 3; if (!hasPrompt || uploadingImage || uploadingVideo) return false; if (videoModel === "kling-motion-control") return /^https?:\/\//.test(referenceUrl) && /^https?:\/\//.test(referenceVideoUrl); if (videoModeType === "image") return /^https?:\/\//.test(referenceUrl); return true; }, [prompt, uploadingImage, uploadingVideo, videoModel, referenceUrl, referenceVideoUrl, videoModeType]);
+  const currentCost = useMemo(() => { if (!costPreview) return null; if (videoModel === "kling-motion-control") return klingMotionMode === "1080p" ? costPreview.kling1080p : costPreview.kling720p; if (videoModel === "seedance-2-5") { if (resolution === "1080p") return costPreview.seedance25_1080p ?? 220; if (resolution === "480p") return costPreview.seedance25_480p ?? 80; return costPreview.seedance25_720p ?? 140; } if (videoModel === "seedance-2") { if (resolution === "4k") return costPreview.seedance4k ?? 300; if (resolution === "1080p") return costPreview.seedance1080p ?? 160; if (resolution === "720p") return costPreview.seedance720p ?? 100; return costPreview.seedance480p ?? 60; } const grokResolution: VideoResolution = resolution === "720p" ? "720p" : "480p"; const rate = grokResolution === "720p" ? costPreview.grok720p : costPreview.grok480p; return Math.round(rate * duration * 10) / 10; }, [costPreview, videoModel, klingMotionMode, resolution, duration]);
+  const canGenerate = useMemo(() => {
+    if (uploadingImage || uploadingVideo || uploadingAsset) return false;
+    if (videoModel === "kling-motion-control") return prompt.trim().length >= 3 && isHttpUrl(referenceUrl) && isHttpUrl(referenceVideoUrl);
+    if (videoModel === "seedance-2-5") {
+      const hasAsset = isHttpUrl(firstFrameUrl) || isHttpUrl(lastFrameUrl) || validReferenceImageUrls.length > 0 || validReferenceVideoUrls.length > 0 || validReferenceAudioUrls.length > 0;
+      if (!prompt.trim() && !hasAsset) return false;
+      if (prompt.length > 30000) return false;
+      return videoModeType !== "image" || isHttpUrl(firstFrameUrl) || validReferenceImageUrls.length > 0;
+    }
+    if (prompt.trim().length < 3) return false;
+    if (videoModeType === "image") return isHttpUrl(referenceUrl);
+    return true;
+  }, [prompt, uploadingImage, uploadingVideo, uploadingAsset, videoModel, referenceUrl, referenceVideoUrl, videoModeType, firstFrameUrl, lastFrameUrl, validReferenceImageUrls.length, validReferenceVideoUrls.length, validReferenceAudioUrls.length]);
   useEffect(() => { router.prefetch("/user"); router.prefetch("/user/video"); router.prefetch("/user/kling"); }, [router]);
   useEffect(() => { function handlePointerDown(event: MouseEvent) { if (!controlsRef.current) return; if (!controlsRef.current.contains(event.target as Node)) setOpenControl(null); } document.addEventListener("mousedown", handlePointerDown); return () => document.removeEventListener("mousedown", handlePointerDown); }, []);
   useEffect(() => {
@@ -204,7 +259,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
     const urls = extractResultUrls({ ...data, resultJson: parsedResultJson });
     const video = urls.find((url) => isVideoUrl(url)) || urls[0] || "";
     if (!video) return { kind: "failed" as const, message: extractTaskError(payload, data) || "Task completed but no output video was returned." };
-    return { kind: "success" as const, video };
+    return { kind: "success" as const, video, assets: urls.filter((url) => url !== video && !isVideoUrl(url)) };
   }, []);
   async function waitForTaskVideo(targetTaskId: string) {
     for (let i = 0; i < 60; i += 1) {
@@ -215,18 +270,45 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
     }
     return { kind: "failed" as const, message: "Timed out while waiting for video render. Please check the task again." };
   }
+  async function uploadAssetFile(file: File, kind: "image" | "video" | "audio") {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("kind", kind);
+    const res = await apiFetch(apiPath("/api/ai/upload"), { method: "POST", body: fd });
+    const payload = (await res.json()) as { url?: string; error?: string };
+    if (!res.ok || !payload.url) throw new Error(payload.error || "Upload failed.");
+    return payload.url;
+  }
   async function handleFileUpload(file: File, kind: "image" | "video") {
     if (kind === "image") { setUploadingImage(true); setStatusText("Uploading reference image..."); } else { setUploadingVideo(true); setStatusText("Uploading motion reference video..."); }
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("kind", kind);
-      const res = await apiFetch(apiPath("/api/ai/upload"), { method: "POST", body: fd });
-      const payload = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !payload.url) { setStatusText(payload.error || "Upload failed."); return; }
-      if (kind === "image") { setReferenceUrl(payload.url); setStatusText("Reference image uploaded."); } else { setReferenceVideoUrl(payload.url); setStatusText("Motion reference video uploaded."); }
+      const url = await uploadAssetFile(file, kind);
+      if (kind === "image") { setReferenceUrl(url); setStatusText("Reference image uploaded."); } else { setReferenceVideoUrl(url); setStatusText("Motion reference video uploaded."); }
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "Upload failed.");
     } finally {
       if (kind === "image") setUploadingImage(false); else setUploadingVideo(false);
+    }
+  }
+  async function handleSeedance25Upload(files: File[], kind: "image" | "video" | "audio", target: "first" | "last" | "images" | "videos" | "audios") {
+    const maxCount = target === "images" ? 10 : target === "videos" || target === "audios" ? 3 : 1;
+    const selectedFiles = files.slice(0, maxCount);
+    if (!selectedFiles.length) return;
+    setUploadingAsset(target);
+    setStatusText(`Uploading ${selectedFiles.length} ${kind} reference${selectedFiles.length > 1 ? "s" : ""}...`);
+    try {
+      const urls: string[] = [];
+      for (const file of selectedFiles) urls.push(await uploadAssetFile(file, kind));
+      if (target === "first") setFirstFrameUrl(urls[0]);
+      if (target === "last") setLastFrameUrl(urls[0]);
+      if (target === "images") setReferenceImageUrls((current) => Array.from(new Set([...current, ...urls])).slice(0, 10));
+      if (target === "videos") setReferenceVideoUrls((current) => Array.from(new Set([...current, ...urls])).slice(0, 3));
+      if (target === "audios") setReferenceAudioUrls((current) => Array.from(new Set([...current, ...urls])).slice(0, 3));
+      setStatusText(`${selectedFiles.length} reference asset${selectedFiles.length > 1 ? "s" : ""} uploaded.`);
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "Upload failed.");
+    } finally {
+      setUploadingAsset(null);
     }
   }
   async function onGenerate(e: FormEvent) {
@@ -234,11 +316,30 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
     if (!canGenerate) return;
     setLoading(true);
     setResultUrl("");
-    setStatusText(videoModel === "kling-motion-control" ? "Generating with Kling Motion Control..." : videoModel === "seedance-2" ? "Generating with Seedance 2..." : "Generating video...");
+    setResultAssetUrls([]);
+    setStatusText(videoModel === "kling-motion-control" ? "Generating with Kling Motion Control..." : videoModel === "seedance-2-5" ? "Generating with Seedance 2.5..." : videoModel === "seedance-2" ? "Generating with Seedance 2..." : "Generating video...");
     setActiveTab("result");
     const body: CreateTaskInput = videoModel === "kling-motion-control"
       ? { serviceId: "kling-motion-control", prompt, inputUrl: referenceUrl, referenceVideoUrl, klingMotionMode, characterOrientation }
-      : {
+      : videoModel === "seedance-2-5"
+        ? {
+            serviceId: "seedance-2-5-video",
+            prompt,
+            firstFrameUrl: isHttpUrl(firstFrameUrl) ? firstFrameUrl : undefined,
+            lastFrameUrl: isHttpUrl(lastFrameUrl) ? lastFrameUrl : undefined,
+            referenceImageUrls: validReferenceImageUrls,
+            referenceVideoUrls: validReferenceVideoUrls,
+            referenceAudioUrls: validReferenceAudioUrls,
+            generateAudio,
+            returnLastFrame,
+            videoResolution: resolution,
+            aspectRatio,
+            duration,
+            videoOutputFormat,
+            webSearch,
+            nsfwChecker: videoNsfwChecker,
+          }
+        : {
           serviceId: AI_VIDEO_MODEL_MAP[videoModel].serviceIds[videoModeType],
           prompt,
           aspectRatio: aspectRatio === "auto" ? undefined : aspectRatio,
@@ -256,8 +357,9 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
     const result = await waitForTaskVideo(payload.data.taskId);
     if (result.kind === "success") {
       setResultUrl(result.video);
+      setResultAssetUrls(result.assets);
       setStatusText("Video completed.");
-      const historyPrompt = videoModel === "kling-motion-control" ? `[Kling Motion Control] ${prompt}` : videoModel === "seedance-2" ? `[Seedance 2] ${prompt}` : prompt;
+      const historyPrompt = videoModel === "kling-motion-control" ? `[Kling Motion Control] ${prompt}` : videoModel === "seedance-2-5" ? `[Seedance 2.5] ${prompt || "Reference assets"}` : videoModel === "seedance-2" ? `[Seedance 2] ${prompt}` : prompt;
       const r = await apiFetch(apiPath("/api/user/history"), { method: "POST", headers: { "Content-Type": "application/json", "x-user-id": userId }, body: JSON.stringify({ mediaType: "video", urls: [result.video], prompt: historyPrompt }) });
       if (r.ok) {
         const p = (await r.json()) as { item?: HistoryItem };
@@ -275,7 +377,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
     setLoading(false);
   }
   async function handleLogout() { await apiFetch(apiPath("/api/auth/logout"), { method: "POST" }); window.location.assign("/login"); }
-  const resultCards: CardItem[] = resultUrl ? [{ id: resultUrl, title: truncate(prompt), meta: videoModel === "kling-motion-control" ? `Kling Motion Control - ${klingMotionMode} - ${characterOrientation}` : videoModel === "seedance-2" ? `Seedance 2 - ${resolution} - ${duration}s` : `Grok Imagine - ${aspectRatio} - ${duration}s`, thumbUrl: resultUrl, videoUrl: resultUrl, createdAt: new Date().toISOString() }] : [];
+  const resultCards: CardItem[] = resultUrl ? [{ id: resultUrl, title: truncate(prompt || "Reference video"), meta: videoModel === "kling-motion-control" ? `Kling Motion Control - ${klingMotionMode} - ${characterOrientation}` : `${activeAiModel?.label || "AI Video"} - ${resolution} - ${formatDuration(duration)}`, thumbUrl: resultUrl, videoUrl: resultUrl, createdAt: new Date().toISOString() }] : [];
   const historyCards: CardItem[] = history.map((item) => ({ id: item.id, title: truncate(item.prompt || "AI Video"), meta: `${new Date(item.createdAt).toLocaleDateString("vi-VN")} - ${item.urls.length} clip`, thumbUrl: item.urls[0], videoUrl: item.urls[0], createdAt: item.createdAt }));
   const displayCards = activeTab === "result" && (loading || resultCards.length > 0) ? resultCards : historyCards;
   const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
@@ -285,6 +387,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const qualityLabel = videoModel === "kling-motion-control" ? klingMotionMode : resolution;
   const workflowLabel = videoModel === "kling-motion-control" ? "Motion Control" : (videoModeType === "text" ? "Text to Video" : "Image to Video");
   const secondaryLabel = videoModel === "kling-motion-control" ? characterOrientation : aspectRatio;
+  const availableDurationOptions = videoModel === "seedance-2-5" ? seedance25DurationOptions : durationOptions;
   const ActiveModelIcon = activeAiModel?.icon ?? WandSparkles;
   return (
     <div className={`${styles.page} ${styles.videoPage}`}>
@@ -350,14 +453,14 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
               </div>
               <div className={styles.controlsCompact}>
                 <div className={styles.optionCluster}>
-                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "aspect" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}><div className={styles.controlSelectIcon}><Ratio size={16} /></div><div><small>{videoModel === "kling-motion-control" ? "Character" : "Aspect ratio"}</small><strong>{secondaryLabel}</strong></div></button>{openControl === "aspect" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? characterOrientationOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${characterOrientation === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setCharacterOrientation(value); setOpenControl(null); }}>{value}</button>) : videoAspectOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
+                  <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "aspect" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "aspect" ? null : "aspect")}><div className={styles.controlSelectIcon}><Ratio size={16} /></div><div><small>{videoModel === "kling-motion-control" ? "Character" : "Aspect ratio"}</small><strong>{secondaryLabel}</strong></div></button>{openControl === "aspect" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? characterOrientationOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${characterOrientation === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setCharacterOrientation(value); setOpenControl(null); }}>{value}</button>) : (activeAiModel?.aspectRatios ?? videoAspectOptions).map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
                   <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "quality" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "quality" ? null : "quality")}><div className={styles.controlSelectIcon}><MonitorUp size={16} /></div><div><small>{videoModel === "kling-motion-control" ? "Output mode" : "Resolution"}</small><strong>{qualityLabel}</strong></div></button>{openControl === "quality" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? klingModeOptions.map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${klingMotionMode === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setKlingMotionMode(value); setOpenControl(null); }}>{value}</button>) : (activeAiModel?.resolutions ?? videoResolutionOptions).map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${resolution === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setResolution(value); setOpenControl(null); }}>{value}</button>)}</div> : null}</div>
-                  {!isKlingPage ? <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "duration" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "duration" ? null : "duration")}><div className={styles.controlSelectIcon}><Timer size={16} /></div><div><small>Duration</small><strong>{duration}s</strong></div></button>{openControl === "duration" ? <div className={styles.settingMenu}>{durationOptions.filter((value) => value <= (activeAiModel?.maxDuration ?? 30)).map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${duration === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setDuration(value); setOpenControl(null); }}>{value} seconds</button>)}</div> : null}</div> : null}
+                  {!isKlingPage ? <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "duration" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "duration" ? null : "duration")}><div className={styles.controlSelectIcon}><Timer size={16} /></div><div><small>Duration</small><strong>{formatDuration(duration)}</strong></div></button>{openControl === "duration" ? <div className={styles.settingMenu}>{availableDurationOptions.filter((value) => value === -1 || value <= (activeAiModel?.maxDuration ?? 30)).map((value) => <button key={value} type="button" className={`${styles.settingMenuItem} ${duration === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setDuration(value); setOpenControl(null); }}>{value === -1 ? "Auto duration" : `${value} seconds`}</button>)}</div> : null}</div> : null}
                   <div className={styles.settingDropdown}><button type="button" className={`${styles.settingButton} ${openControl === "workflow" ? styles.settingButtonActive : ""}`} onClick={() => setOpenControl((prev) => prev === "workflow" ? null : "workflow")}><div className={styles.controlSelectIcon}><Workflow size={16} /></div><div><small>{videoModel === "kling-motion-control" ? "Workflow" : "Generation mode"}</small><strong>{workflowLabel}</strong></div></button>{openControl === "workflow" ? <div className={styles.settingMenu}>{videoModel === "kling-motion-control" ? <button type="button" className={`${styles.settingMenuItem} ${styles.settingMenuItemActive}`} onClick={() => setOpenControl(null)}>Motion Control</button> : <><button type="button" className={`${styles.settingMenuItem} ${videoModeType === "text" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("text"); setOpenControl(null); }}>Text to Video</button><button type="button" className={`${styles.settingMenuItem} ${videoModeType === "image" ? styles.settingMenuItemActive : ""}`} onClick={() => { setVideoModeType("image"); setShowAdvancedSettings(true); setOpenControl(null); }}>Image to Video</button></>}</div> : null}</div>
                 </div>
                 <div className={styles.actionCluster}>
                   <button type="button" className={styles.advancedToggle} onClick={() => setShowAdvancedSettings((prev) => !prev)}>{showAdvancedSettings ? "Hide advanced" : "Advanced settings"}</button>
-                  <button type="button" className={styles.resetBtn} onClick={() => { setPrompt(""); setReferenceUrl(""); setReferenceVideoUrl(""); setMode("normal"); setAspectRatio("2:3"); setDuration(6); setResolution("480p"); setVideoModeType("text"); setVideoModel(variant === "kling" ? "kling-motion-control" : "grok-imagine"); setKlingMotionMode("720p"); setCharacterOrientation("image"); }}>Reset</button>
+                  <button type="button" className={styles.resetBtn} onClick={() => { setPrompt(""); setReferenceUrl(""); setReferenceVideoUrl(""); setFirstFrameUrl(""); setLastFrameUrl(""); setReferenceImageUrls([]); setReferenceVideoUrls([]); setReferenceAudioUrls([]); setGenerateAudio(true); setReturnLastFrame(false); setVideoOutputFormat("mp4"); setWebSearch(false); setVideoNsfwChecker(true); setMode("normal"); setAspectRatio("2:3"); setDuration(6); setResolution("480p"); setVideoModeType("text"); setVideoModel(variant === "kling" ? "kling-motion-control" : "grok-imagine"); setKlingMotionMode("720p"); setCharacterOrientation("image"); }}>Reset</button>
                   <button className={styles.generateBtn} type="submit" disabled={loading || !canGenerate}>{loading ? "Generating..." : `Generate - ${formatCredits(currentCost ?? 0)} credits`}</button>
                 </div>
               </div>
@@ -369,9 +472,53 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
                     {variant !== "kling" ? (
                       <>
                         {activeAiModel?.supportsVideoMode ? <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Video mode</h4><span className={styles.fieldHint}>Motion style</span></div><select value={mode} onChange={(e) => setMode(e.target.value as VideoMode)}>{videoModeOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></div> : null}
-                        <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Duration</h4><span className={styles.fieldHint}>Up to {activeAiModel?.maxDuration ?? 30} seconds</span></div><select value={String(duration)} onChange={(e) => setDuration(Number(e.target.value))}>{durationOptions.filter((value) => value <= (activeAiModel?.maxDuration ?? 30)).map((value) => <option key={value} value={value}>{value}s</option>)}</select></div>
-                        <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Output</h4><span className={styles.fieldHint}>Duration + quality</span></div><div className={styles.subtleNote}>{duration}s - {resolution} - {aspectRatio} - {videoModeType === "text" ? "Text to Video" : "Image to Video"}</div></div>
-                        {videoModeType === "image" ? <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}><div className={styles.fieldBlockHeader}><h4>Reference image</h4><span className={styles.fieldHint}>{uploadingImage ? "Uploading..." : referenceUrl ? "Image URL ready" : "Upload or paste URL"}</span></div><div className={styles.uploadRow}><input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file, "image"); }} /><input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL after upload)" /></div>{referenceUrl ? <div className={styles.referencePreview}><img src={referenceUrl} alt="Video reference image" /><div className={styles.referencePreviewMeta}>This image will be used as the source frame for Image to Video.</div></div> : null}</div> : null}
+                        <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Duration</h4><span className={styles.fieldHint}>Up to {activeAiModel?.maxDuration ?? 30} seconds</span></div><select value={String(duration)} onChange={(e) => setDuration(Number(e.target.value))}>{availableDurationOptions.filter((value) => value === -1 || value <= (activeAiModel?.maxDuration ?? 30)).map((value) => <option key={value} value={value}>{value === -1 ? "Auto" : `${value}s`}</option>)}</select></div>
+                        <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Output</h4><span className={styles.fieldHint}>Duration + quality</span></div><div className={styles.subtleNote}>{formatDuration(duration)} - {resolution} - {aspectRatio} - {videoModeType === "text" ? "Text to Video" : "Image to Video"}</div></div>
+                        {videoModel !== "seedance-2-5" && videoModeType === "image" ? <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}><div className={styles.fieldBlockHeader}><h4>Reference image</h4><span className={styles.fieldHint}>{uploadingImage ? "Uploading..." : referenceUrl ? "Image URL ready" : "Upload or paste URL"}</span></div><div className={styles.uploadRow}><input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileUpload(file, "image"); }} /><input value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://... (URL after upload)" /></div>{referenceUrl ? <div className={styles.referencePreview}><img src={referenceUrl} alt="Video reference image" /><div className={styles.referencePreviewMeta}>This image will be used as the source frame for Image to Video.</div></div> : null}</div> : null}
+                        {videoModel === "seedance-2-5" ? (
+                          <>
+                            <div className={styles.fieldBlock}>
+                              <div className={styles.fieldBlockHeader}><h4>Output format</h4><span className={styles.fieldHint}>MP4 or MOV</span></div>
+                              <select value={videoOutputFormat} onChange={(e) => setVideoOutputFormat(e.target.value as VideoOutputFormat)}><option value="mp4">MP4</option><option value="mov">MOV</option></select>
+                            </div>
+                            <div className={`${styles.fieldBlock} ${styles.qwenOptionBlock}`}>
+                              <div className={styles.fieldBlockHeader}><h4>Generation options</h4><span className={styles.fieldHint}>Seedance 2.5 controls</span></div>
+                              <label className={styles.toggleRow}><span><strong>Generate audio</strong><small>Create synchronized AI audio.</small></span><input type="checkbox" checked={generateAudio} onChange={(e) => setGenerateAudio(e.target.checked)} /></label>
+                              <label className={styles.toggleRow}><span><strong>Return last frame</strong><small>Include the final frame in the result.</small></span><input type="checkbox" checked={returnLastFrame} onChange={(e) => setReturnLastFrame(e.target.checked)} /></label>
+                              <label className={styles.toggleRow}><span><strong>Web search</strong><small>Allow online context lookup.</small></span><input type="checkbox" checked={webSearch} onChange={(e) => setWebSearch(e.target.checked)} /></label>
+                              <label className={styles.toggleRow}><span><strong>NSFW checker</strong><small>Content checking is enabled by default.</small></span><input type="checkbox" checked={videoNsfwChecker} onChange={(e) => setVideoNsfwChecker(e.target.checked)} /></label>
+                            </div>
+
+                            <div className={styles.fieldBlock}>
+                              <div className={styles.fieldBlockHeader}><h4>First frame</h4><span className={styles.fieldHint}>{uploadingAsset === "first" ? "Uploading..." : firstFrameUrl ? "Ready" : "Optional"}</span></div>
+                              <div className={styles.uploadRow}><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => void handleSeedance25Upload(Array.from(e.target.files || []), "image", "first")} /><input value={firstFrameUrl} onChange={(e) => setFirstFrameUrl(e.target.value)} placeholder="https://... first frame" /></div>
+                              {isHttpUrl(firstFrameUrl) ? <div className={styles.referencePreview}><img src={firstFrameUrl} alt="Seedance first frame" /><div className={styles.referencePreviewMeta}>Starting frame for the generated video.</div></div> : null}
+                            </div>
+                            <div className={styles.fieldBlock}>
+                              <div className={styles.fieldBlockHeader}><h4>Last frame</h4><span className={styles.fieldHint}>{uploadingAsset === "last" ? "Uploading..." : lastFrameUrl ? "Ready" : "Optional"}</span></div>
+                              <div className={styles.uploadRow}><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => void handleSeedance25Upload(Array.from(e.target.files || []), "image", "last")} /><input value={lastFrameUrl} onChange={(e) => setLastFrameUrl(e.target.value)} placeholder="https://... last frame" /></div>
+                              {isHttpUrl(lastFrameUrl) ? <div className={styles.referencePreview}><img src={lastFrameUrl} alt="Seedance last frame" /><div className={styles.referencePreviewMeta}>Target frame for the end of the video.</div></div> : null}
+                            </div>
+
+                            <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
+                              <div className={styles.fieldBlockHeader}><h4>Reference images</h4><span className={styles.fieldHint}>{uploadingAsset === "images" ? "Uploading..." : `${validReferenceImageUrls.length}/10 images`}</span></div>
+                              <div className={styles.uploadRow}><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={(e) => void handleSeedance25Upload(Array.from(e.target.files || []), "image", "images")} /><textarea rows={3} value={referenceImageUrls.join("\n")} onChange={(e) => setReferenceImageUrls(parseUrlList(e.target.value, 10))} placeholder="One image URL per line. Use @Image1, @Image2... in the prompt." /></div>
+                              {validReferenceImageUrls.length ? <div className={styles.referenceGrid}>{validReferenceImageUrls.map((url, index) => <div className={styles.referenceThumb} key={`${url}-${index}`}><img src={url} alt={`Seedance reference ${index + 1}`} /><button type="button" aria-label={`Remove reference image ${index + 1}`} onClick={() => setReferenceImageUrls((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={14} /></button></div>)}</div> : null}
+                            </div>
+
+                            <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
+                              <div className={styles.fieldBlockHeader}><h4>Reference videos</h4><span className={styles.fieldHint}>{uploadingAsset === "videos" ? "Uploading..." : `${validReferenceVideoUrls.length}/3 videos, up to 30s total`}</span></div>
+                              <div className={styles.uploadRow}><input type="file" multiple accept="video/mp4,video/quicktime,video/x-matroska" onChange={(e) => void handleSeedance25Upload(Array.from(e.target.files || []), "video", "videos")} /><textarea rows={3} value={referenceVideoUrls.join("\n")} onChange={(e) => setReferenceVideoUrls(parseUrlList(e.target.value, 3))} placeholder="One video URL per line" /></div>
+                              {validReferenceVideoUrls.length ? <div className={styles.seedanceAssetList}>{validReferenceVideoUrls.map((url, index) => <div className={styles.seedanceAssetItem} key={`${url}-${index}`}><video src={url} controls muted playsInline /><span>Video {index + 1}</span><button type="button" aria-label={`Remove reference video ${index + 1}`} onClick={() => setReferenceVideoUrls((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={14} /></button></div>)}</div> : null}
+                            </div>
+
+                            <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
+                              <div className={styles.fieldBlockHeader}><h4>Reference audio</h4><span className={styles.fieldHint}>{uploadingAsset === "audios" ? "Uploading..." : `${validReferenceAudioUrls.length}/3 audio files, up to 30s total`}</span></div>
+                              <div className={styles.uploadRow}><input type="file" multiple accept="audio/mpeg,audio/wav,audio/x-wav,audio/aac,audio/mp4,audio/ogg" onChange={(e) => void handleSeedance25Upload(Array.from(e.target.files || []), "audio", "audios")} /><textarea rows={3} value={referenceAudioUrls.join("\n")} onChange={(e) => setReferenceAudioUrls(parseUrlList(e.target.value, 3))} placeholder="One audio URL per line" /></div>
+                              {validReferenceAudioUrls.length ? <div className={styles.seedanceAssetList}>{validReferenceAudioUrls.map((url, index) => <div className={styles.seedanceAssetItem} key={`${url}-${index}`}><audio src={url} controls /><span>Audio {index + 1}</span><button type="button" aria-label={`Remove reference audio ${index + 1}`} onClick={() => setReferenceAudioUrls((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={14} /></button></div>)}</div> : null}
+                            </div>
+                          </>
+                        ) : null}
                       </>
                     ) : (
                       <>
@@ -395,9 +542,10 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
               <div className={styles.previewStage}>
                 {loading ? <div className={styles.previewEmpty}><div className={styles.spinner} /><strong>Rendering your video</strong><span>{statusText}</span></div> : filteredCards[0] ? <><video src={filteredCards[0].videoUrl} controls muted playsInline /><button type="button" className={styles.previewExpand} onClick={() => setLightboxUrl(filteredCards[0].videoUrl)}>Open preview</button></> : <div className={styles.previewEmpty}><span className={styles.previewGlyph}><Clapperboard size={20} /></span><strong>Your render will appear here</strong><span>Set up the scene and start generating.</span></div>}
               </div>
+              {resultAssetUrls.length ? <div className={styles.returnedFrameStrip}><div><strong>Returned frames</strong><span>{resultAssetUrls.length} image{resultAssetUrls.length > 1 ? "s" : ""}</span></div><div>{resultAssetUrls.map((url, index) => <button type="button" key={`${url}-${index}`} onClick={() => window.open(url, "_blank", "noopener,noreferrer")}><img src={url} alt={`Returned frame ${index + 1}`} /></button>)}</div></div> : null}
               <div className={styles.outputSummary}>
                 <div><span>Model</span><strong>{modelLabel}</strong></div>
-                <div><span>Output</span><strong>{qualityLabel} / {videoModel === "kling-motion-control" ? characterOrientation : `${duration}s`}</strong></div>
+                <div><span>Output</span><strong>{qualityLabel} / {videoModel === "kling-motion-control" ? characterOrientation : formatDuration(duration)}</strong></div>
                 <div><span>Cost</span><strong>{formatCredits(currentCost ?? 0)} credits</strong></div>
               </div>
               <div className={styles.renderQueue}>

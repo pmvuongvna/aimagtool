@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "file is required." }, { status: 400 });
     }
     const file = fileLike;
-    const kind = String(form.get("kind") || "image").toLowerCase() === "video" ? "video" : "image";
+    const requestedKind = String(form.get("kind") || "image").toLowerCase();
+    const kind = requestedKind === "video" || requestedKind === "audio" ? requestedKind : "image";
 
     const payload = (await uploadFileToKie(file, kind)) as Record<string, unknown>;
     const url = extractUploadUrl(payload);

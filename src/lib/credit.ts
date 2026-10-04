@@ -1,13 +1,15 @@
-import type { CreateTaskInput, ImageResolution, KlingMotionMode, SeedanceVideoResolution, VideoResolution } from "@/lib/ai/types";
+import type { CreateTaskInput, ImageResolution, KlingMotionMode, Seedance25VideoResolution, SeedanceVideoResolution, VideoResolution } from "@/lib/ai/types";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
 
 export type CreditSettings = {
   creditPackages: CreditPackage[];
   imageCredits: Record<ImageResolution, number>;
   qwen21ImageCredits: Qwen21ImageCredits;
+  seedream5FlashImageCredits: Seedream5FlashImageCredits;
   videoCredits: Record<VideoResolution, number>;
   grokVideoCreditsPerSecond: Record<VideoResolution, number>;
   seedanceVideoCredits: Record<SeedanceVideoResolution, number>;
+  seedance25VideoCredits: Record<Seedance25VideoResolution, number>;
   klingMotionCredits: Record<KlingMotionMode, number>;
   imageEditExtraCost: number;
   defaultUserCredits: number;
@@ -17,6 +19,15 @@ export type Qwen21ImageCredits = {
   text1k: number;
   text2k: number;
   image1k: number;
+  image2k: number;
+};
+
+export type Seedream5FlashImageCredits = {
+  text1k: number;
+  text15k: number;
+  text2k: number;
+  image1k: number;
+  image15k: number;
   image2k: number;
 };
 
@@ -33,9 +44,11 @@ type CreditSettingsPatch = {
   creditPackages?: CreditPackage[];
   imageCredits?: Partial<Record<ImageResolution, number>>;
   qwen21ImageCredits?: Partial<Qwen21ImageCredits>;
+  seedream5FlashImageCredits?: Partial<Seedream5FlashImageCredits>;
   videoCredits?: Partial<Record<VideoResolution, number>>;
   grokVideoCreditsPerSecond?: Partial<Record<VideoResolution, number>>;
   seedanceVideoCredits?: Partial<Record<SeedanceVideoResolution, number>>;
+  seedance25VideoCredits?: Partial<Record<Seedance25VideoResolution, number>>;
   klingMotionCredits?: Partial<Record<KlingMotionMode, number>>;
   imageEditExtraCost?: number;
   defaultUserCredits?: number;
@@ -58,9 +71,11 @@ const DEFAULT_SETTINGS: CreditSettings = {
   ],
   imageCredits: { "1k": 8, "2k": 16, "4k": 32 },
   qwen21ImageCredits: { text1k: 8, text2k: 16, image1k: 12, image2k: 20 },
+  seedream5FlashImageCredits: { text1k: 8, text15k: 12, text2k: 16, image1k: 12, image15k: 16, image2k: 20 },
   videoCredits: { "480p": 45, "720p": 80 },
   grokVideoCreditsPerSecond: { "480p": 1.6, "720p": 3 },
   seedanceVideoCredits: { "480p": 60, "720p": 100, "1080p": 160, "4k": 300 },
+  seedance25VideoCredits: { "480p": 80, "720p": 140, "1080p": 220 },
   klingMotionCredits: { "720p": 80, "1080p": 120 },
   imageEditExtraCost: 4,
   defaultUserCredits: 500,
@@ -78,9 +93,11 @@ function cloneSettings(settings: CreditSettings) {
     creditPackages: settings.creditPackages.map((item) => ({ ...item })),
     imageCredits: { ...settings.imageCredits },
     qwen21ImageCredits: { ...settings.qwen21ImageCredits },
+    seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits },
     videoCredits: { ...settings.videoCredits },
     grokVideoCreditsPerSecond: { ...settings.grokVideoCreditsPerSecond },
     seedanceVideoCredits: { ...settings.seedanceVideoCredits },
+    seedance25VideoCredits: { ...settings.seedance25VideoCredits },
     klingMotionCredits: { ...settings.klingMotionCredits },
   };
 }
@@ -102,6 +119,14 @@ function normalizeSettings(input?: Partial<CreditSettings> | null): CreditSettin
       image1k: asNonNegativeNumber(source.qwen21ImageCredits?.image1k ?? DEFAULT_SETTINGS.qwen21ImageCredits.image1k, DEFAULT_SETTINGS.qwen21ImageCredits.image1k),
       image2k: asNonNegativeNumber(source.qwen21ImageCredits?.image2k ?? DEFAULT_SETTINGS.qwen21ImageCredits.image2k, DEFAULT_SETTINGS.qwen21ImageCredits.image2k),
     },
+    seedream5FlashImageCredits: {
+      text1k: asNonNegativeNumber(source.seedream5FlashImageCredits?.text1k ?? DEFAULT_SETTINGS.seedream5FlashImageCredits.text1k, DEFAULT_SETTINGS.seedream5FlashImageCredits.text1k),
+      text15k: asNonNegativeNumber(source.seedream5FlashImageCredits?.text15k ?? DEFAULT_SETTINGS.seedream5FlashImageCredits.text15k, DEFAULT_SETTINGS.seedream5FlashImageCredits.text15k),
+      text2k: asNonNegativeNumber(source.seedream5FlashImageCredits?.text2k ?? DEFAULT_SETTINGS.seedream5FlashImageCredits.text2k, DEFAULT_SETTINGS.seedream5FlashImageCredits.text2k),
+      image1k: asNonNegativeNumber(source.seedream5FlashImageCredits?.image1k ?? DEFAULT_SETTINGS.seedream5FlashImageCredits.image1k, DEFAULT_SETTINGS.seedream5FlashImageCredits.image1k),
+      image15k: asNonNegativeNumber(source.seedream5FlashImageCredits?.image15k ?? DEFAULT_SETTINGS.seedream5FlashImageCredits.image15k, DEFAULT_SETTINGS.seedream5FlashImageCredits.image15k),
+      image2k: asNonNegativeNumber(source.seedream5FlashImageCredits?.image2k ?? DEFAULT_SETTINGS.seedream5FlashImageCredits.image2k, DEFAULT_SETTINGS.seedream5FlashImageCredits.image2k),
+    },
     videoCredits: {
       "480p": asNonNegativeNumber(source.videoCredits?.["480p"] ?? DEFAULT_SETTINGS.videoCredits["480p"], DEFAULT_SETTINGS.videoCredits["480p"]),
       "720p": asNonNegativeNumber(source.videoCredits?.["720p"] ?? DEFAULT_SETTINGS.videoCredits["720p"], DEFAULT_SETTINGS.videoCredits["720p"]),
@@ -115,6 +140,11 @@ function normalizeSettings(input?: Partial<CreditSettings> | null): CreditSettin
       "720p": asNonNegativeNumber(source.seedanceVideoCredits?.["720p"] ?? DEFAULT_SETTINGS.seedanceVideoCredits["720p"], DEFAULT_SETTINGS.seedanceVideoCredits["720p"]),
       "1080p": asNonNegativeNumber(source.seedanceVideoCredits?.["1080p"] ?? DEFAULT_SETTINGS.seedanceVideoCredits["1080p"], DEFAULT_SETTINGS.seedanceVideoCredits["1080p"]),
       "4k": asNonNegativeNumber(source.seedanceVideoCredits?.["4k"] ?? DEFAULT_SETTINGS.seedanceVideoCredits["4k"], DEFAULT_SETTINGS.seedanceVideoCredits["4k"]),
+    },
+    seedance25VideoCredits: {
+      "480p": asNonNegativeNumber(source.seedance25VideoCredits?.["480p"] ?? DEFAULT_SETTINGS.seedance25VideoCredits["480p"], DEFAULT_SETTINGS.seedance25VideoCredits["480p"]),
+      "720p": asNonNegativeNumber(source.seedance25VideoCredits?.["720p"] ?? DEFAULT_SETTINGS.seedance25VideoCredits["720p"], DEFAULT_SETTINGS.seedance25VideoCredits["720p"]),
+      "1080p": asNonNegativeNumber(source.seedance25VideoCredits?.["1080p"] ?? DEFAULT_SETTINGS.seedance25VideoCredits["1080p"], DEFAULT_SETTINGS.seedance25VideoCredits["1080p"]),
     },
     klingMotionCredits: {
       "720p": asNonNegativeNumber(source.klingMotionCredits?.["720p"] ?? DEFAULT_SETTINGS.klingMotionCredits["720p"], DEFAULT_SETTINGS.klingMotionCredits["720p"]),
@@ -182,6 +212,16 @@ export async function updateCreditSettings(next: CreditSettingsPatch) {
       image2k: asNonNegativeNumber(next.qwen21ImageCredits.image2k ?? updated.qwen21ImageCredits.image2k, updated.qwen21ImageCredits.image2k),
     };
   }
+  if (next.seedream5FlashImageCredits) {
+    updated.seedream5FlashImageCredits = {
+      text1k: asNonNegativeNumber(next.seedream5FlashImageCredits.text1k ?? updated.seedream5FlashImageCredits.text1k, updated.seedream5FlashImageCredits.text1k),
+      text15k: asNonNegativeNumber(next.seedream5FlashImageCredits.text15k ?? updated.seedream5FlashImageCredits.text15k, updated.seedream5FlashImageCredits.text15k),
+      text2k: asNonNegativeNumber(next.seedream5FlashImageCredits.text2k ?? updated.seedream5FlashImageCredits.text2k, updated.seedream5FlashImageCredits.text2k),
+      image1k: asNonNegativeNumber(next.seedream5FlashImageCredits.image1k ?? updated.seedream5FlashImageCredits.image1k, updated.seedream5FlashImageCredits.image1k),
+      image15k: asNonNegativeNumber(next.seedream5FlashImageCredits.image15k ?? updated.seedream5FlashImageCredits.image15k, updated.seedream5FlashImageCredits.image15k),
+      image2k: asNonNegativeNumber(next.seedream5FlashImageCredits.image2k ?? updated.seedream5FlashImageCredits.image2k, updated.seedream5FlashImageCredits.image2k),
+    };
+  }
   if (next.videoCredits) {
     updated.videoCredits = {
       "480p": asNonNegativeNumber(next.videoCredits["480p"] ?? updated.videoCredits["480p"], updated.videoCredits["480p"]),
@@ -200,6 +240,13 @@ export async function updateCreditSettings(next: CreditSettingsPatch) {
       "720p": asNonNegativeNumber(next.seedanceVideoCredits["720p"] ?? updated.seedanceVideoCredits["720p"], updated.seedanceVideoCredits["720p"]),
       "1080p": asNonNegativeNumber(next.seedanceVideoCredits["1080p"] ?? updated.seedanceVideoCredits["1080p"], updated.seedanceVideoCredits["1080p"]),
       "4k": asNonNegativeNumber(next.seedanceVideoCredits["4k"] ?? updated.seedanceVideoCredits["4k"], updated.seedanceVideoCredits["4k"]),
+    };
+  }
+  if (next.seedance25VideoCredits) {
+    updated.seedance25VideoCredits = {
+      "480p": asNonNegativeNumber(next.seedance25VideoCredits["480p"] ?? updated.seedance25VideoCredits["480p"], updated.seedance25VideoCredits["480p"]),
+      "720p": asNonNegativeNumber(next.seedance25VideoCredits["720p"] ?? updated.seedance25VideoCredits["720p"], updated.seedance25VideoCredits["720p"]),
+      "1080p": asNonNegativeNumber(next.seedance25VideoCredits["1080p"] ?? updated.seedance25VideoCredits["1080p"], updated.seedance25VideoCredits["1080p"]),
     };
   }
   if (next.klingMotionCredits) {
@@ -256,6 +303,11 @@ export async function setUserCredits(userId: string, credits: number) {
 
 export async function calculateTaskCost(input: CreateTaskInput) {
   const settings = await getCreditSettings();
+  if (input.serviceId === "seedream-5-flash-text" || input.serviceId === "seedream-5-flash-image") {
+    const prefix = input.serviceId === "seedream-5-flash-image" ? "image" : "text";
+    const size = input.imageSize === "1.5k" ? "15k" : input.imageSize === "2k" ? "2k" : "1k";
+    return settings.seedream5FlashImageCredits[`${prefix}${size}` as keyof Seedream5FlashImageCredits];
+  }
   if (input.serviceId === "qwen2-1-text" || input.serviceId === "qwen2-1-image") {
     const quality = input.imageResolution === "2k" ? "2k" : "1k";
     if (input.serviceId === "qwen2-1-image") {
@@ -285,6 +337,10 @@ export async function calculateTaskCost(input: CreateTaskInput) {
     const allowed = new Set(["480p", "720p", "1080p", "4k"]);
     const quality: SeedanceVideoResolution = allowed.has(input.videoResolution || "") ? (input.videoResolution as SeedanceVideoResolution) : "720p";
     return settings.seedanceVideoCredits[quality];
+  }
+  if (input.serviceId === "seedance-2-5-video") {
+    const quality: Seedance25VideoResolution = input.videoResolution === "480p" || input.videoResolution === "1080p" ? input.videoResolution : "720p";
+    return settings.seedance25VideoCredits[quality];
   }
   if (input.serviceId === "kling-motion-control") {
     const mode = input.klingMotionMode === "1080p" ? "1080p" : "720p";

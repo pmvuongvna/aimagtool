@@ -26,9 +26,11 @@ type CreditSettingsPayload = {
   creditPackages?: CreditPackage[];
   imageCredits?: { "1k"?: number; "2k"?: number; "4k"?: number };
   qwen21ImageCredits?: { text1k?: number; text2k?: number; image1k?: number; image2k?: number };
+  seedream5FlashImageCredits?: { text1k?: number; text15k?: number; text2k?: number; image1k?: number; image15k?: number; image2k?: number };
   videoCredits?: { "480p"?: number; "720p"?: number };
   grokVideoCreditsPerSecond?: { "480p"?: number; "720p"?: number };
   seedanceVideoCredits?: { "480p"?: number; "720p"?: number; "1080p"?: number; "4k"?: number };
+  seedance25VideoCredits?: { "480p"?: number; "720p"?: number; "1080p"?: number };
   klingMotionCredits?: { "720p"?: number; "1080p"?: number };
   imageEditExtraCost?: number;
   defaultUserCredits?: number;
