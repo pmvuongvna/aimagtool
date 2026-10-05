@@ -1,7 +1,10 @@
 import type { CreateTaskInput, ImageResolution, KlingMotionMode, Seedance25VideoResolution, SeedanceVideoResolution, VideoResolution } from "@/lib/ai/types";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
+import { randomUUID } from "node:crypto";
+import type { PoolClient } from "pg";
 
 export type CreditSettings = {
+  creditPackageVersion: number;
   creditPackages: CreditPackage[];
   imageCredits: Record<ImageResolution, number>;
   qwen21ImageCredits: Qwen21ImageCredits;
@@ -54,6 +57,21 @@ type CreditSettingsPatch = {
   defaultUserCredits?: number;
 };
 
+export type CreditMutationInput = {
+  userId: string;
+  delta: number;
+  reason: string;
+  referenceType?: string;
+  referenceId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type CreditMutationResult = {
+  ok: boolean;
+  applied: boolean;
+  credits: number;
+};
+
 function asNonNegativeNumber(value: number, fallback: number) {
   return Number.isFinite(value) ? Math.max(0, value) : fallback;
 }
@@ -64,10 +82,11 @@ function normalizeCredits(value: number) {
 }
 
 const DEFAULT_SETTINGS: CreditSettings = {
+  creditPackageVersion: 2,
   creditPackages: [
-    { id: "starter", name: "Starter", credits: 500, priceVnd: 99000, badge: "Phổ biến", active: true },
-    { id: "creator", name: "Creator", credits: 2500, priceVnd: 399000, badge: "Tiết kiệm", active: true },
-    { id: "studio", name: "Studio", credits: 10000, priceVnd: 1299000, badge: "Pro", active: true },
+    { id: "starter", name: "Starter", credits: 500, priceVnd: 49000, badge: "Khởi đầu", active: true },
+    { id: "creator", name: "Creator", credits: 1000, priceVnd: 99000, badge: "Phổ biến", active: true },
+    { id: "studio", name: "Studio", credits: 2000, priceVnd: 199000, badge: "Nhiều credit", active: true },
   ],
   imageCredits: { "1k": 8, "2k": 16, "4k": 32 },
   qwen21ImageCredits: { text1k: 8, text2k: 16, image1k: 12, image2k: 20 },
@@ -78,7 +97,7 @@ const DEFAULT_SETTINGS: CreditSettings = {
   seedance25VideoCredits: { "480p": 80, "720p": 140, "1080p": 220 },
   klingMotionCredits: { "720p": 80, "1080p": 120 },
   imageEditExtraCost: 4,
-  defaultUserCredits: 500,
+  defaultUserCredits: 50,
 };
 
 let memorySettings: CreditSettings = {
@@ -104,8 +123,10 @@ function cloneSettings(settings: CreditSettings) {
 
 function normalizeSettings(input?: Partial<CreditSettings> | null): CreditSettings {
   const source = input || {};
+  const packageVersion = Number(source.creditPackageVersion || 0);
   return {
-    creditPackages: Array.isArray(source.creditPackages) && source.creditPackages.length
+    creditPackageVersion: DEFAULT_SETTINGS.creditPackageVersion,
+    creditPackages: packageVersion >= DEFAULT_SETTINGS.creditPackageVersion && Array.isArray(source.creditPackages) && source.creditPackages.length
       ? source.creditPackages.map((item) => ({ ...item }))
       : DEFAULT_SETTINGS.creditPackages.map((item) => ({ ...item })),
     imageCredits: {
@@ -186,6 +207,7 @@ export async function updateCreditSettings(next: CreditSettingsPatch) {
   const updated = cloneSettings(current);
 
   if (Array.isArray(next.creditPackages)) {
+    updated.creditPackageVersion = DEFAULT_SETTINGS.creditPackageVersion;
     updated.creditPackages = next.creditPackages
       .map((item, index) => ({
         id: String(item.id || `package-${index + 1}`),
@@ -267,10 +289,18 @@ async function ensureDbUserCredits(userId: string) {
   await ensureSchema();
   const pool = getPool();
   const settings = await getCreditSettings();
-  await pool.query(
+  const inserted = await pool.query(
     "INSERT INTO user_credits (user_id, credits, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (user_id) DO NOTHING",
     [userId, settings.defaultUserCredits],
   );
+  if ((inserted.rowCount || 0) > 0 && settings.defaultUserCredits > 0) {
+    await pool.query(
+      `INSERT INTO credit_ledger (id, user_id, delta, balance_after, reason, reference_type, reference_id, metadata)
+       VALUES ($1, $2, $3, $3, 'signup_bonus', 'signup_bonus', $2, $4::jsonb)
+       ON CONFLICT (reference_type, reference_id) WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL DO NOTHING`,
+      [randomUUID(), userId, settings.defaultUserCredits, JSON.stringify({ source: "default_user_credits" })],
+    );
+  }
 }
 
 export async function getUserCredits(userId: string) {
@@ -286,19 +316,117 @@ export async function getUserCredits(userId: string) {
   return Number(result.rows[0].credits || 0);
 }
 
-export async function setUserCredits(userId: string, credits: number) {
+export async function applyCreditMutationWithClient(client: PoolClient, input: CreditMutationInput): Promise<CreditMutationResult> {
+  const delta = Math.round(input.delta * 100) / 100;
+  if (!Number.isFinite(delta) || delta === 0) {
+    const current = await client.query("SELECT credits FROM user_credits WHERE user_id = $1 LIMIT 1", [input.userId]);
+    return { ok: true, applied: false, credits: Number(current.rows[0]?.credits || 0) };
+  }
+
+  if (input.referenceType && input.referenceId) {
+    const existing = await client.query(
+      "SELECT balance_after FROM credit_ledger WHERE reference_type = $1 AND reference_id = $2 LIMIT 1",
+      [input.referenceType, input.referenceId],
+    );
+    if ((existing.rowCount || 0) > 0) {
+      const current = await client.query("SELECT credits FROM user_credits WHERE user_id = $1 LIMIT 1", [input.userId]);
+      return { ok: true, applied: false, credits: Number(current.rows[0]?.credits ?? existing.rows[0].balance_after ?? 0) };
+    }
+  }
+
+  const settings = await getCreditSettings();
+  await client.query(
+    "INSERT INTO user_credits (user_id, credits, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (user_id) DO NOTHING",
+    [input.userId, settings.defaultUserCredits],
+  );
+  const updated = await client.query(
+    `UPDATE user_credits
+     SET credits = ROUND((credits + $2)::numeric, 2), updated_at = NOW()
+     WHERE user_id = $1 AND credits + $2 >= 0
+     RETURNING credits`,
+    [input.userId, delta],
+  );
+  if ((updated.rowCount || 0) === 0) {
+    const current = await client.query("SELECT credits FROM user_credits WHERE user_id = $1 LIMIT 1", [input.userId]);
+    return { ok: false, applied: false, credits: Number(current.rows[0]?.credits || 0) };
+  }
+
+  const credits = Number(updated.rows[0].credits || 0);
+  await client.query(
+    `INSERT INTO credit_ledger (id, user_id, delta, balance_after, reason, reference_type, reference_id, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+    [randomUUID(), input.userId, delta, credits, input.reason, input.referenceType || null, input.referenceId || null, JSON.stringify(input.metadata || {})],
+  );
+  return { ok: true, applied: true, credits };
+}
+
+export async function applyCreditMutation(input: CreditMutationInput): Promise<CreditMutationResult> {
+  if (!hasDatabase()) {
+    const current = await getUserCredits(input.userId);
+    const next = normalizeCredits(current + input.delta);
+    if (input.delta < 0 && current + input.delta < 0) return { ok: false, applied: false, credits: current };
+    memoryUserCredits.set(input.userId, next);
+    return { ok: true, applied: true, credits: next };
+  }
+
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await applyCreditMutationWithClient(client, input);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (input.referenceType && input.referenceId && (error as { code?: string }).code === "23505") {
+      const existing = await getPool().query(
+        "SELECT balance_after FROM credit_ledger WHERE reference_type = $1 AND reference_id = $2 LIMIT 1",
+        [input.referenceType, input.referenceId],
+      );
+      if ((existing.rowCount || 0) > 0) {
+        const current = await getPool().query("SELECT credits FROM user_credits WHERE user_id = $1 LIMIT 1", [input.userId]);
+        return { ok: true, applied: false, credits: Number(current.rows[0]?.credits ?? existing.rows[0].balance_after ?? 0) };
+      }
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function setUserCredits(userId: string, credits: number, metadata: Record<string, unknown> = {}) {
   const normalized = normalizeCredits(credits);
   if (!hasDatabase()) {
     memoryUserCredits.set(userId, normalized);
     return normalized;
   }
   await ensureSchema();
-  const pool = getPool();
-  await pool.query(
-    "INSERT INTO user_credits (user_id, credits, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (user_id) DO UPDATE SET credits = EXCLUDED.credits, updated_at = NOW()",
-    [userId, normalized],
-  );
-  return normalized;
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const settings = await getCreditSettings();
+    await client.query(
+      "INSERT INTO user_credits (user_id, credits, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (user_id) DO NOTHING",
+      [userId, settings.defaultUserCredits],
+    );
+    const currentResult = await client.query("SELECT credits FROM user_credits WHERE user_id = $1 FOR UPDATE", [userId]);
+    const current = Number(currentResult.rows[0]?.credits || 0);
+    const result = await applyCreditMutationWithClient(client, {
+      userId,
+      delta: normalized - current,
+      reason: "admin_adjustment",
+      referenceType: "admin_adjustment",
+      referenceId: randomUUID(),
+      metadata: { targetBalance: normalized, ...metadata },
+    });
+    await client.query("COMMIT");
+    return result.credits;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function calculateTaskCost(input: CreateTaskInput) {
@@ -350,7 +478,7 @@ export async function calculateTaskCost(input: CreateTaskInput) {
   return settings.videoCredits[quality];
 }
 
-export async function chargeCredits(userId: string, amount: number) {
+export async function chargeCredits(userId: string, amount: number, referenceId: string = randomUUID(), metadata: Record<string, unknown> = {}) {
   const normalized = normalizeCredits(amount);
   if (normalized <= 0) return { ok: true as const, credits: await getUserCredits(userId) };
 
@@ -362,20 +490,18 @@ export async function chargeCredits(userId: string, amount: number) {
     return { ok: true as const, credits: next };
   }
 
-  await ensureDbUserCredits(userId);
-  const pool = getPool();
-  const result = await pool.query(
-    "UPDATE user_credits SET credits = credits - $2, updated_at = NOW() WHERE user_id = $1 AND credits >= $2 RETURNING credits",
-    [userId, normalized],
-  );
-  if ((result.rowCount || 0) === 0) {
-    const current = await getUserCredits(userId);
-    return { ok: false as const, credits: current };
-  }
-  return { ok: true as const, credits: Number(result.rows[0].credits) };
+  const result = await applyCreditMutation({
+    userId,
+    delta: -normalized,
+    reason: "generation_charge",
+    referenceType: "generation_charge",
+    referenceId,
+    metadata,
+  });
+  return result.ok ? { ok: true as const, credits: result.credits } : { ok: false as const, credits: result.credits };
 }
 
-export async function refundCredits(userId: string, amount: number) {
+export async function refundCredits(userId: string, amount: number, referenceId: string = randomUUID(), metadata: Record<string, unknown> = {}) {
   const normalized = normalizeCredits(amount);
   if (normalized <= 0) return getUserCredits(userId);
 
@@ -386,11 +512,13 @@ export async function refundCredits(userId: string, amount: number) {
     return next;
   }
 
-  await ensureDbUserCredits(userId);
-  const pool = getPool();
-  const result = await pool.query(
-    "UPDATE user_credits SET credits = credits + $2, updated_at = NOW() WHERE user_id = $1 RETURNING credits",
-    [userId, normalized],
-  );
-  return Number(result.rows[0].credits || 0);
+  const result = await applyCreditMutation({
+    userId,
+    delta: normalized,
+    reason: "generation_refund",
+    referenceType: "generation_refund",
+    referenceId,
+    metadata,
+  });
+  return result.credits;
 }

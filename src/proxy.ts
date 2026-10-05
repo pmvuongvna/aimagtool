@@ -16,7 +16,7 @@ function applyCors(request: NextRequest, response: NextResponse) {
   response.headers.set("Access-Control-Allow-Origin", origin);
   response.headers.set("Access-Control-Allow-Credentials", "true");
   response.headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-user-id, x-admin-token");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-user-id, x-admin-token, x-idempotency-key");
   response.headers.set("Vary", "Origin");
   return response;
 }
@@ -35,7 +35,11 @@ export async function proxy(request: NextRequest) {
   const user = await getUserBySessionToken(token);
 
   if (pathname.startsWith("/user")) {
-    if (!user) return NextResponse.redirect(new URL("/login", request.url));
+    if (!user) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   if (pathname.startsWith("/admin")) {

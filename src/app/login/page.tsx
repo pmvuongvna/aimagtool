@@ -11,6 +11,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  function nextPath() {
+    const requested = new URLSearchParams(window.location.search).get("next") || "/user";
+    return requested.startsWith("/") && !requested.startsWith("//") ? requested : "/user";
+  }
+
   async function waitForSession() {
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const res = await apiFetch(apiPath("/api/auth/me"), { cache: "no-store" });
@@ -36,7 +41,7 @@ export default function LoginPage() {
         return;
       }
       await waitForSession();
-      window.location.assign(payload.user?.role === "admin" ? "/admin" : "/user");
+      window.location.assign(payload.user?.role === "admin" ? "/admin" : nextPath());
     } finally {
       setLoading(false);
     }

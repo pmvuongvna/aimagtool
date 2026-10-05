@@ -107,31 +107,11 @@ async function setRoleForUsers(userIds: string[], role: "user" | "admin") {
 }
 
 async function setCreditsForMany(userIds: string[], creditsByUser: Map<string, number>) {
-  if (!userIds.length || !hasDatabase()) return;
-  await ensureSchema();
-  const pool = getPool();
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    for (const userId of userIds) {
-      const credits = creditsByUser.get(userId);
-      if (typeof credits !== "number" || Number.isNaN(credits)) continue;
-      await client.query(
-        `
-          INSERT INTO user_credits (user_id, credits, updated_at)
-          VALUES ($1, $2, NOW())
-          ON CONFLICT (user_id)
-          DO UPDATE SET credits = EXCLUDED.credits, updated_at = NOW()
-        `,
-        [userId, credits],
-      );
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
+  if (!userIds.length) return;
+  for (const userId of userIds) {
+    const credits = creditsByUser.get(userId);
+    if (typeof credits !== "number" || Number.isNaN(credits)) continue;
+    await setUserCredits(userId, credits, { source: "admin_bulk_action" });
   }
 }
 
@@ -203,7 +183,7 @@ export async function PUT(request: NextRequest) {
   const settings = body.settings ? await updateCreditSettings(body.settings) : await getCreditSettings();
   const userCredits =
     body.userCredit && body.userCredit.userId
-      ? await setUserCredits(body.userCredit.userId, body.userCredit.credits)
+      ? await setUserCredits(body.userCredit.userId, body.userCredit.credits, { source: "admin_user_panel" })
       : null;
   const bulkResult = body.bulkAction ? await runBulkAction(body.bulkAction, settings) : null;
 

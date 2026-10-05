@@ -1,11 +1,14 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createSessionToken, loginUser, sanitizeUser, setAuthCookie } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function GET() {
   return NextResponse.json({ error: "Method not allowed. Use POST /api/auth/login." }, { status: 405 });
 }
 
 export async function POST(request: NextRequest) {
+  const { ok, retryAfter } = checkRateLimit(request);
+  if (!ok) return NextResponse.json({ error: "Too many login attempts." }, { status: 429, headers: retryAfter ? { "Retry-After": String(retryAfter) } : undefined });
   try {
     const body = (await request.json()) as { email?: string; password?: string };
     const email = String(body.email ?? "").trim();

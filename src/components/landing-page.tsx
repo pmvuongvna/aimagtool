@@ -40,10 +40,10 @@ const copy = {
       "Pick ratio, quality, and look: realistic, anime, cinematic, 3D.",
       "Download, upscale, share, or continue editing in your library.",
     ],
-    pricingTitle: "Plans",
-    pricingDesc: "Start free and scale with higher credits and faster queue.",
-    pricingBtn: ["Choose plan", "Choose Pro"],
-    priceSuffix: "/package",
+    pricingTitle: "Credit packs",
+    pricingDesc: "Buy credits once and use them whenever you create. No subscription or automatic renewal.",
+    pricingBtn: ["Buy credits", "Buy credits"],
+    priceSuffix: " one-time",
     features: ["credits", "AI image generation", "AI video generation", "Priority processing", "No watermark"],
     faqTitle: "Frequently asked questions",
     faqDesc: "Quick answers for new users.",
@@ -87,10 +87,10 @@ const copy = {
       "Tùy chọn tỷ lệ, chất lượng, phong cách ảnh thực, anime, cinematic, 3D hoặc sản phẩm.",
       "Lưu kết quả, upscale, chia sẻ hoặc tiếp tục chỉnh sửa trong thư viện cá nhân.",
     ],
-    pricingTitle: "Gói dịch vụ",
-    pricingDesc: "Bắt đầu miễn phí, nâng cấp khi bạn cần thêm tín dụng, chất lượng cao hơn và tốc độ xử lý ưu tiên.",
-    pricingBtn: ["Chọn gói", "Chọn Pro"],
-    priceSuffix: "/gói",
+    pricingTitle: "Gói credit",
+    pricingDesc: "Mua credit một lần và dùng bất cứ khi nào cần. Không subscription, không tự động gia hạn.",
+    pricingBtn: ["Mua credit", "Mua credit"],
+    priceSuffix: " một lần",
     features: ["tín dụng", "Tạo ảnh AI", "Tạo video AI", "Ưu tiên xử lý", "Không watermark"],
     faqTitle: "Câu hỏi thường gặp",
     faqDesc: "Một vài thông tin cơ bản để người dùng hiểu nhanh cách hoạt động của escanor.app.",
@@ -122,9 +122,9 @@ export default function LandingPage({ locale }: { locale: Locale }) {
   const pricing = useMemo(() => {
     if (packages.length === 0) {
       return [
-        { id: "free", name: "Free", credits: 100, priceVnd: 0, badge: locale === "vi" ? "Dùng thử" : "Trial" },
-        { id: "pro", name: "Escanor Pro", credits: 5000, priceVnd: 199000, badge: locale === "vi" ? "Phổ biến" : "Popular" },
-        { id: "biz", name: "Business", credits: 20000, priceVnd: 499000, badge: "Team" },
+        { id: "starter", name: "Starter", credits: 500, priceVnd: 49000, badge: locale === "vi" ? "Khởi đầu" : "Starter" },
+        { id: "creator", name: "Creator", credits: 1000, priceVnd: 99000, badge: locale === "vi" ? "Phổ biến" : "Popular" },
+        { id: "studio", name: "Studio", credits: 2000, priceVnd: 199000, badge: locale === "vi" ? "Nhiều credit" : "More credits" },
       ];
     }
     return packages;
@@ -148,8 +148,8 @@ export default function LandingPage({ locale }: { locale: Locale }) {
           </a>
           <div className={styles.links}>
             <a className={styles.navActive} href="#home">{t.nav[0]}</a>
-            <a href="/user">{t.nav[1]}</a>
-            <a href="/user/video">{t.nav[2]}</a>
+            <Link href="/user">{t.nav[1]}</Link>
+            <Link href="/user/video">{t.nav[2]}</Link>
             <a href="#workflow">{t.nav[3]}</a>
             <a href="#pricing">{t.nav[4]}</a>
             <a href="#faq">{t.nav[5]}</a>
@@ -215,7 +215,7 @@ export default function LandingPage({ locale }: { locale: Locale }) {
                     <li>{t.features[3]}</li>
                     <li>{t.features[4]}</li>
                   </ul>
-                  <button className={`${styles.btn} ${idx === 1 ? styles.btnGold : ""}`}>{idx === 1 ? t.pricingBtn[1] : t.pricingBtn[0]}</button>
+                  <Link href={`/user/credits?package=${encodeURIComponent(item.id)}`} className={`${styles.btn} ${idx === 1 ? styles.btnGold : ""}`}>{idx === 1 ? t.pricingBtn[1] : t.pricingBtn[0]}</Link>
                 </article>
               ))}
             </div>

@@ -5,6 +5,7 @@ import type { CreateTaskInput } from "@/lib/ai/types";
 import { calculateTaskCost, chargeCredits, refundCredits } from "@/lib/credit";
 import { getUserFromRequest } from "@/lib/auth";
 import { isProd } from "@/lib/env";
+import { randomUUID } from "node:crypto";
 
 export async function POST(request: NextRequest) {
   const { ok, retryAfter } = checkRateLimit(request);
@@ -26,7 +27,9 @@ export async function POST(request: NextRequest) {
     }
     const userId = authUser?.id || request.headers.get("x-user-id") || "demo-user";
     const cost = await calculateTaskCost(body);
-    const charged = await chargeCredits(userId, cost);
+    const creditReferenceId = request.headers.get("x-idempotency-key")?.trim() || randomUUID();
+    const creditMetadata = { serviceId: body.serviceId, requestId: creditReferenceId };
+    const charged = await chargeCredits(userId, cost, creditReferenceId, creditMetadata);
     if (!charged.ok) {
       return NextResponse.json(
         { error: `Not enough credits. Required ${cost}, available ${charged.credits}.`, required: cost, available: charged.credits },
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
       const payload = await createAIGenerationTask(body);
       return NextResponse.json({ ...payload, creditCost: cost, remainingCredits: charged.credits });
     } catch (innerError) {
-      const credits = await refundCredits(userId, cost);
+      const credits = await refundCredits(userId, cost, creditReferenceId, creditMetadata);
       const message = innerError instanceof Error ? innerError.message : "Unable to create task.";
       return NextResponse.json({ error: message, remainingCredits: credits }, { status: 400 });
     }

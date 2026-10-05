@@ -12,6 +12,11 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  function nextPath() {
+    const requested = new URLSearchParams(window.location.search).get("next") || "/user";
+    return requested.startsWith("/") && !requested.startsWith("//") ? requested : "/user";
+  }
+
   async function waitForSession() {
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const res = await apiFetch(apiPath("/api/auth/me"), { cache: "no-store" });
@@ -37,7 +42,7 @@ export default function RegisterPage() {
         return;
       }
       await waitForSession();
-      window.location.assign("/user");
+      window.location.assign(nextPath());
     } finally {
       setLoading(false);
     }
@@ -60,7 +65,7 @@ export default function RegisterPage() {
           </label>
           <label>
             Mật khẩu
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Tối thiểu 6 ký tự" />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Tối thiểu 8 ký tự" />
           </label>
           {error ? <p className={styles.error}>{error}</p> : null}
           <button className={styles.submitBtn} disabled={loading}>{loading ? "Đang tạo..." : "Đăng ký"}</button>

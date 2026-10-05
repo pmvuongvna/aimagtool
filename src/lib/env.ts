@@ -32,6 +32,24 @@ export function getAdminCredentials() {
   return { email, password };
 }
 
+export function hasPayOSConfig() {
+  return Boolean(
+    process.env.PAYOS_CLIENT_ID?.trim()
+    && process.env.PAYOS_API_KEY?.trim()
+    && process.env.PAYOS_CHECKSUM_KEY?.trim(),
+  );
+}
+
+export function getPayOSConfig() {
+  return {
+    clientId: required("PAYOS_CLIENT_ID"),
+    apiKey: required("PAYOS_API_KEY"),
+    checksumKey: required("PAYOS_CHECKSUM_KEY"),
+    publicAppUrl: (process.env.PUBLIC_APP_URL || "https://escanor.app").trim().replace(/\/+$/, ""),
+    webhookUrl: (process.env.PAYOS_WEBHOOK_URL || "https://api.escanor.app/api/payments/payos/webhook").trim(),
+  };
+}
+
 export function allowDemoAuth() {
   if (isProd) return false;
   return process.env.ALLOW_DEMO_AUTH !== "false";

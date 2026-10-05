@@ -46,7 +46,7 @@ export default function TemplatesClient() {
   const [search, setSearch] = useState("");
   const [credits, setCredits] = useState(0);
   const [userName, setUserName] = useState("User");
-  const [activePackage, setActivePackage] = useState<CreditPackage | null>(null);
+  const [, setActivePackage] = useState<CreditPackage | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplate | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -128,14 +128,14 @@ export default function TemplatesClient() {
           <div className={shellStyles.sidebarSpacer} />
 
           <div className={shellStyles.upgradeCard}>
-            <h3>Upgrade Pro</h3>
-            <p>Unlock more prompt packs, more models, and a gallery that keeps updating from curated sources.</p>
-            <button type="button">Upgrade now {"->"}</button>
+            <h3>Nạp thêm credit</h3>
+            <p>Mua credit một lần để dùng cho mọi model ảnh và video.</p>
+            <Link href="/user/credits">Xem các gói {"->"}</Link>
           </div>
 
           <div className={shellStyles.planBox}>
-            <div className={shellStyles.planRow}><span>Current plan</span><strong>{activePackage?.badge || "Free"}</strong></div>
-            <div className={shellStyles.planRow}><span>Credits left</span><strong>{formatCredits(credits)}</strong></div>
+            <div className={shellStyles.planRow}><span>Ví credit</span><strong>Trả theo lượt dùng</strong></div>
+            <div className={shellStyles.planRow}><span>Credits còn lại</span><strong>{formatCredits(credits)}</strong></div>
           </div>
         </aside>
 
@@ -148,12 +148,12 @@ export default function TemplatesClient() {
             </div>
 
             <div className={shellStyles.topActions}>
-              <div className={shellStyles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</div>
+              <Link href="/user/credits" className={shellStyles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</Link>
               <div className={shellStyles.userCard}>
                 <div className={shellStyles.avatar} />
                 <div>
                   <strong>{userName}</strong>
-                  <span>{activePackage?.name || "Free Plan"}</span>
+                  <span>Credit wallet</span>
                 </div>
               </div>
             </div>

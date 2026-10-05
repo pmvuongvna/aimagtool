@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Coins,
+  Clock3,
   CreditCard,
   ExternalLink,
   Gift,
@@ -31,6 +32,7 @@ import { TEMPLATE_CATEGORIES, type TemplateCategory } from "@/lib/template-catal
 
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string; active: boolean };
 type AdminUser = { id: string; name: string; email: string; role: "user" | "admin"; createdAt: string; credits: number };
+type AdminPayment = { id: string; orderCode: number; userName: string; userEmail: string; packageName: string; credits: number; amountVnd: number; status: string; createdAt: string; paidAt: string | null };
 
 type AdminPayload = {
   settings: {
@@ -91,7 +93,7 @@ type TemplateItem = {
 type TemplateSnapshot = { importSettings: ImportSettings; runs: ImportRun[]; templates: TemplateItem[] };
 type UserSort = "newest" | "oldest" | "credits-desc" | "credits-asc" | "name-asc";
 type UserBulkAction = "set-zero" | "reset-default" | "add-default" | "set-package" | "promote-admin" | "demote-user";
-type AdminSectionKey = "users" | "credits" | "imports" | "manual" | "monitoring" | "library";
+type AdminSectionKey = "users" | "credits" | "payments" | "imports" | "manual" | "monitoring" | "library";
 
 const DEFAULT_MANUAL_TEMPLATE = {
   title: "",
@@ -124,6 +126,7 @@ const truncateText = (value: string, size = 80) => (value.length > size ? `${val
 const ADMIN_SECTIONS: Array<{ id: AdminSectionKey; label: string; eyebrow: string; title: string; description: string }> = [
   { id: "users", label: "Users", eyebrow: "Users", title: "User Management", description: "Search accounts, sort balances, and update user access from one focused workspace." },
   { id: "credits", label: "Credits", eyebrow: "Credits", title: "Credit Policy", description: "Manage image tiers, video pricing, Grok runtime rates, and package presets without unrelated panels." },
+  { id: "payments", label: "Payments", eyebrow: "Payments", title: "Payment Operations", description: "Monitor payOS orders, verify pending payments, and keep credit purchases auditable." },
   { id: "imports", label: "Imports", eyebrow: "Imports", title: "Prompt Importer", description: "Control MeiGen sync cadence, launch imports, and run maintenance tasks from a dedicated operations panel." },
   { id: "manual", label: "Manual", eyebrow: "Manual", title: "Manual Prompt Studio", description: "Publish curated prompts with explicit model, media, category, thumbnail, and tag controls." },
   { id: "monitoring", label: "Monitoring", eyebrow: "Monitoring", title: "Run Monitoring", description: "Inspect import history, success rate, and error messages in one clean monitoring view." },
@@ -133,6 +136,7 @@ const ADMIN_SECTIONS: Array<{ id: AdminSectionKey; label: string; eyebrow: strin
 const ADMIN_SECTION_ICONS: Record<AdminSectionKey, typeof Users> = {
   users: Users,
   credits: CreditCard,
+  payments: Coins,
   imports: Sparkles,
   manual: ImageIcon,
   monitoring: ChartNoAxesCombined,
@@ -144,6 +148,7 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<AdminPayload["settings"] | null>(null);
   const [packageJson, setPackageJson] = useState("[]");
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [payments, setPayments] = useState<AdminPayment[]>([]);
   const [status, setStatus] = useState("Loading settings...");
   const [templateSnapshot, setTemplateSnapshot] = useState<TemplateSnapshot | null>(null);
   const [manualTemplate, setManualTemplate] = useState(DEFAULT_MANUAL_TEMPLATE);
@@ -160,12 +165,14 @@ export default function AdminPage() {
   const [bulkPackageId, setBulkPackageId] = useState("");
   const [creditMode, setCreditMode] = useState<"add" | "subtract">("add");
   const [creditAdjustment, setCreditAdjustment] = useState(100);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const [settingsRes, templatesRes] = await Promise.all([
+      const [settingsRes, templatesRes, paymentsRes] = await Promise.all([
         apiFetch(apiPath("/api/admin/settings")),
         apiFetch(apiPath("/api/admin/templates")),
+        apiFetch(apiPath("/api/admin/payments")),
       ]);
 
       const settingsPayload = (await settingsRes.json()) as { settings?: AdminPayload["settings"]; users?: AdminUser[]; error?: string };
@@ -191,6 +198,11 @@ export default function AdminPage() {
         setManualImportCount(templatePayload.importSettings.importCount);
       }
 
+      if (paymentsRes.ok) {
+        const paymentsPayload = (await paymentsRes.json()) as { payments?: AdminPayment[] };
+        setPayments(paymentsPayload.payments || []);
+      }
+
       setStatus("Ready");
     }
     void load();
@@ -203,6 +215,9 @@ export default function AdminPage() {
   const featuredTemplateCount = useMemo(() => (templateSnapshot?.templates || []).filter((item) => item.featured).length, [templateSnapshot]);
   const publishedTemplateCount = useMemo(() => (templateSnapshot?.templates || []).filter((item) => item.published).length, [templateSnapshot]);
   const activePackageCount = useMemo(() => (settings?.creditPackages || []).filter((item) => item.active).length, [settings]);
+  const paidPayments = useMemo(() => payments.filter((item) => item.status === "PAID"), [payments]);
+  const paymentRevenue = useMemo(() => paidPayments.reduce((sum, item) => sum + item.amountVnd, 0), [paidPayments]);
+  const pendingPaymentCount = useMemo(() => payments.filter((item) => item.status === "PENDING" || item.status === "MANUAL_REVIEW").length, [payments]);
   const latestImportRun = useMemo(() => templateSnapshot?.runs?.[0] || null, [templateSnapshot]);
   const manualTemplateCount = useMemo(
     () => (templateSnapshot?.templates || []).filter((item) => item.source === "manual").length,
@@ -483,6 +498,33 @@ export default function AdminPage() {
     setTemplateLoading(false);
   }
 
+  async function refreshPayments() {
+    const response = await apiFetch(apiPath("/api/admin/payments"), { cache: "no-store" });
+    const payload = (await response.json().catch(() => ({}))) as { payments?: AdminPayment[]; error?: string };
+    if (!response.ok) throw new Error(payload.error || "Cannot load payments");
+    setPayments(payload.payments || []);
+  }
+
+  async function runPaymentAction(action: "reconcile" | "confirm-webhook") {
+    setPaymentLoading(true);
+    setStatus(action === "confirm-webhook" ? "Registering payOS webhook..." : "Reconciling pending payments...");
+    try {
+      const response = await apiFetch(apiPath("/api/admin/payments"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; outcomes?: unknown[] };
+      if (!response.ok) throw new Error(payload.error || "Payment action failed");
+      await refreshPayments();
+      setStatus(action === "confirm-webhook" ? "payOS webhook registered" : `Reconciled ${payload.outcomes?.length || 0} payment(s)`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Payment action failed");
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
+
   async function handleLogout() {
     await apiFetch(apiPath("/api/auth/logout"), { method: "POST" });
     router.push("/login");
@@ -513,7 +555,7 @@ export default function AdminPage() {
           </div>
 
           <nav className="admin-sidebar-nav" aria-label="Admin navigation">
-            {ADMIN_SECTIONS.slice(0, 2).map((item) => {
+            {ADMIN_SECTIONS.slice(0, 3).map((item) => {
               const Icon = ADMIN_SECTION_ICONS[item.id];
               return (
                 <button key={item.id} type="button" className={`admin-sidebar-link ${activeSection === item.id ? "active" : ""}`} onClick={() => setActiveSection(item.id)}>
@@ -521,10 +563,10 @@ export default function AdminPage() {
                 </button>
               );
             })}
-            <details className="admin-sidebar-group" open={!["users", "credits"].includes(activeSection)}>
+            <details className="admin-sidebar-group" open={!["users", "credits", "payments"].includes(activeSection)}>
               <summary><span>Content operations</span><ChevronDown size={16} /></summary>
               <div>
-                {ADMIN_SECTIONS.slice(2).map((item) => {
+                {ADMIN_SECTIONS.slice(3).map((item) => {
                   const Icon = ADMIN_SECTION_ICONS[item.id];
                   return (
                     <button key={item.id} type="button" className={`admin-sidebar-link ${activeSection === item.id ? "active" : ""}`} onClick={() => setActiveSection(item.id)}>
@@ -798,7 +840,7 @@ export default function AdminPage() {
             </div>
 
             <label>Credit Packages (JSON)
-              <textarea rows={10} value={packageJson} onChange={(e) => setPackageJson(e.target.value)} placeholder='[{"id":"starter","name":"Starter","credits":500,"priceVnd":99000,"badge":"Pho bien","active":true}]' />
+              <textarea rows={10} value={packageJson} onChange={(e) => setPackageJson(e.target.value)} placeholder='[{"id":"starter","name":"Starter","credits":500,"priceVnd":49000,"badge":"Khoi dau","active":true}]' />
             </label>
             <button className="generate-cta">Save Credit Settings</button>
           </form>
@@ -960,7 +1002,40 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className={activeSection === "monitoring" || activeSection === "library" ? "admin-lower-grid admin-lower-grid-solo" : "admin-lower-grid admin-tab-hidden"}>
+      <section className={activeSection === "payments" || activeSection === "monitoring" || activeSection === "library" ? "admin-lower-grid admin-lower-grid-solo" : "admin-lower-grid admin-tab-hidden"}>
+        <section id="admin-payments" className={`admin-card ${activeSection === "payments" ? "" : "admin-tab-hidden"}`}>
+          <div className="admin-panel-head">
+            <div>
+              <p className="admin-kicker">payOS operations</p>
+              <h2>Credit Payments</h2>
+              <p className="admin-hint">Orders are credited only after a signed webhook or a successful provider reconciliation.</p>
+            </div>
+            <div className="admin-inline-actions">
+              <button type="button" className="chip-btn ghost" disabled={paymentLoading} onClick={() => void runPaymentAction("confirm-webhook")}>Register webhook</button>
+              <button type="button" className="chip-btn" disabled={paymentLoading} onClick={() => void runPaymentAction("reconcile")}>Reconcile pending</button>
+            </div>
+          </div>
+          <div className="admin-user-metrics">
+            <article><span className="violet"><CreditCard size={21} /></span><div><small>Paid orders</small><strong>{paidPayments.length}</strong></div></article>
+            <article><span className="blue"><Coins size={21} /></span><div><small>Revenue</small><strong>{formatNumber(paymentRevenue)}đ</strong></div></article>
+            <article><span className="amber"><Clock3 size={21} /></span><div><small>Pending review</small><strong>{pendingPaymentCount}</strong></div></article>
+          </div>
+          <div className="admin-users-table-wrap">
+            <table className="admin-users-table">
+              <thead><tr><th>Order</th><th>User</th><th>Package</th><th>Amount</th><th>Status</th><th>Created</th></tr></thead>
+              <tbody>
+                {payments.length ? payments.map((payment) => <tr key={payment.id}>
+                  <td><div className="admin-user-main"><b>#{payment.orderCode}</b><code>{payment.id}</code></div></td>
+                  <td><div className="admin-user-main"><b>{payment.userName}</b><span>{payment.userEmail}</span></div></td>
+                  <td><div className="admin-user-main"><b>{payment.packageName}</b><span>{formatNumber(payment.credits)} credits</span></div></td>
+                  <td>{formatNumber(payment.amountVnd)}đ</td>
+                  <td><span className={`admin-role ${payment.status === "PAID" ? "user" : "admin"}`}>{payment.status}</span></td>
+                  <td>{formatDate(payment.createdAt)}</td>
+                </tr>) : <tr><td colSpan={6} className="admin-users-empty">No payment orders yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
         <section id="admin-monitoring" className={`admin-card ${activeSection === "monitoring" ? "" : "admin-tab-hidden"}`}>
           <div className="admin-panel-head">
             <div>

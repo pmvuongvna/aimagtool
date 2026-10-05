@@ -145,7 +145,11 @@
   margin-bottom: 18px;
 }
 
-.upgradeCard button {
+.upgradeCard button,
+.upgradeCard > a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   border: none;
   background: #fff;
@@ -154,6 +158,7 @@
   border-radius: 12px;
   font-weight: 800;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .planBox {
@@ -245,6 +250,7 @@
   align-items: center;
   gap: 9px;
   font-weight: 800;
+  text-decoration: none;
 }
 
 .iconBtn {
@@ -1905,6 +1911,10 @@
     max-height: 82vh;
     border-radius: 14px;
   }
+}
+
+a.creditsPill {
+  text-decoration: none;
 }
 
 @media (max-width: 520px) {

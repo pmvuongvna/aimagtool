@@ -3,12 +3,13 @@ import {
   FolderOpen,
   House,
   Image as ImageIcon,
+  Coins,
   Video,
   WandSparkles,
 } from "lucide-react";
 import styles from "@/app/user/generate.module.css";
 
-type StudioSection = "dashboard" | "image" | "video" | "kling" | "templates" | "history" | "styles";
+type StudioSection = "dashboard" | "image" | "video" | "kling" | "templates" | "history" | "styles" | "credits";
 
 const items = [
   { id: "dashboard", active: ["dashboard"], href: "/user", label: "Home", icon: House },
@@ -16,6 +17,7 @@ const items = [
   { id: "video", active: ["video"], href: "/user/video", label: "Video", icon: Video },
   { id: "kling", active: ["kling", "styles"], href: "/user/tools", label: "Tools", icon: WandSparkles },
   { id: "history", active: ["history", "templates"], href: "/user/templates", label: "Library", icon: FolderOpen },
+  { id: "credits", active: ["credits"], href: "/user/credits", label: "Credits", icon: Coins },
 ] as const;
 
 export function StudioNavigation({ active }: { active: StudioSection }) {

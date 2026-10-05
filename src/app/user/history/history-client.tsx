@@ -53,7 +53,7 @@ export default function HistoryClient() {
   const [search, setSearch] = useState("");
   const [credits, setCredits] = useState(0);
   const [userName, setUserName] = useState("User");
-  const [activePackage, setActivePackage] = useState<CreditPackage | null>(null);
+  const [, setActivePackage] = useState<CreditPackage | null>(null);
   const [lightboxItem, setLightboxItem] = useState<HistoryItem | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
@@ -142,7 +142,7 @@ export default function HistoryClient() {
           </div>
 
           <div className={shellStyles.planBox}>
-            <div className={shellStyles.planRow}><span>Gói hiện tại</span><strong>{activePackage?.badge || "Free"}</strong></div>
+            <div className={shellStyles.planRow}><span>Ví credit</span><strong>Trả theo lượt dùng</strong></div>
             <div className={shellStyles.planRow}><span>Credits còn lại</span><strong>{formatCredits(credits)}</strong></div>
           </div>
         </aside>
@@ -156,12 +156,12 @@ export default function HistoryClient() {
             </div>
 
             <div className={shellStyles.topActions}>
-              <div className={shellStyles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</div>
+              <Link href="/user/credits" className={shellStyles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</Link>
               <div className={shellStyles.userCard}>
                 <div className={shellStyles.avatar} />
                 <div>
                   <strong>{userName}</strong>
-                  <span>{activePackage?.name || "Free Plan"}</span>
+                  <span>Credit wallet</span>
                 </div>
               </div>
             </div>

@@ -51,6 +51,57 @@ export async function ensureSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE SEQUENCE IF NOT EXISTS payment_order_code_seq START WITH 100000;
+
+    CREATE TABLE IF NOT EXISTS payment_orders (
+      id TEXT PRIMARY KEY,
+      order_code BIGINT UNIQUE NOT NULL,
+      user_id TEXT NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'payos',
+      provider_payment_id TEXT,
+      provider_reference TEXT,
+      package_id TEXT NOT NULL,
+      package_name TEXT NOT NULL,
+      credits NUMERIC(14, 2) NOT NULL,
+      amount_vnd BIGINT NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'VND',
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      checkout_url TEXT,
+      qr_code TEXT,
+      description TEXT NOT NULL DEFAULT '',
+      expires_at TIMESTAMPTZ,
+      paid_at TIMESTAMPTZ,
+      cancelled_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_events (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL DEFAULT 'payos',
+      event_key TEXT UNIQUE NOT NULL,
+      payment_order_id TEXT,
+      order_code BIGINT,
+      event_type TEXT NOT NULL,
+      signature_valid BOOLEAN NOT NULL DEFAULT FALSE,
+      payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+      error TEXT,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      processed_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS credit_ledger (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      delta NUMERIC(14, 2) NOT NULL,
+      balance_after NUMERIC(14, 2) NOT NULL,
+      reason TEXT NOT NULL,
+      reference_type TEXT,
+      reference_id TEXT,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS history_items (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -99,6 +150,11 @@ export async function ensureSchema() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_history_user_created ON history_items(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_payment_orders_user_created ON payment_orders(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_payment_orders_status_created ON payment_orders(status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_payment_events_order ON payment_events(order_code, received_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_credit_ledger_user_created ON credit_ledger(user_id, created_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_ledger_reference ON credit_ledger(reference_type, reference_id) WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_prompt_templates_media ON prompt_templates(media_type, published, featured);
     CREATE INDEX IF NOT EXISTS idx_prompt_templates_category ON prompt_templates(category, published);
     CREATE INDEX IF NOT EXISTS idx_prompt_import_runs_created ON prompt_import_runs(created_at DESC);

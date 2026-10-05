@@ -180,7 +180,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [loading, setLoading] = useState(false);
   const [resultUrls, setResultUrls] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [packages, setPackages] = useState<CreditPackage[]>([]);
+  const [, setPackages] = useState<CreditPackage[]>([]);
   const [lightboxUrls, setLightboxUrls] = useState<string[] | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxMediaType, setLightboxMediaType] = useState<"image" | "video">("image");
@@ -435,7 +435,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     for (let i = 0; i < quantity; i += 1) {
       const res = await apiFetch(apiPath("/api/ai/create-task"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": userId },
+        headers: { "Content-Type": "application/json", "x-user-id": userId, "x-idempotency-key": crypto.randomUUID() },
         body: JSON.stringify(body),
       });
       const payload = (await res.json()) as TaskResponse;
@@ -525,7 +525,6 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     if (galleryFilter === "anime") return /anime|manga/.test(haystack);
     return /cinematic|điện ảnh/.test(haystack);
   });
-  const activePackage = packages[0];
   return (
     <div className={`${styles.page} ${styles.imageStudioPage}`}>
       <div className={`${styles.appShell} ${styles.imageStudioShell}`}>
@@ -540,16 +539,16 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           <div className={styles.sidebarSpacer} />
 
           <div className={styles.sidebarAccount} id="upgrade">
-            <Link href="/user#upgrade" className={styles.sidebarUtility}>
+            <Link href="/user/credits" className={styles.sidebarUtility}>
               <Crown size={18} />
-              <span>Nâng cấp</span>
+              <span>Nạp credit</span>
               <ChevronRight size={15} />
             </Link>
             <div className={styles.sidebarUser} id="account">
               <span className={styles.userAvatar}><UserRound size={18} /></span>
               <span className={styles.sidebarUserCopy}>
                 <strong>{userName}</strong>
-                <small>{activePackage?.name || "Free Plan"}</small>
+                <small>Credit wallet</small>
               </span>
               <button type="button" onClick={handleLogout} aria-label="Đăng xuất"><LogOut size={16} /></button>
             </div>
@@ -559,9 +558,9 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
         <main className={`${styles.main} ${styles.imageStudioMain}`} id="dashboard">
           <header className={styles.imageTopbar}>
             <div className={styles.topActions}>
-              <div className={styles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</div>
+              <Link href="/user/credits" className={styles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</Link>
               <button type="button" className={styles.iconBtn} aria-label="Thông báo"><Bell size={17} aria-hidden="true" /><span className={styles.iconDot} /></button>
-              <Link href="/user#upgrade" className={styles.upgradeButton}><Crown size={17} /> Nâng cấp</Link>
+              <Link href="/user/credits" className={styles.upgradeButton}><Crown size={17} /> Nạp credit</Link>
             </div>
           </header>
 

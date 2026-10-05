@@ -11,11 +11,16 @@ Set these in **Vercel Project Settings → Environment Variables**:
 - `ADMIN_TOKEN` (required in production, for admin API calls via header)
 - `ADMIN_EMAIL` (recommended)
 - `ADMIN_PASSWORD` (recommended)
+- `DATABASE_URL` (required for persistent auth, credits, and payments)
+- `PAYOS_CLIENT_ID` (required for one-time credit checkout)
+- `PAYOS_API_KEY` (required for one-time credit checkout)
+- `PAYOS_CHECKSUM_KEY` (required for payment signatures and webhook verification)
+- `PUBLIC_APP_URL=https://escanor.app`
+- `PAYOS_WEBHOOK_URL=https://api.escanor.app/api/payments/payos/webhook`
 
 Optional:
 
 - `ALLOW_DEMO_AUTH=true` (local dev only; automatically disabled in production)
-- `DATABASE_URL` (reserved for Coolify/Postgres integration)
 
 Use `env.example` as template.
 
@@ -25,6 +30,9 @@ Use `env.example` as template.
 - No `NEXT_PUBLIC_*` secrets are used.
 - Upload endpoint does not return raw provider payload anymore.
 - Auth cookie is `httpOnly`, signed JWT (`jose`), `secure` in production.
+- User passwords are stored with salted `scrypt`; legacy local hashes are upgraded after a successful login.
+- payOS secrets stay server-side, and credits are granted only from a verified webhook or authenticated provider reconciliation.
+- Payment orders and credit mutations use PostgreSQL transactions and idempotent ledger references.
 - `/user/*` and `/admin/*` are protected by `src/proxy.ts`.
 - In production, unauthenticated access to user APIs is blocked.
 
@@ -44,8 +52,11 @@ Open [http://localhost:3000](http://localhost:3000)
 3. Add env vars above
 4. Deploy
 
-## 5) Notes for Coolify database
+## 5) payOS setup
 
-The app is already prepared with `DATABASE_URL` in config template.
-Current auth/credit/history logic is still in-memory for non-production demo flows.
-For full persistent multi-instance production, next step is wiring these modules to Postgres on Coolify.
+1. Add the payOS environment variables to the backend deployment.
+2. Deploy the API so the webhook route is publicly reachable.
+3. In Admin → Payments, click `Register webhook`, or register `PAYOS_WEBHOOK_URL` in the payOS dashboard.
+4. Run a small real payment and confirm the order, ledger entry, and user balance all update once.
+
+Payment endpoints intentionally fail closed when `DATABASE_URL` is missing. In-memory credit mode remains available only for local generation demos.

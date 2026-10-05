@@ -166,7 +166,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const [resultUrl, setResultUrl] = useState("");
   const [resultAssetUrls, setResultAssetUrls] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [packages, setPackages] = useState<CreditPackage[]>([]);
+  const [, setPackages] = useState<CreditPackage[]>([]);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const saveCache = useCallback((next: Partial<VideoDashboardCache>) => { if (typeof window === "undefined") return; try { const raw = window.sessionStorage.getItem(CACHE_KEY); const base: VideoDashboardCache = raw ? (JSON.parse(raw) as VideoDashboardCache) : { userId: "", userName: "User", credits: 0, costPreview: null, history: [], packages: [] }; window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...base, ...next })); } catch {} }, []);
   const activeAiModel = isAiVideoModel(videoModel) ? AI_VIDEO_MODEL_MAP[videoModel] : null;
@@ -349,7 +349,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
           inputUrl: videoModeType === "image" ? referenceUrl : undefined,
           nsfwChecker: AI_VIDEO_MODEL_MAP[videoModel].nsfwChecker,
         };
-    const res = await apiFetch(apiPath("/api/ai/create-task"), { method: "POST", headers: { "Content-Type": "application/json", "x-user-id": userId }, body: JSON.stringify(body) });
+    const res = await apiFetch(apiPath("/api/ai/create-task"), { method: "POST", headers: { "Content-Type": "application/json", "x-user-id": userId, "x-idempotency-key": crypto.randomUUID() }, body: JSON.stringify(body) });
     const payload = (await res.json()) as TaskResponse;
     if (!res.ok || !payload.data?.taskId) { setStatusText(payload.error || "Video generation failed."); if (typeof payload.remainingCredits === "number") setCredits(payload.remainingCredits); setLoading(false); return; }
     setTaskId(payload.data.taskId);
@@ -382,7 +382,6 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const displayCards = activeTab === "result" && (loading || resultCards.length > 0) ? resultCards : historyCards;
   const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
   const filteredHistoryCards = historyCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
-  const activePackage = packages[0];
   const modelLabel = videoModel === "kling-motion-control" ? "Kling 2.6" : AI_VIDEO_MODEL_MAP[videoModel].label;
   const qualityLabel = videoModel === "kling-motion-control" ? klingMotionMode : resolution;
   const workflowLabel = videoModel === "kling-motion-control" ? "Motion Control" : (videoModeType === "text" ? "Text to Video" : "Image to Video");
@@ -396,17 +395,17 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
           <Link href="/" className={styles.logoLink}><span className={styles.logoMark} /><span className={styles.logoText}>VizoAI</span></Link>
           <StudioNavigation active={isKlingPage ? "kling" : "video"} />
           <div className={styles.sidebarSpacer} />
-          <div className={styles.upgradeCard}><h3>Upgrade Pro</h3><p>Unlock advanced video pipelines, motion control, and extra credits for continuous video campaigns.</p><button type="button">Upgrade now {"->"}</button></div>
-          <div className={styles.planBox}><div className={styles.planRow}><span>Current plan</span><strong>{activePackage?.badge || "Free"}</strong></div><div className={styles.planRow}><span>Credits left</span><strong>{formatCredits(credits)}</strong></div></div>
+          <div className={styles.upgradeCard}><h3>Nạp thêm credit</h3><p>Mua credit một lần để tiếp tục tạo video, không tự gia hạn.</p><Link href="/user/credits">Xem các gói {"->"}</Link></div>
+          <div className={styles.planBox}><div className={styles.planRow}><span>Ví credit</span><strong>Trả theo lượt dùng</strong></div><div className={styles.planRow}><span>Credits còn lại</span><strong>{formatCredits(credits)}</strong></div></div>
         </aside>
         <main className={`${styles.main} ${styles.videoMain}`} id="dashboard">
           <header className={styles.topbar}>
             <div className={styles.search}><Search size={17} aria-hidden="true" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search clips, prompts, history..." /><div className={styles.shortcut}>Ctrl K</div></div>
             <div className={styles.topActions}>
-              <div className={styles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</div>
+              <Link href="/user/credits" className={styles.creditsPill}><Coins size={16} aria-hidden="true" /> {formatCredits(credits)} Credits</Link>
               <button type="button" className={styles.iconBtn} aria-label="Notifications"><Bell size={17} aria-hidden="true" /><span className={styles.iconDot} /></button>
               <button type="button" className={styles.iconBtn} onClick={handleLogout} aria-label="Log out"><LogOut size={17} aria-hidden="true" /></button>
-              <div className={styles.userCard}><div className={styles.avatar} /><div><strong>{userName}</strong><span>{activePackage?.name || "Free Plan"}</span></div></div>
+              <div className={styles.userCard}><div className={styles.avatar} /><div><strong>{userName}</strong><span>Credit wallet</span></div></div>
             </div>
           </header>
           <section className={`${styles.generator} ${styles.videoStudio} ${isKlingPage ? styles.klingGenerator : ""}`} id="generator">

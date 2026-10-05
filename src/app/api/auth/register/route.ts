@@ -1,11 +1,14 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createSessionToken, registerUser, sanitizeUser, setAuthCookie } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function GET() {
   return NextResponse.json({ error: "Method not allowed. Use POST /api/auth/register." }, { status: 405 });
 }
 
 export async function POST(request: NextRequest) {
+  const { ok, retryAfter } = checkRateLimit(request);
+  if (!ok) return NextResponse.json({ error: "Too many registration attempts." }, { status: 429, headers: retryAfter ? { "Retry-After": String(retryAfter) } : undefined });
   try {
     const body = (await request.json()) as { name?: string; email?: string; password?: string };
     const name = String(body.name ?? "").trim();
@@ -14,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     if (name.length < 2) return NextResponse.json({ error: "Name must be at least 2 characters." }, { status: 400 });
     if (!email.includes("@")) return NextResponse.json({ error: "Invalid email address." }, { status: 400 });
-    if (password.length < 6) return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+    if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
     const result = await registerUser(name, email, password);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 409 });

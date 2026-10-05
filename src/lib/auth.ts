@@ -2,6 +2,8 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { getAdminCredentials, getSessionSecret, allowDemoAuth } from "@/lib/env";
 import { ensureSchema, getPool, hasDatabase } from "@/lib/db";
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 
 export type AuthRole = "user" | "admin";
 
@@ -28,9 +30,25 @@ type SessionPayload = JWTPayload & {
 
 const AUTH_COOKIE = "aistudio_session";
 const globalKey = "__aistudio_auth_state__";
+const scrypt = promisify(scryptCallback);
 
 function pseudoHashPassword(password: string) {
   return `pw:${password}`;
+}
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const derived = (await scrypt(password, salt, 64)) as Buffer;
+  return `scrypt$${salt}$${derived.toString("hex")}`;
+}
+
+async function verifyPassword(password: string, storedHash: string) {
+  if (storedHash.startsWith("pw:")) return storedHash === pseudoHashPassword(password);
+  const [algorithm, salt, encoded] = storedHash.split("$");
+  if (algorithm !== "scrypt" || !salt || !encoded) return false;
+  const expected = Buffer.from(encoded, "hex");
+  const actual = (await scrypt(password, salt, expected.length)) as Buffer;
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 function normalizeEmail(email: string) {
@@ -112,7 +130,7 @@ export async function registerUser(name: string, email: string, password: string
       id,
       name: name.trim(),
       email: normalizedEmail,
-      passwordHash: pseudoHashPassword(password),
+      passwordHash: await hashPassword(password),
       role: "user",
       createdAt: new Date().toISOString(),
     };
@@ -141,7 +159,7 @@ export async function registerUser(name: string, email: string, password: string
     id,
     name: name.trim(),
     email: normalizedEmail,
-    passwordHash: pseudoHashPassword(password),
+    passwordHash: await hashPassword(password),
     role: "user",
     createdAt: new Date().toISOString(),
   };
@@ -185,8 +203,12 @@ export async function loginUser(email: string, password: string) {
       role: AuthRole;
       created_at: string;
     };
-    if (row.password_hash !== pseudoHashPassword(password)) {
+    if (!(await verifyPassword(password, row.password_hash))) {
       return { ok: false as const, error: "Invalid email or password." };
+    }
+    if (row.password_hash.startsWith("pw:")) {
+      row.password_hash = await hashPassword(password);
+      await pool.query("UPDATE auth_users SET password_hash = $2 WHERE id = $1", [row.id, row.password_hash]);
     }
     return {
       ok: true as const,
@@ -208,7 +230,7 @@ export async function loginUser(email: string, password: string) {
   if (!userId) return { ok: false as const, error: "Invalid email or password." };
   const user = state.usersById.get(userId);
   if (!user) return { ok: false as const, error: "Invalid email or password." };
-  if (user.passwordHash !== pseudoHashPassword(password)) {
+  if (!(await verifyPassword(password, user.passwordHash))) {
     return { ok: false as const, error: "Invalid email or password." };
   }
   return { ok: true as const, user };
@@ -227,7 +249,7 @@ export async function getUserFromRequest(request: NextRequest) {
   return getUserBySessionToken(token);
 }
 
-export function clearSession(_token?: string | null) {
+export function clearSession() {
   return;
 }
 
