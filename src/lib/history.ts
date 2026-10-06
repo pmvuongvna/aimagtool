@@ -68,6 +68,8 @@ export async function addHistoryItem(input: Omit<HistoryItem, "id" | "createdAt"
 
   if (!hasDatabase()) {
     const state = getState();
+    const existing = state.items.find((entry) => entry.userId === input.userId && entry.urls.some((url) => input.urls.includes(url)));
+    if (existing) return existing;
     state.items.unshift(item);
     state.items = filterRecentItems(state.items).slice(0, HISTORY_LIMIT);
     return item;
@@ -75,10 +77,23 @@ export async function addHistoryItem(input: Omit<HistoryItem, "id" | "createdAt"
 
   await purgeExpiredHistory();
   const pool = getPool();
-  await pool.query(
+  const client = await pool.connect();
+  try {
+  await client.query("BEGIN");
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [input.userId]);
+  const existing = await client.query("SELECT * FROM history_items WHERE user_id=$1 AND urls ?| $2::text[] LIMIT 1", [input.userId, input.urls]);
+  if (existing.rows[0]) {
+    await client.query("COMMIT");
+    const row = existing.rows[0];
+    return { id: String(row.id), userId: String(row.user_id), mediaType: row.media_type as MediaType, urls: normalizeUrls(row.urls), prompt: String(row.prompt), createdAt: new Date(row.created_at).toISOString() };
+  }
+  await client.query(
     "INSERT INTO history_items (id, user_id, media_type, urls, prompt, created_at) VALUES ($1,$2,$3,$4::jsonb,$5,$6)",
     [item.id, item.userId, item.mediaType, JSON.stringify(item.urls), item.prompt, item.createdAt],
   );
+  await client.query("COMMIT");
+  } catch (error) { await client.query("ROLLBACK"); throw error; }
+  finally { client.release(); }
   return item;
 }
 

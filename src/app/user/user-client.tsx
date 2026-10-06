@@ -1,4 +1,5 @@
 "use client";
+import { GenerationActivity } from "@/components/generation-activity";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -322,6 +323,11 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     void bootstrap();
   }, [saveCache]);
 
+  const refreshGenerationHistory = useCallback(() => {
+    void apiFetch(apiPath("/api/user/history"), { cache: "no-store" }).then(async (response) => {
+      if (response.ok) { const data = await response.json() as { items?: HistoryItem[] }; setHistory(data.items || []); }
+    }).catch(() => {});
+  }, []);
   const checkTask = useCallback(async (targetTaskId: string) => {
     const res = await apiFetch(apiPath(`/api/ai/task/${targetTaskId}`));
     const payload = (await res.json()) as Record<string, unknown>;
@@ -576,6 +582,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
               <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><Video size={17} /> Video</Link>
             </div>
 
+            <GenerationActivity mediaType="image" creating={loading} onRefresh={refreshGenerationHistory} />
             <form onSubmit={onGenerate}>
               <div className={styles.imageComposer} ref={controlsRef}>
                 <div className={styles.promptBox}>
@@ -877,9 +884,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
               ))}
             </div>
 
-            {loading ? (
-              <div className={styles.loadingBox}><div className={styles.spinner} /><b>Đang tạo ảnh...</b><p>{statusText}</p></div>
-            ) : filteredCards.length === 0 ? (
+            {filteredCards.length === 0 ? (
               <div className={styles.emptyState}>
                 <Images size={28} />
                 <strong>Chưa có nội dung phù hợp</strong>

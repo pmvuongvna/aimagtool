@@ -1,5 +1,6 @@
 
 "use client";
+import { GenerationActivity } from "@/components/generation-activity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -261,6 +262,11 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
     if (!video) return { kind: "failed" as const, message: extractTaskError(payload, data) || "Task completed but no output video was returned." };
     return { kind: "success" as const, video, assets: urls.filter((url) => url !== video && !isVideoUrl(url)) };
   }, []);
+  const refreshGenerationHistory = useCallback(() => {
+    void apiFetch(apiPath("/api/user/history"), { cache: "no-store" }).then(async (response) => {
+      if (response.ok) { const data = await response.json() as { items?: HistoryItem[] }; setHistory((data.items || []).filter((item) => item.mediaType === "video")); }
+    }).catch(() => {});
+  }, []);
   async function waitForTaskVideo(targetTaskId: string) {
     for (let i = 0; i < 60; i += 1) {
       const result = await checkTask(targetTaskId);
@@ -379,7 +385,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   async function handleLogout() { await apiFetch(apiPath("/api/auth/logout"), { method: "POST" }); window.location.assign("/login"); }
   const resultCards: CardItem[] = resultUrl ? [{ id: resultUrl, title: truncate(prompt || "Reference video"), meta: videoModel === "kling-motion-control" ? `Kling Motion Control - ${klingMotionMode} - ${characterOrientation}` : `${activeAiModel?.label || "AI Video"} - ${resolution} - ${formatDuration(duration)}`, thumbUrl: resultUrl, videoUrl: resultUrl, createdAt: new Date().toISOString() }] : [];
   const historyCards: CardItem[] = history.map((item) => ({ id: item.id, title: truncate(item.prompt || "AI Video"), meta: `${new Date(item.createdAt).toLocaleDateString("vi-VN")} - ${item.urls.length} clip`, thumbUrl: item.urls[0], videoUrl: item.urls[0], createdAt: item.createdAt }));
-  const displayCards = activeTab === "result" && (loading || resultCards.length > 0) ? resultCards : historyCards;
+  const displayCards = activeTab === "result" && resultCards.length > 0 ? resultCards : historyCards;
   const filteredCards = displayCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
   const filteredHistoryCards = historyCards.filter((item) => `${item.title} ${item.meta}`.toLowerCase().includes(search.toLowerCase()));
   const modelLabel = videoModel === "kling-motion-control" ? "Kling 2.6" : AI_VIDEO_MODEL_MAP[videoModel].label;
@@ -415,6 +421,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
               {isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}><WandSparkles size={15} /> Kling Motion</button> : <Link href="/user/kling" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><WandSparkles size={15} /> Kling Motion</Link>}
             </div>
             <div className={styles.videoWorkspace}>
+            <GenerationActivity mediaType="video" creating={loading} onRefresh={refreshGenerationHistory} />
             <form onSubmit={onGenerate} className={styles.videoComposer} ref={controlsRef}>
               <div className={styles.composerHeading}>
                 <div><span className={styles.eyebrow}>CREATE VIDEO</span><h1>{pageTitle}</h1><p>Build the scene, choose a model, and render without leaving the workspace.</p></div>
@@ -539,7 +546,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
                 <div className={styles.segmentTabs}><button type="button" className={`${styles.segmentTab} ${activeTab === "result" ? styles.segmentTabActive : ""}`} onClick={() => setActiveTab("result")}>Result</button><button type="button" className={`${styles.segmentTab} ${activeTab === "history" ? styles.segmentTabActive : ""}`} onClick={() => setActiveTab("history")}>History</button></div>
               </div>
               <div className={styles.previewStage}>
-                {loading ? <div className={styles.previewEmpty}><div className={styles.spinner} /><strong>Rendering your video</strong><span>{statusText}</span></div> : filteredCards[0] ? <><video src={filteredCards[0].videoUrl} controls muted playsInline /><button type="button" className={styles.previewExpand} onClick={() => setLightboxUrl(filteredCards[0].videoUrl)}>Open preview</button></> : <div className={styles.previewEmpty}><span className={styles.previewGlyph}><Clapperboard size={20} /></span><strong>Your render will appear here</strong><span>Set up the scene and start generating.</span></div>}
+                {filteredCards[0] ? <><video src={filteredCards[0].videoUrl} controls muted playsInline /><button type="button" className={styles.previewExpand} onClick={() => setLightboxUrl(filteredCards[0].videoUrl)}>Open preview</button></> : <div className={styles.previewEmpty}><span className={styles.previewGlyph}><Clapperboard size={20} /></span><strong>Your render will appear here</strong><span>Set up the scene and start generating.</span></div>}
               </div>
               {resultAssetUrls.length ? <div className={styles.returnedFrameStrip}><div><strong>Returned frames</strong><span>{resultAssetUrls.length} image{resultAssetUrls.length > 1 ? "s" : ""}</span></div><div>{resultAssetUrls.map((url, index) => <button type="button" key={`${url}-${index}`} onClick={() => window.open(url, "_blank", "noopener,noreferrer")}><img src={url} alt={`Returned frame ${index + 1}`} /></button>)}</div></div> : null}
               <div className={styles.outputSummary}>

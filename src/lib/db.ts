@@ -52,6 +52,13 @@ export async function ensureSchema() {
     );
 
     CREATE SEQUENCE IF NOT EXISTS payment_order_code_seq START WITH 100000;
+    CREATE TABLE IF NOT EXISTS generation_tasks (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, media_type TEXT NOT NULL,
+      prompt TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+      urls JSONB NOT NULL DEFAULT '[]'::jsonb, error TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_generation_tasks_user ON generation_tasks(user_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS payment_orders (
       id TEXT PRIMARY KEY,
