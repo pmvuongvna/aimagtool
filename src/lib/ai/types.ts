@@ -1,6 +1,10 @@
 export type AIServiceId =
   | "gpt-image-2-text"
   | "gpt-image-2-image"
+  | "gpt-image-2-5-flare-text"
+  | "gpt-image-2-5-flare-image"
+  | "gpt-image-2-5-sunburst-text"
+  | "gpt-image-2-5-sunburst-image"
   | "seedream-5-lite-text"
   | "seedream-5-lite-image"
   | "seedream-5-flash-text"
@@ -18,7 +22,7 @@ export type AIServiceId =
 
 export type ImageResolution = "1k" | "2k" | "4k";
 export type ImageSize = ImageResolution | "1.5k";
-export type ImageBackground = "opaque" | "transparent";
+export type ImageBackground = "opaque" | "transparent" | "auto";
 export type ImageOutputFormat = "png" | "webp" | "jpeg";
 export type VideoResolution = "480p" | "720p";
 export type SeedanceVideoResolution = "480p" | "720p" | "1080p" | "4k";

@@ -152,26 +152,34 @@ function normalizeCharacterOrientation(value?: CharacterOrientation) {
   return value === "video" ? "video" : "image";
 }
 
+export const GPT25_ASPECT_RATIOS = ["auto", "1:1", "3:2", "2:3", "16:9", "9:16", "4:3", "3:4", "21:9", "27:16", "16:27", "9:8", "8:9"];
+function gpt25Service(variant: "flare" | "sunburst", editing: boolean): ServiceConfig {
+  return {
+    model: `gpt-image-2-5-${variant}-${editing ? "image-to-image" : "text-to-image"}`,
+    requiresReferenceImage: editing,
+    buildInput: (payload) => {
+      const aspect = payload.aspectRatio || "auto";
+      if (!GPT25_ASPECT_RATIOS.includes(aspect)) throw new Error("Unsupported GPT Image 2.5 aspect ratio.");
+      if (["27:16", "16:27", "9:8", "8:9"].includes(aspect) && payload.imageResolution && payload.imageResolution !== "1k") throw new Error("This aspect ratio supports 1K only.");
+      const urls = payload.inputUrls?.length ? payload.inputUrls : payload.inputUrl ? [payload.inputUrl] : [];
+      if (editing && (urls.length < 1 || urls.length > 16)) throw new Error("GPT Image 2.5 requires between 1 and 16 reference images.");
+      return {
+        prompt: requirePromptWithinLimit(payload.prompt, 20000, "GPT Image 2.5"),
+        aspect_ratio: aspect,
+        resolution: mapImageResolution(payload.imageResolution),
+        background: payload.imageBackground || "opaque",
+        ...(editing ? { input_urls: urls.map((url) => requireHttpUrl(url)) } : {}),
+      };
+    },
+  };
+}
 const SERVICES: Record<AIServiceId, ServiceConfig> = {
-  "gpt-image-2-text": {
-    model: "gpt-image-2-text-to-image",
-    requiresReferenceImage: false,
-    buildInput: (payload) => ({
-      prompt: requirePrompt(payload.prompt),
-      aspect_ratio: payload.aspectRatio || "16:9",
-      resolution: mapImageResolution(payload.imageResolution),
-    }),
-  },
-  "gpt-image-2-image": {
-    model: "gpt-image-2-image-to-image",
-    requiresReferenceImage: true,
-    buildInput: (payload) => ({
-      prompt: requirePrompt(payload.prompt),
-      aspect_ratio: payload.aspectRatio || "16:9",
-      resolution: mapImageResolution(payload.imageResolution),
-      input_urls: [requireHttpUrl(payload.inputUrl)],
-    }),
-  },
+  "gpt-image-2-5-flare-text": gpt25Service("flare", false),
+  "gpt-image-2-5-flare-image": gpt25Service("flare", true),
+  "gpt-image-2-5-sunburst-text": gpt25Service("sunburst", false),
+  "gpt-image-2-5-sunburst-image": gpt25Service("sunburst", true),
+  "gpt-image-2-text": gpt25Service("flare", false),
+  "gpt-image-2-image": gpt25Service("flare", true),
   "seedream-5-lite-text": {
     model: "seedream/5-lite-text-to-image",
     requiresReferenceImage: false,

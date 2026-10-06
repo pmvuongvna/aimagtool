@@ -38,6 +38,8 @@ type AdminPayload = {
   settings: {
     creditPackages: CreditPackage[];
     imageCredits: { "1k": number; "2k": number; "4k": number };
+    gpt25FlareCredits: { "1k": number; "2k": number; "4k": number };
+    gpt25SunburstCredits: { "1k": number; "2k": number; "4k": number };
     qwen21ImageCredits: { text1k: number; text2k: number; image1k: number; image2k: number };
     seedream5FlashImageCredits: { text1k: number; text15k: number; text2k: number; image1k: number; image15k: number; image2k: number };
     videoCredits: { "480p": number; "720p": number };
@@ -100,7 +102,7 @@ const DEFAULT_MANUAL_TEMPLATE = {
   prompt: "",
   thumbnailUrl: "",
   mediaType: "image" as "image" | "video",
-  model: "GPT Image 2",
+  model: "GPT Image 2.5 Flare",
   aspectRatio: "1:1",
   category: "All" as TemplateCategory,
   tags: "",
@@ -755,6 +757,7 @@ export default function AdminPage() {
             </div>
 
             <div className="admin-credit-groups">
+              {(["gpt25FlareCredits", "gpt25SunburstCredits"] as const).map((key) => <div className="admin-form-block" key={key}><h3>GPT Image 2.5 {key === "gpt25FlareCredits" ? "Flare" : "Sunburst"}</h3><div className="admin-subgrid">{(["1k", "2k", "4k"] as const).map((resolution) => <label key={resolution}>{resolution.toUpperCase()}<input type="number" min="0" step="0.1" value={settings[key][resolution]} onChange={(e) => setSettings({ ...settings, [key]: { ...settings[key], [resolution]: Number(e.target.value) } })} /></label>)}</div><p className="admin-hint">Image to Image uses the tier plus the shared edit surcharge.</p></div>)}
               <div className="admin-form-block">
                 <h3>Image generation</h3>
                 <div className="admin-subgrid">

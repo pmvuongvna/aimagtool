@@ -31,7 +31,7 @@ import { StudioNavigation } from "@/components/studio-navigation";
 import styles from "./generate.module.css";
 
 type TaskResponse = { data?: { taskId?: string }; error?: string; creditCost?: number; remainingCredits?: number };
-type ProfileResponse = { userId: string; credits: number; previewCosts: { image1k: number; image2k: number; image4k: number; imageEdit1k: number; imageEdit2k: number; imageEdit4k: number; qwen21Text1k: number; qwen21Text2k: number; qwen21Image1k: number; qwen21Image2k: number; seedream5FlashText1k: number; seedream5FlashText15k: number; seedream5FlashText2k: number; seedream5FlashImage1k: number; seedream5FlashImage15k: number; seedream5FlashImage2k: number } };
+type ProfileResponse = { userId: string; credits: number; previewCosts: { gpt25Flare: Record<ImageResolution, number>; gpt25Sunburst: Record<ImageResolution, number>; imageEditExtraCost: number; image1k: number; image2k: number; image4k: number; imageEdit1k: number; imageEdit2k: number; imageEdit4k: number; qwen21Text1k: number; qwen21Text2k: number; qwen21Image1k: number; qwen21Image2k: number; seedream5FlashText1k: number; seedream5FlashText15k: number; seedream5FlashText2k: number; seedream5FlashImage1k: number; seedream5FlashImage15k: number; seedream5FlashImage2k: number } };
 type HistoryItem = { id: string; mediaType: "image" | "video"; urls: string[]; prompt: string; createdAt: string };
 type CreditPackage = { id: string; name: string; credits: number; priceVnd: number; badge?: string };
 type DashboardCache = {
@@ -56,7 +56,7 @@ type CardItem = {
 };
 
 type GalleryFilter = "all" | "image" | "video" | "realistic" | "anime" | "cinematic";
-type ImageModelId = "gpt" | "seedream" | "seedream5flash" | "qwen3" | "qwen2";
+type ImageModelId = "gpt" | "gptSunburst" | "seedream" | "seedream5flash" | "qwen3" | "qwen2";
 type ImageModelOption = {
   id: ImageModelId;
   label: string;
@@ -70,6 +70,7 @@ type ImageModelOption = {
 
 const CACHE_KEY = "aistudio_user_dashboard_cache_v1";
 const defaultAspectOptions = ["1:1", "16:9", "4:3", "3:4", "9:16"];
+const gpt25AspectOptions = ["auto", "1:1", "3:2", "2:3", "16:9", "9:16", "4:3", "3:4", "21:9", "27:16", "16:27", "9:8", "8:9"];
 const qwen21AspectOptions = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16", "21:9", "9:21"];
 const seedream5FlashAspectOptions = ["1:1", "4:3", "3:4", "16:9", "9:16", "2:3", "3:2", "21:9"];
 const styleOptions = ["Cinematic", "Ảnh thực", "Anime", "3D Render", "Editorial"];
@@ -77,7 +78,8 @@ const quantityOptions = [1, 2];
 const resolutionOptions: ImageResolution[] = ["1k", "2k", "4k"];
 const QWEN_PROMPT_MAX_LENGTH = 5000;
 const IMAGE_MODELS: ImageModelOption[] = [
-  { id: "gpt", label: "GPT Image 2", description: "Versatile image generation", textServiceId: "gpt-image-2-text", imageServiceId: "gpt-image-2-image", aspectRatios: defaultAspectOptions, resolutions: resolutionOptions },
+  { id: "gpt", label: "GPT Image 2.5 Flare", description: "Fast generation and reference editing", textServiceId: "gpt-image-2-5-flare-text", imageServiceId: "gpt-image-2-5-flare-image", aspectRatios: gpt25AspectOptions, resolutions: resolutionOptions },
+  { id: "gptSunburst", label: "GPT Image 2.5 Sunburst", description: "Refined generation and precise editing", textServiceId: "gpt-image-2-5-sunburst-text", imageServiceId: "gpt-image-2-5-sunburst-image", aspectRatios: gpt25AspectOptions, resolutions: resolutionOptions },
   { id: "seedream", label: "Seedream 5 Lite", description: "Fast creative rendering", textServiceId: "seedream-5-lite-text", imageServiceId: "seedream-5-lite-image", aspectRatios: defaultAspectOptions, resolutions: resolutionOptions },
   { id: "seedream5flash", label: "Seedream 5 Flash", description: "Fast generation and multi-image editing", textServiceId: "seedream-5-flash-text", imageServiceId: "seedream-5-flash-image", aspectRatios: seedream5FlashAspectOptions, resolutions: ["1k", "1.5k", "2k"] },
   { id: "qwen3", label: "Qwen3 Pro", description: "Detailed professional output", textServiceId: "qwen3-pro-text", imageServiceId: "qwen3-pro-image", aspectRatios: defaultAspectOptions, resolutions: resolutionOptions },
@@ -144,8 +146,8 @@ function getImageModel(modelId: ImageModelId) {
   return IMAGE_MODELS.find((model) => model.id === modelId) || IMAGE_MODELS[0];
 }
 
-function parseReferenceUrls(value: string) {
-  return Array.from(new Set(value.split(/[\n,]/).map((url) => url.trim()).filter(Boolean))).slice(0, 10);
+function parseReferenceUrls(value: string, limit = 10) {
+  return Array.from(new Set(value.split(/[\n,]/).map((url) => url.trim()).filter(Boolean))).slice(0, limit);
 }
 
 export default function UserClient({ initialPrompt }: { initialPrompt: string }) {
@@ -196,24 +198,32 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, []);
 
   const selectedImageModel = getImageModel(imageModel);
+  const isGpt25 = imageModel === "gpt" || imageModel === "gptSunburst";
+  const referenceLimit = isGpt25 ? 16 : 10;
+  const availableResolutions = isGpt25 && ["27:16", "16:27", "9:8", "8:9"].includes(aspectRatio) ? ["1k" as ImageSize] : selectedImageModel.resolutions;
   const supportsImageWorkflow = Boolean(selectedImageModel.imageServiceId);
   const availableAspectRatios = generationMode === "image" && selectedImageModel.imageAspectRatios ? selectedImageModel.imageAspectRatios : selectedImageModel.aspectRatios;
   const validReferenceUrls = referenceUrls.filter((url) => /^https?:\/\//.test(url));
-  const supportsMultipleReferences = imageModel === "qwen2" || imageModel === "seedream5flash";
+  const supportsMultipleReferences = isGpt25 || imageModel === "qwen2" || imageModel === "seedream5flash";
   const qwenMaskInvalid = imageModel === "qwen2" && Boolean(maskUrl) && (validReferenceUrls.length !== 1 || imageBackground === "transparent");
 
   const currentCost = useMemo(() => {
+    if (imageModel === "gpt" || imageModel === "gptSunburst") {
+      const rates = costPreview?.[imageModel === "gpt" ? "gpt25Flare" : "gpt25Sunburst"];
+      const single = rates?.[imageResolution as ImageResolution];
+      return single === undefined ? null : (single + (generationMode === "image" ? costPreview?.imageEditExtraCost || 0 : 0)) * quantity;
+    }
     if (imageModel === "qwen2") {
       const single = generationMode === "image"
         ? (imageResolution === "2k" ? costPreview?.qwen21Image2k : costPreview?.qwen21Image1k)
         : (imageResolution === "2k" ? costPreview?.qwen21Text2k : costPreview?.qwen21Text1k);
-      return single ? single * quantity : null;
+      return typeof single === "number" ? single * quantity : null;
     }
     if (imageModel === "seedream5flash") {
       const sizeKey = imageResolution === "1.5k" ? "15k" : imageResolution === "2k" ? "2k" : "1k";
       const costKey = `seedream5Flash${generationMode === "image" ? "Image" : "Text"}${sizeKey[0].toUpperCase()}${sizeKey.slice(1)}` as keyof ProfileResponse["previewCosts"];
       const single = costPreview?.[costKey];
-      return single ? single * quantity : null;
+      return typeof single === "number" ? single * quantity : null;
     }
     const single = generationMode === "image"
       ? (imageResolution === "4k" ? costPreview?.imageEdit4k : imageResolution === "2k" ? costPreview?.imageEdit2k : costPreview?.imageEdit1k)
@@ -222,8 +232,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   }, [costPreview, generationMode, imageModel, imageResolution, quantity]);
 
   const composedPrompt = composeImagePrompt(prompt, negativePrompt, activeStyle);
-  const promptTooLong = (imageModel === "qwen3" || imageModel === "qwen2" || imageModel === "seedream5flash") && composedPrompt.length > QWEN_PROMPT_MAX_LENGTH;
-  const canGenerate = prompt.trim().length >= 3 && !promptTooLong && !qwenMaskInvalid && (generationMode === "text" || (supportsImageWorkflow && validReferenceUrls.length > 0 && (!supportsMultipleReferences || validReferenceUrls.length <= 10))) && !uploading;
+  const promptTooLong = isGpt25 ? composedPrompt.length > 20000 : (imageModel === "qwen3" || imageModel === "qwen2" || imageModel === "seedream5flash") && composedPrompt.length > QWEN_PROMPT_MAX_LENGTH;
+  const canGenerate = prompt.trim().length >= 3 && !promptTooLong && !qwenMaskInvalid && availableResolutions.includes(imageResolution) && (generationMode === "text" || (supportsImageWorkflow && validReferenceUrls.length > 0 && (!supportsMultipleReferences || validReferenceUrls.length <= referenceLimit))) && !uploading;
 
   function changeGenerationMode(nextMode: "text" | "image") {
     setGenerationMode(nextMode);
@@ -238,9 +248,11 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     const nextModel = getImageModel(nextModelId);
     setImageModel(nextModelId);
     if (!nextModel.imageServiceId) setGenerationMode("text");
-    if (nextModelId !== "qwen2" && nextModelId !== "seedream5flash") {
+    if (nextModelId !== "qwen2" && nextModelId !== "seedream5flash" && nextModelId !== "gpt" && nextModelId !== "gptSunburst") {
       setReferenceUrls((current) => current.slice(0, 1));
     }
+    else setReferenceUrls((current) => current.slice(0, nextModelId === "gpt" || nextModelId === "gptSunburst" ? 16 : 10));
+    if (nextModelId !== "gpt" && nextModelId !== "gptSunburst" && imageBackground === "auto") setImageBackground("opaque");
     if (nextModelId !== "qwen2") {
       setMaskUrl("");
     }
@@ -368,18 +380,21 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
   async function handleReferenceUploads(files: File[]) {
     if (!files.length) return;
-    const remainingSlots = supportsMultipleReferences ? Math.max(0, 10 - referenceUrls.length) : 1;
+    const remainingSlots = supportsMultipleReferences ? Math.max(0, referenceLimit - referenceUrls.length) : 1;
     const selectedFiles = files.slice(0, remainingSlots);
     if (!selectedFiles.length) {
-      setStatusText(`${selectedImageModel.label} hỗ trợ tối đa 10 ảnh tham chiếu trong giao diện.`);
+      setStatusText(`${selectedImageModel.label} hỗ trợ tối đa ${referenceLimit} ảnh tham chiếu.`);
       return;
     }
     setUploading(true);
     setStatusText(`Đang upload ${selectedFiles.length} ảnh tham chiếu...`);
     try {
       const uploadedUrls: string[] = [];
-      for (const file of selectedFiles) uploadedUrls.push(await uploadImageFile(file));
-      setReferenceUrls((current) => supportsMultipleReferences ? Array.from(new Set([...current, ...uploadedUrls])).slice(0, 10) : [uploadedUrls[0]]);
+      for (const file of selectedFiles) {
+        if (isGpt25 && file.size > 30 * 1024 * 1024) throw new Error("Ảnh tham chiếu tối đa 30MB.");
+        uploadedUrls.push(await uploadImageFile(file));
+      }
+      setReferenceUrls((current) => supportsMultipleReferences ? Array.from(new Set([...current, ...uploadedUrls])).slice(0, referenceLimit) : [uploadedUrls[0]]);
       setStatusText(`Đã upload ${uploadedUrls.length} ảnh tham chiếu.`);
     } catch (error) {
       setStatusText(error instanceof Error ? error.message : "Upload thất bại.");
@@ -424,6 +439,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
       inputUrl: generationMode === "image" ? validReferenceUrls[0] : undefined,
       inputUrls: generationMode === "image" && supportsMultipleReferences ? validReferenceUrls : undefined,
       maskUrl: generationMode === "image" && imageModel === "qwen2" ? maskUrl || undefined : undefined,
+      ...(isGpt25 ? { imageBackground } : {}),
       ...(imageModel === "qwen2" ? {
         imageBackground,
         imageOutputFormat,
@@ -587,7 +603,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
               <div className={styles.imageComposer} ref={controlsRef}>
                 <div className={styles.promptBox}>
                   <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Mô tả điều anh muốn tạo..." />
-                  <span className={styles.promptCount}>{imageModel === "qwen3" || imageModel === "qwen2" || imageModel === "seedream5flash" ? `${composedPrompt.length}/${QWEN_PROMPT_MAX_LENGTH}` : prompt.length}</span>
+                  <span className={styles.promptCount}>{isGpt25 ? `${composedPrompt.length}/20000` : imageModel === "qwen3" || imageModel === "qwen2" || imageModel === "seedream5flash" ? `${composedPrompt.length}/${QWEN_PROMPT_MAX_LENGTH}` : prompt.length}</span>
                 </div>
 
                 <div className={styles.composerToolbar}>
@@ -637,7 +653,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                   {openControl === "aspect" ? (
                     <div className={styles.settingMenu}>
                       {availableAspectRatios.map((value) => (
-                        <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); setOpenControl(null); }}>
+                        <button key={value} type="button" className={`${styles.settingMenuItem} ${aspectRatio === value ? styles.settingMenuItemActive : ""}`} onClick={() => { setAspectRatio(value); if (isGpt25 && ["27:16", "16:27", "9:8", "8:9"].includes(value)) setImageResolution("1k"); setOpenControl(null); }}>
                           {value === "auto" ? "Tự động" : value}
                         </button>
                       ))}
@@ -724,7 +740,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                     <div className={styles.fieldBlock}>
                       <div className={styles.fieldBlockHeader}><h4>Độ phân giải</h4><span className={styles.fieldHint}>{imageModel === "seedream5flash" ? "1K / 1.5K / 2K" : imageModel === "qwen2" ? "1K / 2K" : imageModel === "seedream" ? "Basic 2K / High 3K / Ultra 4K" : "1K / 2K / 4K"}</span></div>
                       <select value={imageResolution} onChange={(e) => setImageResolution(e.target.value as ImageSize)}>
-                        {selectedImageModel.resolutions.map((value) => <option key={value} value={value}>{imageModel === "seedream" ? (value === "1k" ? "Basic (2K)" : value === "2k" ? "High (3K)" : "Ultra (4K)") : value.toUpperCase()}</option>)}
+                        {availableResolutions.map((value) => <option key={value} value={value}>{imageModel === "seedream" ? (value === "1k" ? "Basic (2K)" : value === "2k" ? "High (3K)" : "Ultra (4K)") : value.toUpperCase()}</option>)}
                       </select>
                     </div>
 
@@ -736,6 +752,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       </select>
                     </div>
 
+                    {isGpt25 ? <div className={styles.fieldBlock}><div className={styles.fieldBlockHeader}><h4>Nền ảnh</h4></div><select value={imageBackground} onChange={(e) => setImageBackground(e.target.value as ImageBackground)}><option value="opaque">Nền thông thường</option><option value="transparent">Nền trong suốt</option><option value="auto">Tự động</option></select></div> : null}
                     {imageModel === "qwen2" ? (
                       <>
                         <div className={styles.fieldBlock}>
@@ -799,11 +816,11 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
 
                     {generationMode === "image" ? (
                       <div className={`${styles.fieldBlock} ${styles.advancedPanelWide}`}>
-                        <div className={styles.fieldBlockHeader}><h4>Ảnh tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : `${validReferenceUrls.length}/${supportsMultipleReferences ? 10 : 1} ảnh`}</span></div>
+                        <div className={styles.fieldBlockHeader}><h4>Ảnh tham chiếu</h4><span className={styles.fieldHint}>{uploading ? "Đang upload..." : `${validReferenceUrls.length}/${supportsMultipleReferences ? referenceLimit : 1} ảnh`}</span></div>
                         <div className={styles.uploadRow}>
                           <input type="file" accept="image/jpeg,image/png,image/webp" multiple={supportsMultipleReferences} onChange={(e) => void handleReferenceUploads(Array.from(e.target.files || []))} />
                           {supportsMultipleReferences ? (
-                            <textarea rows={3} value={referenceUrls.join("\n")} onChange={(e) => setReferenceUrls(parseReferenceUrls(e.target.value))} placeholder="Mỗi URL ảnh trên một dòng, tối đa 10 ảnh" />
+                            <textarea rows={3} value={referenceUrls.join("\n")} onChange={(e) => setReferenceUrls(parseReferenceUrls(e.target.value, referenceLimit))} placeholder={`Mỗi URL ảnh trên một dòng, tối đa ${referenceLimit} ảnh`} />
                           ) : (
                             <input value={referenceUrls[0] || ""} onChange={(e) => setReferenceUrls(e.target.value.trim() ? [e.target.value] : [])} placeholder="https://... (URL sau khi upload)" />
                           )}
@@ -842,7 +859,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
                       <div className={styles.fieldBlockHeader}><h4>Prompt nâng cao</h4><span className={styles.fieldHint}>Negative prompt</span></div>
                       <textarea value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} placeholder="Những gì anh không muốn xuất hiện trong ảnh" />
                       <div style={{ marginTop: 10 }} className={styles.subtleNote}>
-                        {imageModel === "seedream5flash" ? "Seedream 5 Flash hỗ trợ Text to Image và Image to Image với nhiều ảnh tham chiếu, kích thước 1K/1.5K/2K và NSFW checker mặc định tắt." : imageModel === "qwen2" ? "Qwen 2.1 hỗ trợ Text to Image và Image to Image với tối đa 10 ảnh tham chiếu. Mask chuyển sang chỉnh sửa cục bộ; NSFW checker mặc định tắt." : imageModel === "qwen3" ? "Qwen3 Pro hỗ trợ Text to Image và Image to Image theo Kie.ai; Image to Image cần ảnh tham chiếu." : imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2 hỗ trợ xuất 1K, 2K và 4K."}
+                        {imageModel === "seedream5flash" ? "Seedream 5 Flash hỗ trợ Text to Image và Image to Image với nhiều ảnh tham chiếu, kích thước 1K/1.5K/2K và NSFW checker mặc định tắt." : imageModel === "qwen2" ? "Qwen 2.1 hỗ trợ Text to Image và Image to Image với tối đa 10 ảnh tham chiếu. Mask chuyển sang chỉnh sửa cục bộ; NSFW checker mặc định tắt." : imageModel === "qwen3" ? "Qwen3 Pro hỗ trợ Text to Image và Image to Image theo Kie.ai; Image to Image cần ảnh tham chiếu." : imageModel === "seedream" ? "Seedream 5 Lite dùng quality basic/high/ultra tương ứng 2K/3K/4K theo Kie.ai." : "GPT Image 2.5: tối đa 16 ảnh tham chiếu. Tỷ lệ 27:16, 16:27, 9:8 và 8:9 chỉ hỗ trợ 1K. Sunburst nền trong suốt ở 2K/4K cần prompt mô tả chủ thể tách nền, không cảnh nền hoặc bóng."}
                       </div>
                     </div>
                   </div>

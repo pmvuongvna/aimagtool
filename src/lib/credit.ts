@@ -7,6 +7,8 @@ export type CreditSettings = {
   creditPackageVersion: number;
   creditPackages: CreditPackage[];
   imageCredits: Record<ImageResolution, number>;
+  gpt25FlareCredits: Record<ImageResolution, number>;
+  gpt25SunburstCredits: Record<ImageResolution, number>;
   qwen21ImageCredits: Qwen21ImageCredits;
   seedream5FlashImageCredits: Seedream5FlashImageCredits;
   videoCredits: Record<VideoResolution, number>;
@@ -46,6 +48,8 @@ export type CreditPackage = {
 type CreditSettingsPatch = {
   creditPackages?: CreditPackage[];
   imageCredits?: Partial<Record<ImageResolution, number>>;
+  gpt25FlareCredits?: Partial<Record<ImageResolution, number>>;
+  gpt25SunburstCredits?: Partial<Record<ImageResolution, number>>;
   qwen21ImageCredits?: Partial<Qwen21ImageCredits>;
   seedream5FlashImageCredits?: Partial<Seedream5FlashImageCredits>;
   videoCredits?: Partial<Record<VideoResolution, number>>;
@@ -80,6 +84,13 @@ function normalizeCredits(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.round(value * 100) / 100);
 }
+function normalizeGptCredits(input: Partial<Record<ImageResolution, number>> | undefined, fallback: Partial<Record<ImageResolution, number>>) {
+  return {
+    "1k": asNonNegativeNumber(input?.["1k"] ?? fallback["1k"] ?? 8, 8),
+    "2k": asNonNegativeNumber(input?.["2k"] ?? fallback["2k"] ?? 16, 16),
+    "4k": asNonNegativeNumber(input?.["4k"] ?? fallback["4k"] ?? 32, 32),
+  };
+}
 
 const DEFAULT_SETTINGS: CreditSettings = {
   creditPackageVersion: 2,
@@ -89,6 +100,8 @@ const DEFAULT_SETTINGS: CreditSettings = {
     { id: "studio", name: "Studio", credits: 2000, priceVnd: 199000, badge: "Nhiều credit", active: true },
   ],
   imageCredits: { "1k": 8, "2k": 16, "4k": 32 },
+  gpt25FlareCredits: { "1k": 8, "2k": 16, "4k": 32 },
+  gpt25SunburstCredits: { "1k": 8, "2k": 16, "4k": 32 },
   qwen21ImageCredits: { text1k: 8, text2k: 16, image1k: 12, image2k: 20 },
   seedream5FlashImageCredits: { text1k: 8, text15k: 12, text2k: 16, image1k: 12, image15k: 16, image2k: 20 },
   videoCredits: { "480p": 45, "720p": 80 },
@@ -111,6 +124,8 @@ function cloneSettings(settings: CreditSettings) {
     ...settings,
     creditPackages: settings.creditPackages.map((item) => ({ ...item })),
     imageCredits: { ...settings.imageCredits },
+    gpt25FlareCredits: { ...settings.gpt25FlareCredits },
+    gpt25SunburstCredits: { ...settings.gpt25SunburstCredits },
     qwen21ImageCredits: { ...settings.qwen21ImageCredits },
     seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits },
     videoCredits: { ...settings.videoCredits },
@@ -126,6 +141,8 @@ function normalizeSettings(input?: Partial<CreditSettings> | null): CreditSettin
   const packageVersion = Number(source.creditPackageVersion || 0);
   return {
     creditPackageVersion: DEFAULT_SETTINGS.creditPackageVersion,
+    gpt25FlareCredits: normalizeGptCredits(source.gpt25FlareCredits, source.imageCredits || DEFAULT_SETTINGS.imageCredits),
+    gpt25SunburstCredits: normalizeGptCredits(source.gpt25SunburstCredits, source.imageCredits || DEFAULT_SETTINGS.imageCredits),
     creditPackages: packageVersion >= DEFAULT_SETTINGS.creditPackageVersion && Array.isArray(source.creditPackages) && source.creditPackages.length
       ? source.creditPackages.map((item) => ({ ...item }))
       : DEFAULT_SETTINGS.creditPackages.map((item) => ({ ...item })),
@@ -205,6 +222,8 @@ export async function getCreditSettings() {
 export async function updateCreditSettings(next: CreditSettingsPatch) {
   const current = await getCreditSettings();
   const updated = cloneSettings(current);
+  if (next.gpt25FlareCredits) updated.gpt25FlareCredits = normalizeGptCredits(next.gpt25FlareCredits, current.gpt25FlareCredits);
+  if (next.gpt25SunburstCredits) updated.gpt25SunburstCredits = normalizeGptCredits(next.gpt25SunburstCredits, current.gpt25SunburstCredits);
 
   if (Array.isArray(next.creditPackages)) {
     updated.creditPackageVersion = DEFAULT_SETTINGS.creditPackageVersion;
@@ -431,6 +450,10 @@ export async function setUserCredits(userId: string, credits: number, metadata: 
 
 export async function calculateTaskCost(input: CreateTaskInput) {
   const settings = await getCreditSettings();
+  if (input.serviceId.startsWith("gpt-image-2-5-") || input.serviceId === "gpt-image-2-text" || input.serviceId === "gpt-image-2-image") {
+    const rates = input.serviceId.includes("sunburst") ? settings.gpt25SunburstCredits : settings.gpt25FlareCredits;
+    return rates[input.imageResolution || "1k"] + (input.serviceId.endsWith("-image") ? settings.imageEditExtraCost : 0);
+  }
   if (input.serviceId === "seedream-5-flash-text" || input.serviceId === "seedream-5-flash-image") {
     const prefix = input.serviceId === "seedream-5-flash-image" ? "image" : "text";
     const size = input.imageSize === "1.5k" ? "15k" : input.imageSize === "2k" ? "2k" : "1k";
@@ -444,8 +467,6 @@ export async function calculateTaskCost(input: CreateTaskInput) {
     return quality === "2k" ? settings.qwen21ImageCredits.text2k : settings.qwen21ImageCredits.text1k;
   }
   if (
-    input.serviceId === "gpt-image-2-text" ||
-    input.serviceId === "gpt-image-2-image" ||
     input.serviceId === "seedream-5-lite-text" ||
     input.serviceId === "seedream-5-lite-image" ||
     input.serviceId === "qwen3-pro-image" ||
@@ -453,7 +474,7 @@ export async function calculateTaskCost(input: CreateTaskInput) {
   ) {
     const quality = input.imageResolution || "1k";
     const base = settings.imageCredits[quality];
-    return input.serviceId === "gpt-image-2-image" || input.serviceId === "seedream-5-lite-image" || input.serviceId === "qwen3-pro-image" ? base + settings.imageEditExtraCost : base;
+    return input.serviceId === "seedream-5-lite-image" || input.serviceId === "qwen3-pro-image" ? base + settings.imageEditExtraCost : base;
   }
   if (input.serviceId === "grok-text-video" || input.serviceId === "grok-image-video") {
     const quality: VideoResolution = input.videoResolution === "720p" ? "720p" : "480p";

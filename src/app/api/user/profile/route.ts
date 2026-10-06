@@ -13,9 +13,12 @@ export async function GET(request: NextRequest) {
   const settings = await getCreditSettings();
 
   const previewCosts = {
-    image1k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "1k" } as CreateTaskInput),
-    image2k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "2k" } as CreateTaskInput),
-    image4k: await calculateTaskCost({ serviceId: "gpt-image-2-text", prompt: "x", imageResolution: "4k" } as CreateTaskInput),
+    gpt25Flare: settings.gpt25FlareCredits,
+    gpt25Sunburst: settings.gpt25SunburstCredits,
+    imageEditExtraCost: settings.imageEditExtraCost,
+    image1k: settings.imageCredits["1k"],
+    image2k: settings.imageCredits["2k"],
+    image4k: settings.imageCredits["4k"],
     imageEdit1k: await calculateTaskCost({ serviceId: "qwen3-pro-image", prompt: "x", imageResolution: "1k", inputUrl: "https://example.com/a.jpg" } as CreateTaskInput),
     imageEdit2k: await calculateTaskCost({ serviceId: "qwen3-pro-image", prompt: "x", imageResolution: "2k", inputUrl: "https://example.com/a.jpg" } as CreateTaskInput),
     imageEdit4k: await calculateTaskCost({ serviceId: "qwen3-pro-image", prompt: "x", imageResolution: "4k", inputUrl: "https://example.com/a.jpg" } as CreateTaskInput),
