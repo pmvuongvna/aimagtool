@@ -1,6 +1,7 @@
 
 "use client";
 import { GenerationActivity } from "@/components/generation-activity";
+import { StudioTabs } from "@/components/studio-tabs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9,14 +10,12 @@ import {
   ChevronDown,
   Clapperboard,
   Coins,
-  Image as ImageIcon,
   LogOut,
   MonitorUp,
   Ratio,
   Search,
   Sparkles,
   Timer,
-  Video,
   WandSparkles,
   Workflow,
   X,
@@ -415,11 +414,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
             </div>
           </header>
           <section className={`${styles.generator} ${styles.videoStudio} ${isKlingPage ? styles.klingGenerator : ""}`} id="generator">
-            <div className={`${styles.generatorTabs} ${isKlingPage ? styles.klingGeneratorTabs : ""}`}>
-              <Link href="/user" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><ImageIcon size={15} /> AI Image</Link>
-              {!isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}><Video size={15} /> AI Video</button> : <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><Video size={15} /> AI Video</Link>}
-              {isKlingPage ? <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}><WandSparkles size={15} /> Kling Motion</button> : <Link href="/user/kling" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><WandSparkles size={15} /> Kling Motion</Link>}
-            </div>
+            <StudioTabs active={isKlingPage ? "kling" : "video"} />
             <div className={styles.videoWorkspace}>
             <GenerationActivity mediaType="video" creating={loading} onRefresh={refreshGenerationHistory} />
             <form onSubmit={onGenerate} className={styles.videoComposer} ref={controlsRef}>

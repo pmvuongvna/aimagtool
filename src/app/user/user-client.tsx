@@ -1,5 +1,6 @@
 "use client";
 import { GenerationActivity } from "@/components/generation-activity";
+import { StudioTabs } from "@/components/studio-tabs";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -593,10 +594,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           </section>
 
           <section className={styles.generator} id="generator">
-            <div className={styles.generatorTabs}>
-              <button type="button" className={`${styles.generatorTab} ${styles.generatorTabActive}`}><ImageIcon size={17} /> Hình ảnh</button>
-              <Link href="/user/video" className={`${styles.generatorTab} ${styles.generatorTabLink}`}><Video size={17} /> Video</Link>
-            </div>
+            <StudioTabs active="image" />
 
             <GenerationActivity mediaType="image" creating={loading} onRefresh={refreshGenerationHistory} />
             <form onSubmit={onGenerate}>
