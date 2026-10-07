@@ -1,4 +1,6 @@
 export type AIServiceId =
+  | "nano-banana-2-1-text"
+  | "nano-banana-2-1-image"
   | "gpt-image-2-text"
   | "gpt-image-2-image"
   | "gpt-image-2-5-flare-text"

@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
 
   const previewCosts = {
     gpt25Flare: settings.gpt25FlareCredits,
+    nanoBanana21: settings.nanoBanana21Credits,
     gpt25Sunburst: settings.gpt25SunburstCredits,
     imageEditExtraCost: settings.imageEditExtraCost,
     image1k: settings.imageCredits["1k"],

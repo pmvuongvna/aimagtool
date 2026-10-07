@@ -173,7 +173,29 @@ function gpt25Service(variant: "flare" | "sunburst", editing: boolean): ServiceC
     },
   };
 }
+function nanoBanana21Service(editing: boolean): ServiceConfig {
+  return {
+    model: "nano-banana-2-1",
+    requiresReferenceImage: editing,
+    buildInput: (payload) => {
+      const aspect = payload.aspectRatio || "auto";
+      const allowed = ["auto", "1:1", "2:3", "3:2", "1:4", "4:1", "3:4", "4:3", "4:5", "5:4", "1:8", "8:1", "9:16", "16:9", "21:9"];
+      if (!allowed.includes(aspect)) throw new Error("Unsupported Nano Banana 2.1 aspect ratio.");
+      const urls = payload.inputUrls?.length ? payload.inputUrls : payload.inputUrl ? [payload.inputUrl] : [];
+      if (urls.length > 14 || (editing && !urls.length)) throw new Error("Nano Banana 2.1 supports 1 to 14 reference images for editing.");
+      return {
+        prompt: requirePromptWithinLimit(payload.prompt, 20000, "Nano Banana 2.1"),
+        aspect_ratio: aspect,
+        resolution: mapImageResolution(payload.imageResolution),
+        output_format: payload.imageOutputFormat === "png" ? "png" : "jpg",
+        image_input: editing ? urls.map((url) => requireHttpUrl(url)) : [],
+      };
+    },
+  };
+}
 const SERVICES: Record<AIServiceId, ServiceConfig> = {
+  "nano-banana-2-1-text": nanoBanana21Service(false),
+  "nano-banana-2-1-image": nanoBanana21Service(true),
   "gpt-image-2-5-flare-text": gpt25Service("flare", false),
   "gpt-image-2-5-flare-image": gpt25Service("flare", true),
   "gpt-image-2-5-sunburst-text": gpt25Service("sunburst", false),

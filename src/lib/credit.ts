@@ -9,6 +9,7 @@ export type CreditSettings = {
   imageCredits: Record<ImageResolution, number>;
   gpt25FlareCredits: Record<ImageResolution, number>;
   gpt25SunburstCredits: Record<ImageResolution, number>;
+  nanoBanana21Credits: Record<ImageResolution, number>;
   qwen21ImageCredits: Qwen21ImageCredits;
   seedream5FlashImageCredits: Seedream5FlashImageCredits;
   videoCredits: Record<VideoResolution, number>;
@@ -50,6 +51,7 @@ type CreditSettingsPatch = {
   imageCredits?: Partial<Record<ImageResolution, number>>;
   gpt25FlareCredits?: Partial<Record<ImageResolution, number>>;
   gpt25SunburstCredits?: Partial<Record<ImageResolution, number>>;
+  nanoBanana21Credits?: Partial<Record<ImageResolution, number>>;
   qwen21ImageCredits?: Partial<Qwen21ImageCredits>;
   seedream5FlashImageCredits?: Partial<Seedream5FlashImageCredits>;
   videoCredits?: Partial<Record<VideoResolution, number>>;
@@ -102,6 +104,7 @@ const DEFAULT_SETTINGS: CreditSettings = {
   imageCredits: { "1k": 8, "2k": 16, "4k": 32 },
   gpt25FlareCredits: { "1k": 8, "2k": 16, "4k": 32 },
   gpt25SunburstCredits: { "1k": 8, "2k": 16, "4k": 32 },
+  nanoBanana21Credits: { "1k": 8, "2k": 16, "4k": 32 },
   qwen21ImageCredits: { text1k: 8, text2k: 16, image1k: 12, image2k: 20 },
   seedream5FlashImageCredits: { text1k: 8, text15k: 12, text2k: 16, image1k: 12, image15k: 16, image2k: 20 },
   videoCredits: { "480p": 45, "720p": 80 },
@@ -126,6 +129,7 @@ function cloneSettings(settings: CreditSettings) {
     imageCredits: { ...settings.imageCredits },
     gpt25FlareCredits: { ...settings.gpt25FlareCredits },
     gpt25SunburstCredits: { ...settings.gpt25SunburstCredits },
+    nanoBanana21Credits: { ...settings.nanoBanana21Credits },
     qwen21ImageCredits: { ...settings.qwen21ImageCredits },
     seedream5FlashImageCredits: { ...settings.seedream5FlashImageCredits },
     videoCredits: { ...settings.videoCredits },
@@ -143,6 +147,7 @@ function normalizeSettings(input?: Partial<CreditSettings> | null): CreditSettin
     creditPackageVersion: DEFAULT_SETTINGS.creditPackageVersion,
     gpt25FlareCredits: normalizeGptCredits(source.gpt25FlareCredits, source.imageCredits || DEFAULT_SETTINGS.imageCredits),
     gpt25SunburstCredits: normalizeGptCredits(source.gpt25SunburstCredits, source.imageCredits || DEFAULT_SETTINGS.imageCredits),
+    nanoBanana21Credits: normalizeGptCredits(source.nanoBanana21Credits, DEFAULT_SETTINGS.nanoBanana21Credits),
     creditPackages: packageVersion >= DEFAULT_SETTINGS.creditPackageVersion && Array.isArray(source.creditPackages) && source.creditPackages.length
       ? source.creditPackages.map((item) => ({ ...item }))
       : DEFAULT_SETTINGS.creditPackages.map((item) => ({ ...item })),
@@ -224,6 +229,7 @@ export async function updateCreditSettings(next: CreditSettingsPatch) {
   const updated = cloneSettings(current);
   if (next.gpt25FlareCredits) updated.gpt25FlareCredits = normalizeGptCredits(next.gpt25FlareCredits, current.gpt25FlareCredits);
   if (next.gpt25SunburstCredits) updated.gpt25SunburstCredits = normalizeGptCredits(next.gpt25SunburstCredits, current.gpt25SunburstCredits);
+  if (next.nanoBanana21Credits) updated.nanoBanana21Credits = normalizeGptCredits(next.nanoBanana21Credits, current.nanoBanana21Credits);
 
   if (Array.isArray(next.creditPackages)) {
     updated.creditPackageVersion = DEFAULT_SETTINGS.creditPackageVersion;
@@ -450,6 +456,7 @@ export async function setUserCredits(userId: string, credits: number, metadata: 
 
 export async function calculateTaskCost(input: CreateTaskInput) {
   const settings = await getCreditSettings();
+  if (input.serviceId === "nano-banana-2-1-text" || input.serviceId === "nano-banana-2-1-image") return settings.nanoBanana21Credits[input.imageResolution || "1k"];
   if (input.serviceId.startsWith("gpt-image-2-5-") || input.serviceId === "gpt-image-2-text" || input.serviceId === "gpt-image-2-image") {
     const rates = input.serviceId.includes("sunburst") ? settings.gpt25SunburstCredits : settings.gpt25FlareCredits;
     return rates[input.imageResolution || "1k"] + (input.serviceId.endsWith("-image") ? settings.imageEditExtraCost : 0);

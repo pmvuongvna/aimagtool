@@ -4,5 +4,10 @@
 @keyframes turn { to { transform: rotate(360deg); } }
 @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .overlay, .spinner { animation: none; } }
-.tabs { flex-wrap: wrap; max-width: 100%; }
-.tabs a { white-space: nowrap; }
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 540px); margin: 0 auto 24px; padding: 6px; gap: 6px; border: 1px solid #e7e9f0; border-radius: 8px; background: #eef0f6; box-sizing: border-box; }
+.tab { display: flex; justify-content: center; align-items: center; gap: 8px; min-width: 0; min-height: 42px; padding: 8px 10px; box-sizing: border-box; border-radius: 6px; color: #616b80; font-size: 14px; font-weight: 600; line-height: 20px; text-decoration: none; white-space: nowrap; }
+.tab svg { flex-shrink: 0; }
+.tab:hover { background: #ffffff80; }
+.tab:focus-visible { outline: 2px solid #6155dc; outline-offset: 2px; }
+.active, .active:hover { color: #5850e9; background: #fff; box-shadow: 0 3px 12px #20284a0d; }
+@media (max-width: 480px) { .tab { flex-direction: column; gap: 4px; padding: 8px 2px; font-size: 12px; line-height: 18px; } .tabs { gap: 4px; padding: 4px; } }
