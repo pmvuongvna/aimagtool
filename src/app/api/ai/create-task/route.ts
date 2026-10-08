@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
     const userId = authUser?.id || request.headers.get("x-user-id") || "demo-user";
     const cost = await calculateTaskCost(body);
     const creditReferenceId = request.headers.get("x-idempotency-key")?.trim() || randomUUID();
+    const requestedBatchId = request.headers.get("x-generation-batch-id")?.trim();
+    const batchId = requestedBatchId && /^[a-zA-Z0-9-]{1,80}$/.test(requestedBatchId) ? requestedBatchId : randomUUID();
     const creditMetadata = { serviceId: body.serviceId, requestId: creditReferenceId };
     const charged = await chargeCredits(userId, cost, creditReferenceId, creditMetadata);
     if (!charged.ok) {
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const payload = await createAIGenerationTask(body);
-      if (payload.data?.taskId) await saveGenerationTask({ id: payload.data.taskId, userId, mediaType: body.serviceId.includes("video") || body.serviceId === "kling-motion-control" ? "video" : "image", prompt: body.prompt || "Reference assets", status: "pending", urls: [], createdAt: new Date().toISOString() });
+      if (payload.data?.taskId) await saveGenerationTask({ id: payload.data.taskId, batchId, userId, mediaType: body.serviceId.includes("video") || body.serviceId === "kling-motion-control" ? "video" : "image", prompt: body.prompt || "Reference assets", status: "pending", urls: [], createdAt: new Date().toISOString() });
       return NextResponse.json({ ...payload, creditCost: cost, remainingCredits: charged.credits });
     } catch (innerError) {
       const credits = await refundCredits(userId, cost, creditReferenceId, creditMetadata);

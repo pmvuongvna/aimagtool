@@ -163,6 +163,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState(isKlingPage ? "Ready for Kling Motion generation." : "Ready for video generation.");
   const [loading, setLoading] = useState(false);
+  const [activeBatchId, setActiveBatchId] = useState("");
   const [resultUrl, setResultUrl] = useState("");
   const [resultAssetUrls, setResultAssetUrls] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -319,6 +320,8 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
   async function onGenerate(e: FormEvent) {
     e.preventDefault();
     if (!canGenerate) return;
+    const batchId = crypto.randomUUID();
+    setActiveBatchId(batchId);
     setLoading(true);
     setResultUrl("");
     setResultAssetUrls([]);
@@ -354,7 +357,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
           inputUrl: videoModeType === "image" ? referenceUrl : undefined,
           nsfwChecker: AI_VIDEO_MODEL_MAP[videoModel].nsfwChecker,
         };
-    const res = await apiFetch(apiPath("/api/ai/create-task"), { method: "POST", headers: { "Content-Type": "application/json", "x-user-id": userId, "x-idempotency-key": crypto.randomUUID() }, body: JSON.stringify(body) });
+    const res = await apiFetch(apiPath("/api/ai/create-task"), { method: "POST", headers: { "Content-Type": "application/json", "x-user-id": userId, "x-idempotency-key": crypto.randomUUID(), "x-generation-batch-id": batchId }, body: JSON.stringify(body) });
     const payload = (await res.json()) as TaskResponse;
     if (!res.ok || !payload.data?.taskId) { setStatusText(payload.error || "Video generation failed."); if (typeof payload.remainingCredits === "number") setCredits(payload.remainingCredits); setLoading(false); return; }
     setTaskId(payload.data.taskId);
@@ -416,7 +419,7 @@ export default function VideoClient({ initialPrompt, variant = "grok" }: { initi
           <section className={`${styles.generator} ${styles.videoStudio} ${isKlingPage ? styles.klingGenerator : ""}`} id="generator">
             <StudioTabs active={isKlingPage ? "kling" : "video"} />
             <div className={styles.videoWorkspace}>
-            <GenerationActivity mediaType="video" creating={loading} onRefresh={refreshGenerationHistory} />
+            <GenerationActivity key={activeBatchId || "restored-video"} activeBatchId={activeBatchId} mediaType="video" creating={loading} onRefresh={refreshGenerationHistory} />
             <form onSubmit={onGenerate} className={styles.videoComposer} ref={controlsRef}>
               <div className={styles.composerHeading}>
                 <div><span className={styles.eyebrow}>CREATE VIDEO</span><h1>{pageTitle}</h1><p>Build the scene, choose a model, and render without leaving the workspace.</p></div>

@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, CircleAlert, Check, X, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { apiFetch, apiPath } from "@/lib/api-url";
 import type { GenerationTask } from "@/lib/generation-tasks";
+import { selectGenerationBatch } from "@/lib/generation-display";
 import styles from "./generation-activity.module.css";
 
-export function GenerationActivity({ mediaType, creating, onRefresh }: { mediaType: "image" | "video"; creating: boolean; onRefresh: () => void }) {
+export function GenerationActivity({ mediaType, creating, activeBatchId, onRefresh }: { mediaType: "image" | "video"; creating: boolean; activeBatchId?: string; onRefresh: () => void }) {
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
-  const [observedAt, setObservedAt] = useState(0);
   const [preview, setPreview] = useState<{ urls: string[]; index: number } | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -33,7 +33,6 @@ export function GenerationActivity({ mediaType, creating, onRefresh }: { mediaTy
         if (stopped) return;
         const items = data.tasks.filter((task) => task.mediaType === mediaType);
         setTasks(items);
-        setObservedAt(Date.now());
         const completed = items.filter((task) => task.status === "success").map((task) => task.id).join(",");
         if (completed !== previous) { previous = completed; onRefresh(); }
       } catch { /* Retry on the next poll. */ }
@@ -41,18 +40,20 @@ export function GenerationActivity({ mediaType, creating, onRefresh }: { mediaTy
     }
     void refresh();
     return () => { stopped = true; clearTimeout(timer); };
-  }, [mediaType, creating, onRefresh]);
-  const visible = [...tasks.filter((task) => !["success", "failed"].includes(task.status)), ...tasks.filter((task) => ["success", "failed"].includes(task.status) && observedAt - new Date(task.createdAt).getTime() < 86400000).slice(0, 6)];
-  if (!visible.length && !creating) return null;
+  }, [mediaType, creating, activeBatchId, onRefresh]);
+  const visible = selectGenerationBatch(tasks, activeBatchId);
+  const urls = [...new Set(visible.filter((task) => task.status === "success").flatMap((task) => task.urls))];
+  const pending = creating || visible.some((task) => !["success", "failed"].includes(task.status));
+  const errors = visible.filter((task) => task.status === "failed");
+  if (!visible.length && !creating && !activeBatchId) return null;
   return <section className={styles.activity} aria-label="Generation activity" aria-live="polite">
-    <h2>{mediaType === "image" ? "Tác vụ tạo ảnh" : "Tác vụ tạo video"}</h2>
-    {!visible.length ? <div className={styles.row}><LoaderCircle className={styles.spin} size={18} /> Đang gửi yêu cầu...</div> : visible.map((task) => <article className={styles.row} key={task.id}>
-      <div className={styles.details}>{task.status === "success" ? <Check size={18} /> : task.status === "failed" ? <CircleAlert size={18} /> : <LoaderCircle className={styles.spin} size={18} />}<div><strong>{task.prompt}</strong><span>{task.status === "success" ? "Hoàn tất" : task.status === "failed" ? task.error : `Đang tạo · ${task.status}`}</span></div></div>
-      {task.status === "success" ? <div className={styles.outputs}>{task.urls.map((url, index) => <button type="button" className={styles.output} key={url} onClick={() => setPreview({ urls: task.urls, index })} aria-label={`Mở ${isVideo(url) ? "video" : "ảnh"} ${index + 1}`}>
+    <div className={styles.header}><h2>{mediaType === "image" ? "Kết quả tạo ảnh" : "Kết quả tạo video"}</h2><span className={styles.status}>{pending ? <><LoaderCircle className={styles.spin} size={16} /> Đang tạo</> : urls.length ? <><Check size={16} /> Hoàn tất</> : <><CircleAlert size={16} /> Chưa có kết quả</>}</span></div>
+    {pending && !urls.length ? <div className={styles.pending}><LoaderCircle className={styles.spin} size={28} /><span>{mediaType === "image" ? "Đang tạo ảnh..." : "Đang tạo video..."}</span></div> : null}
+    {urls.length ? <div className={styles.outputs}>{urls.map((url, index) => <button type="button" className={styles.output} key={url} onClick={() => setPreview({ urls, index })} aria-label={`Mở ${isVideo(url) ? "video" : "ảnh"} ${index + 1}`}>
         {isVideo(url) ? <video src={url} muted playsInline preload="metadata" /> : <img src={url} alt={`Kết quả ${index + 1}`} />}
         <span className={styles.expand}><Maximize2 size={18} /></span>
       </button>)}</div> : null}
-    </article>)}
+    {errors.map((task) => <p className={styles.error} key={task.id}><CircleAlert size={16} />{task.error || "Tác vụ thất bại. Vui lòng thử lại."}</p>)}
     {preview ? <dialog ref={dialogRef} className={styles.lightbox} aria-label="Xem kết quả" onCancel={closePreview} onClose={() => setPreview(null)} onClick={(event) => { if (event.target === event.currentTarget) closePreview(); }} onKeyDown={(event) => { if (event.key === "ArrowLeft") { event.preventDefault(); stepPreview(-1); } if (event.key === "ArrowRight") { event.preventDefault(); stepPreview(1); } }}>
       <button autoFocus type="button" className={styles.close} onClick={closePreview} aria-label="Đóng"><X size={24} /></button>
       <div className={styles.previewMedia}>{isVideo(preview.urls[preview.index]) ? <video key={preview.urls[preview.index]} src={preview.urls[preview.index]} controls playsInline autoPlay /> : <img src={preview.urls[preview.index]} alt={`Kết quả ${preview.index + 1}`} />}</div>

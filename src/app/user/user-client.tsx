@@ -184,6 +184,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
   const [taskId, setTaskId] = useState("");
   const [statusText, setStatusText] = useState("Sẵn sàng tạo ảnh.");
   const [loading, setLoading] = useState(false);
+  const [activeBatchId, setActiveBatchId] = useState("");
   const [resultUrls, setResultUrls] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [, setPackages] = useState<CreditPackage[]>([]);
@@ -432,6 +433,8 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
       setStatusText(`${selectedImageModel.label} chỉ hỗ trợ Text to Image.`);
       return;
     }
+    const batchId = crypto.randomUUID();
+    setActiveBatchId(batchId);
     setLoading(true);
     setResultUrls([]);
     setStatusText("Đang tạo ảnh...");
@@ -464,7 +467,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
     for (let i = 0; i < quantity; i += 1) {
       const res = await apiFetch(apiPath("/api/ai/create-task"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": userId, "x-idempotency-key": crypto.randomUUID() },
+        headers: { "Content-Type": "application/json", "x-user-id": userId, "x-idempotency-key": crypto.randomUUID(), "x-generation-batch-id": batchId },
         body: JSON.stringify(body),
       });
       const payload = (await res.json()) as TaskResponse;
@@ -602,7 +605,7 @@ export default function UserClient({ initialPrompt }: { initialPrompt: string })
           <section className={styles.generator} id="generator">
             <StudioTabs active="image" />
 
-            <GenerationActivity mediaType="image" creating={loading} onRefresh={refreshGenerationHistory} />
+            <GenerationActivity key={activeBatchId || "restored-image"} activeBatchId={activeBatchId} mediaType="image" creating={loading} onRefresh={refreshGenerationHistory} />
             <form onSubmit={onGenerate}>
               <div className={styles.imageComposer} ref={controlsRef}>
                 <div className={styles.promptBox}>

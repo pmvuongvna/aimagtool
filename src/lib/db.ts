@@ -59,6 +59,7 @@ export async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_generation_tasks_user ON generation_tasks(user_id, created_at DESC);
+    ALTER TABLE generation_tasks ADD COLUMN IF NOT EXISTS batch_id TEXT;
 
     CREATE TABLE IF NOT EXISTS payment_orders (
       id TEXT PRIMARY KEY,
